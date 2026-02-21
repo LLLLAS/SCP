@@ -299,6 +299,7 @@ Instances:Create("UIListLayout", {
 
 -- Library methods
 Library.Unload = function(self)
+    self.Unloaded = true  -- flag checked by async callbacks
     for _, c in self.Connections do c.Connection:Disconnect() end
     for _, t in self.Threads do coroutine.close(t) end
     if self.Holder then self.Holder:Clean() end
@@ -925,9 +926,12 @@ Library.CreateKeybind = function(self, Data)
     Items["AlwaysOnLiner"] = AlwaysLiner
 
     Items["KeyButton"]:OnHover(function()
+        if not Library or Library.Unloaded then return end
+        if not Library or Library.Unloaded then return end
         Items["KeyButton"]:Tween(nil, { BackgroundColor3 = Library:GetLighterColor(Library.Theme.Element, 1.4) })
     end)
     Items["KeyButton"]:OnHoverLeave(function()
+        if not Library or Library.Unloaded then return end
         Items["KeyButton"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
     end)
 
@@ -1324,6 +1328,7 @@ Library.ModeratorList = function(self)
             return s
         end
         local function rebuild()
+            if not Library or Library.Unloaded then return end
             line.Instance.Text = string.format("%s  <font color=\"#%s\">%s</font>", esc(Username), Library.Theme.TextMuted:ToHex(), esc(Role))
         end
         rebuild()
@@ -1547,33 +1552,36 @@ Library.Window = function(self, Data)
         ["Toggle Off"] = true, ["Toggle On"] = true,
     }
 
-    -- Apply transparency to a single instance list
-    local function ApplyTransparencyToList(list, a, ti)
-        for _, v in list do
-            if not (v:IsA("Frame") or v:IsA("ScrollingFrame")) then continue end
-            if v.BackgroundTransparency >= 0.99 then continue end
-            TweenService:Create(v, ti, { BackgroundTransparency = a }):Play()
-        end
-    end
-
     function Window:SetTransparency(Alpha)
         Window.Transparency = MathClamp(Alpha, 0, 1)
         local a  = Window.Transparency
         local ti = TweenInfo.new(0.14, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
-        -- Walk MainFrame (active content)
-        local mainList = Items["MainFrame"].Instance:GetDescendants()
-        TableInsert(mainList, Items["MainFrame"].Instance)
-        ApplyTransparencyToList(mainList, a, ti)
+        local function Apply(inst)
+            for _, v in inst:GetDescendants() do
+                if v:IsA("Frame") or v:IsA("ScrollingFrame") then
+                    -- Only touch frames that have a visible background (skip transparent containers)
+                    if v.BackgroundTransparency < 0.99 then
+                        TweenService:Create(v, ti, { BackgroundTransparency = a }):Play()
+                    end
+                elseif v:IsA("UIStroke") then
+                    -- Fade stroke too so borders don't make sections look solid
+                    TweenService:Create(v, ti, { Transparency = a }):Play()
+                end
+            end
+            -- Also apply to the root instance itself
+            if (inst:IsA("Frame") or inst:IsA("ScrollingFrame")) and inst.BackgroundTransparency < 0.99 then
+                TweenService:Create(inst, ti, { BackgroundTransparency = a }):Play()
+            end
+        end
 
-        -- ALSO walk all Pages (including inactive ones in UnusedHolder)
-        -- so they're already correct when switched to
+        -- Active content (MainFrame and all its children)
+        Apply(Items["MainFrame"].Instance)
+
+        -- All pages including inactive ones sitting in UnusedHolder
         for _, page in Window.Pages do
             if page.Items and page.Items["Page"] then
-                local pageInst = page.Items["Page"].Instance
-                local pageList = pageInst:GetDescendants()
-                TableInsert(pageList, pageInst)
-                ApplyTransparencyToList(pageList, a, ti)
+                Apply(page.Items["Page"].Instance)
             end
         end
     end
@@ -1601,22 +1609,22 @@ Library.Window = function(self, Data)
 
         if Bool then
             -- Before showing: snap ALL panels (incl. inactive pages) instantly
-            local function SnapFrames(list)
-                for _, v in list do
+            local function SnapFrames(root)
+                for _, v in root:GetDescendants() do
                     if (v:IsA("Frame") or v:IsA("ScrollingFrame")) and v.BackgroundTransparency < 0.99 then
                         v.BackgroundTransparency = Window.Transparency
+                    elseif v:IsA("UIStroke") then
+                        v.Transparency = Window.Transparency
                     end
                 end
+                if (root:IsA("Frame") or root:IsA("ScrollingFrame")) and root.BackgroundTransparency < 0.99 then
+                    root.BackgroundTransparency = Window.Transparency
+                end
             end
-            local mainAll = frame:GetDescendants()
-            TableInsert(mainAll, frame)
-            SnapFrames(mainAll)
+            SnapFrames(frame)
             for _, page in Window.Pages do
                 if page.Items and page.Items["Page"] then
-                    local pi = page.Items["Page"].Instance
-                    local pl = pi:GetDescendants()
-                    TableInsert(pl, pi)
-                    SnapFrames(pl)
+                    SnapFrames(page.Items["Page"].Instance)
                 end
             end
 
@@ -1768,7 +1776,7 @@ Library.Page = function(self, Data)
             -- Activate tab: background highlight + underline expand + text brighten
             Items["Tab"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 0 })
             Items["Liner"]:Tween(TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2New(0.7, 0, 0, 2) })
-            Items["Tab"].Instance.TextColor3 = Library.Theme.Text
+            if Library and not Library.Unloaded then Items["Tab"].Instance.TextColor3 = Library.Theme.Text end
 
             -- Slide page in from right (position only, never touch child transparency)
             Items["Page"].Instance.Parent = Page.Window.Items["Content"].Instance
@@ -1778,11 +1786,11 @@ Library.Page = function(self, Data)
             -- Re-apply window transparency to this page's frames
             if Page.Window.Transparency > 0 then
                 local ti2 = TweenInfo.new(0.14, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-                local pageList = Items["Page"].Instance:GetDescendants()
-                TableInsert(pageList, Items["Page"].Instance)
-                for _, v in pageList do
+                for _, v in Items["Page"].Instance:GetDescendants() do
                     if (v:IsA("Frame") or v:IsA("ScrollingFrame")) and v.BackgroundTransparency < 0.99 then
                         TweenService:Create(v, ti2, { BackgroundTransparency = Page.Window.Transparency }):Play()
+                    elseif v:IsA("UIStroke") then
+                        TweenService:Create(v, ti2, { Transparency = Page.Window.Transparency }):Play()
                     end
                 end
             end
@@ -1795,7 +1803,7 @@ Library.Page = function(self, Data)
             -- Deactivate tab
             Items["Tab"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 1 })
             Items["Liner"]:Tween(TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2New(0, 0, 0, 2) })
-            Items["Tab"].Instance.TextColor3 = Library.Theme.TextMuted
+            if Library and not Library.Unloaded then Items["Tab"].Instance.TextColor3 = Library.Theme.TextMuted end
 
             Items["Page"].Instance.Visible = false
             Items["Page"].Instance.Parent = Library.UnusedHolder.Instance
@@ -2004,6 +2012,7 @@ Library.Sections.Toggle = function(self, Data)
     })
 
     Items["Row"]:OnHover(function()
+        if not Library or Library.Unloaded then return end
         Items["Box"]:Tween(nil, { BackgroundColor3 = Library:GetLighterColor(Library.Theme.Element, 1.4) })
     end)
     Items["Row"]:OnHoverLeave(function()
@@ -2015,6 +2024,7 @@ Library.Sections.Toggle = function(self, Data)
     function Toggle:Get() return Toggle.Value end
 
     function Toggle:Set(Value)
+        if not Library or Library.Unloaded then return end
         Toggle.Value = Value
         Library.Flags[Toggle.Flag] = Value
         if Toggle.Value then
@@ -2097,17 +2107,21 @@ Library.Sections.Button = function(self, Data)
         Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
 
     Items["Button"]:OnHover(function()
+        if not Library or Library.Unloaded then return end
         Items["Button"]:Tween(nil, { BackgroundColor3 = Library:GetLighterColor(Library.Theme.Element, 1.4) })
     end)
     Items["Button"]:OnHoverLeave(function()
+        if not Library or Library.Unloaded then return end
         Items["Button"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
     end)
 
     function Button:SetVisibility(Bool) Items["Button"].Instance.Visible = Bool end
     function Button:Press()
+        if not Library or Library.Unloaded then return end
         Items["Button"]:Tween(nil, { BackgroundColor3 = Library.Theme.Accent })
         Library:SafeCall(Button.Callback)
         task.wait(0.12)
+        if not Library or Library.Unloaded then return end
         Items["Button"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
     end
 
@@ -2202,9 +2216,11 @@ Library.Sections.Slider = function(self, Data)
     Items["Fill"]:AddToTheme({ BackgroundColor3 = "Accent" })
 
     Items["Track"]:OnHover(function()
+        if not Library or Library.Unloaded then return end
         Items["Track"]:Tween(nil, { BackgroundColor3 = Library:GetLighterColor(Library.Theme.Element, 1.4) })
     end)
     Items["Track"]:OnHoverLeave(function()
+        if not Library or Library.Unloaded then return end
         Items["Track"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
     end)
 
@@ -2376,9 +2392,11 @@ Library.Sections.Dropdown = function(self, Data)
         Padding = UDimNew(0,3), SortOrder = Enum.SortOrder.LayoutOrder })
 
     Items["Button"]:OnHover(function()
+        if not Library or Library.Unloaded then return end
         Items["Button"]:Tween(nil, { BackgroundColor3 = Library:GetLighterColor(Library.Theme.Element, 1.4) })
     end)
     Items["Button"]:OnHoverLeave(function()
+        if not Library or Library.Unloaded then return end
         Items["Button"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
     end)
 
@@ -2716,9 +2734,11 @@ Library.Sections.Textbox = function(self, Data)
     Items["Label"]:AddToTheme({ TextColor3 = "TextMuted" })
 
     Items["Input"]:OnHover(function()
+        if not Library or Library.Unloaded then return end
         Items["Input"]:Tween(nil, { BackgroundColor3 = Library:GetLighterColor(Library.Theme.Element, 1.4) })
     end)
     Items["Input"]:OnHoverLeave(function()
+        if not Library or Library.Unloaded then return end
         Items["Input"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
     end)
 
