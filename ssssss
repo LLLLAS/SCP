@@ -1415,7 +1415,8 @@ Library.Window = function(self, Data)
     local Window = {
         Name = Data.Name or Data.name or "Window",
         Logo = Data.Logo or Data.logo or nil,
-        Pages = {}, Items = {}, IsOpen = false
+        Pages = {}, Items = {}, IsOpen = false,
+        Transparency = Data.Transparency or Data.transparency or 0
     }
 
     local Items = {}
@@ -1427,7 +1428,8 @@ Library.Window = function(self, Data)
         Position = UDim2New(0.5, 0, 0.5, 0),
         Size = UDim2New(0, 580, 0, 440),
         BorderSizePixel = 0,
-        BackgroundColor3 = T.Background
+        BackgroundColor3 = T.Background,
+        BackgroundTransparency = Window.Transparency
     })
     Corner(Items["MainFrame"].Instance, 8)
     Items["MainFrame"]:AddToTheme({ BackgroundColor3 = "Background" })
@@ -1450,6 +1452,7 @@ Library.Window = function(self, Data)
         Parent = Items["TopBar"].Instance, Name = "\0",
         Position = UDim2New(0,0,0.5,0),
         Size = UDim2New(1,0,0.5,0),
+        ZIndex = 1,
         BorderSizePixel = 0,
         BackgroundColor3 = T.TopBar
     }):AddToTheme({ BackgroundColor3 = "TopBar" })
@@ -1468,6 +1471,7 @@ Library.Window = function(self, Data)
         AnchorPoint = Vector2New(0, 0.5),
         Position = UDim2New(0, 12, 0.5, 0),
         BorderSizePixel = 0,
+        ZIndex = 2,
         BackgroundColor3 = T.Accent
     })
     Corner(titleDot.Instance, 99)
@@ -1530,6 +1534,21 @@ Library.Window = function(self, Data)
         task.wait()
         Items["MainFrame"].Instance.AnchorPoint = Vector2New(0, 0)
         Items["MainFrame"].Instance.Position = UDim2New(0, cp.X, 0, cp.Y)
+    end
+
+    function Window:SetTransparency(Alpha)
+        Window.Transparency = MathClamp(Alpha, 0, 1)
+        -- Animate the main frame background transparency
+        TweenService:Create(Items["MainFrame"].Instance,
+            TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+            { BackgroundTransparency = Window.Transparency }
+        ):Play()
+        -- Also tween TopBar and section surfaces proportionally
+        local surfaceAlpha = MathClamp(Window.Transparency * 0.9, 0, 1)
+        TweenService:Create(Items["TopBar"].Instance,
+            TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+            { BackgroundTransparency = surfaceAlpha }
+        ):Play()
     end
 
     -- =============================================
@@ -1699,26 +1718,17 @@ Library.Page = function(self, Data)
         Debounce = true
 
         if Bool then
-            -- Activate tab indicator
+            -- Activate tab: background highlight + underline expand + text brighten
             Items["Tab"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 0 })
             Items["Liner"]:Tween(TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2New(0.7, 0, 0, 2) })
-            Items["Tab"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { TextTransparency = 0 })
             Items["Tab"].Instance.TextColor3 = Library.Theme.Text
 
-            -- Slide in from slightly right with fade
+            -- Slide page in from right (position only, never touch child transparency)
             Items["Page"].Instance.Parent = Page.Window.Items["Content"].Instance
             Items["Page"].Instance.Visible = true
-            Items["Page"].Instance.Position = UDim2New(0.04, 0, 0, 0)
-            local desc = Items["Page"].Instance:GetDescendants()
-            table.insert(desc, Items["Page"].Instance)
-            for _, v in desc do
-                if v:IsA("TextLabel") or v:IsA("TextButton") or v:IsA("Frame") or v:IsA("ScrollingFrame") or v:IsA("ImageLabel") then
-                    local prop = v:IsA("TextLabel") and "TextTransparency" or nil
-                    if prop then v[prop] = 1 end
-                end
-            end
+            Items["Page"].Instance.Position = UDim2New(0.05, 0, 0, 0)
             TweenService:Create(Items["Page"].Instance,
-                TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+                TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
                 { Position = UDim2New(0, 0, 0, 0) }
             ):Play()
         else
@@ -1788,6 +1798,7 @@ Library.Pages.Section = function(self, Data)
         Parent = Items["Header"].Instance, Name = "\0",
         Position = UDim2New(0, 0, 0.5, 0),
         Size = UDim2New(1, 0, 0.5, 0),
+        ZIndex = 1,
         BorderSizePixel = 0,
         BackgroundColor3 = T.Surface2
     }):AddToTheme({ BackgroundColor3 = "Surface2" })
@@ -1798,6 +1809,7 @@ Library.Pages.Section = function(self, Data)
         AnchorPoint = Vector2New(0, 0.5),
         Position = UDim2New(0, 8, 0.5, 0),
         BorderSizePixel = 0,
+        ZIndex = 2,
         BackgroundColor3 = T.Accent
     })
     Corner(hAccent.Instance, 2)
@@ -1813,6 +1825,7 @@ Library.Pages.Section = function(self, Data)
         BackgroundTransparency = 1,
         Position = UDim2New(0, 17, 0.5, 0),
         BorderSizePixel = 0,
+        ZIndex = 2,
         AutomaticSize = Enum.AutomaticSize.X,
         TextSize = 11,
         TextXAlignment = Enum.TextXAlignment.Left,
@@ -2686,6 +2699,7 @@ Library.CreateSettingsPage = function(self, Window, KeybindList, Watermark, Mode
         SS:Toggle({ Name = "Keybind List", Flag = "Keybind list", Default = true, Callback = function(v) KeybindList:SetVisibility(v) end })
         SS:Toggle({ Name = "Moderator List", Flag = "Moderator list", Default = true, Callback = function(v) if ModeratorList then ModeratorList:SetVisibility(v) end end })
         SS:Label("Menu Keybind"):Keybind({ Name = "Menu Keybind", Flag = "MenuKeybind", Default = Library.MenuKeybind, Mode = "Toggle", Callback = function() Library.MenuKeybind = Library.Flags["MenuKeybind"].Key end })
+        SS:Slider({ Name = "BG Transparency", Default = 0, Flag = "BG Transparency", Decimals = 0.05, Suffix = "", Max = 0.95, Min = 0, Callback = function(v) Window:SetTransparency(v) end })
         SS:Slider({ Name = "Tween Speed", Default = 0.18, Flag = "Tween Speed", Decimals = 0.01, Suffix = "s", Max = 2, Min = 0, Callback = function(v) Library.Tween.Time = v end })
         SS:Dropdown({ Name = "Tween Style", Flag = "Tween style", MaxSize = 200, Items = { "Linear", "Quad", "Quart", "Back", "Bounce", "Circular", "Cubic", "Elastic", "Exponential", "Sine", "Quint" }, Default = "Quart", Callback = function(v) if not v then v = "Quart" end Library.Tween.Style = Enum.EasingStyle[v] end })
         SS:Dropdown({ Name = "Tween Direction", Flag = "Tween direction", Items = { "In", "Out", "InOut" }, Default = "Out", Callback = function(v) if not v then v = "Out" end Library.Tween.Direction = Enum.EasingDirection[v] end })
