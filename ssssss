@@ -1,5 +1,3 @@
-
-
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local UserInputService = game:GetService("UserInputService")
@@ -80,6 +78,7 @@ local StringLen = string.len
 local InstanceNew = Instance.new
 local RectNew = Rect.new
 
+-- LinoriaLib color palette
 local Themes = {
     ["Preset"] = {
         ["Background"]      = FromRGB(15, 15, 23),
@@ -95,15 +94,6 @@ local Themes = {
         ["Element"]         = FromRGB(30, 30, 45),
         ["ElementHover"]    = FromRGB(38, 38, 55),
         ["TopBar"]          = FromRGB(18, 18, 28),
-        -- Status colors
-        ["StatusOn"]        = FromRGB(72, 210, 110),
-        ["StatusOff"]       = FromRGB(210, 72, 72),
-        ["StatusWarn"]      = FromRGB(210, 175, 55),
-        ["AccentGlow"]      = FromRGB(140, 120, 255),
-        -- Status colors for watermark
-        ["StatusOn"]        = FromRGB(80, 220, 120),
-        ["StatusOff"]       = FromRGB(220, 80, 80),
-        ["StatusWarn"]      = FromRGB(220, 180, 60),
     }
 }
 
@@ -113,7 +103,6 @@ for _, v in Library.Folders do
     if not isfolder(v) then makefolder(v) end
 end
 
--- ============================================================
 -- Tween system
 local Tween = {} do
     Tween.__index = Tween
@@ -148,23 +137,11 @@ local Tween = {} do
     end
 
     Tween.Get = function(self) return self.Tween, self.Info, self.Goal end
-
-    -- Preset animations for common uses
-    Tween.Spring = function(_, Item, Goal, Raw)
-        return Tween:Create(Item, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), Goal, Raw)
-    end
-    Tween.Quick = function(_, Item, Goal, Raw)
-        return Tween:Create(Item, TweenInfo.new(0.1, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), Goal, Raw)
-    end
-    Tween.Smooth = function(_, Item, Goal, Raw)
-        return Tween:Create(Item, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), Goal, Raw)
-    end
     Tween.Pause = function(self) if self.Tween then self.Tween:Pause() end end
     Tween.Play = function(self) if self.Tween then self.Tween:Play() end end
     Tween.Clean = function(self) if self.Tween then Tween:Pause() self = nil end end
 end
 
--- ============================================================
 -- Instances system
 Instances = {} do
     Instances.__index = Instances
@@ -302,7 +279,6 @@ Instances:Create("UIListLayout", {
     Padding = UDimNew(0, 6)
 })
 
--- ============================================================
 -- Library methods
 Library.Unload = function(self)
     for _, c in self.Connections do c.Connection:Disconnect() end
@@ -452,8 +428,7 @@ Library.RefreshConfigsList = function(self, Element)
     Element:Refresh(ret)
 end
 
--- ============================================================
--- Helper: UICorner
+-- Helper: make a UICorner
 local function Corner(parent, radius)
     local c = InstanceNew("UICorner")
     c.CornerRadius = UDimNew(0, radius or 4)
@@ -461,7 +436,7 @@ local function Corner(parent, radius)
     return c
 end
 
--- ============================================================
+-- =============================================
 -- Colorpicker
 Library.CreateColorpicker = function(self, Data)
     local Colorpicker = {
@@ -474,14 +449,13 @@ Library.CreateColorpicker = function(self, Data)
     local T = Library.Theme
     local Items = {}
 
-    -- FIX: Swatch shows actual picked colour (not accent/placeholder)
     Items["ColorpickerButton"] = Instances:Create("TextButton", {
         Parent = Data.Parent.Instance, Name = "\0",
         FontFace = Library.Font, TextColor3 = FromRGB(0,0,0),
         Text = "", AutoButtonColor = false,
         Size = UDim2New(0, 16, 0, 16),
         BorderSizePixel = 0, TextSize = 13,
-        BackgroundColor3 = FromRGB(255, 255, 255)  -- will be updated on Set()
+        BackgroundColor3 = FromRGB(140,255,213)
     })
     Corner(Items["ColorpickerButton"].Instance, 3)
 
@@ -773,15 +747,13 @@ Library.CreateColorpicker = function(self, Data)
 
     function Colorpicker:SlidePalette(Input)
         if not Input or not SlidingPalette then return end
-        -- FIX: correct saturation/value calculation
-        local px = Items["Palette"].Instance.AbsolutePosition
-        local ps = Items["Palette"].Instance.AbsoluteSize
-        local dx = MathClamp((Input.Position.X - px.X) / ps.X, 0, 1)
-        local dy = MathClamp((Input.Position.Y - px.Y) / ps.Y, 0, 1)
-        Colorpicker.Saturation = dx          -- left=0 right=1
-        Colorpicker.Value      = 1 - dy      -- top=1 bottom=0
-        Items["PaletteDragger"]:Tween(TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-            { Position = UDim2New(MathClamp(dx,0,0.99), 0, MathClamp(dy,0,0.99), 0) })
+        local sx = MathClamp(1 - (Input.Position.X - Items["Palette"].Instance.AbsolutePosition.X) / Items["Palette"].Instance.AbsoluteSize.X, 0, 1)
+        local sy = MathClamp(1 - (Input.Position.Y - Items["Palette"].Instance.AbsolutePosition.Y) / Items["Palette"].Instance.AbsoluteSize.Y, 0, 1)
+        Colorpicker.Saturation = sx
+        Colorpicker.Value = sy
+        local dx = MathClamp((Input.Position.X - Items["Palette"].Instance.AbsolutePosition.X) / Items["Palette"].Instance.AbsoluteSize.X, 0, 0.99)
+        local dy = MathClamp((Input.Position.Y - Items["Palette"].Instance.AbsolutePosition.Y) / Items["Palette"].Instance.AbsoluteSize.Y, 0, 0.99)
+        Items["PaletteDragger"]:Tween(TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2New(dx, 0, dy, 0) })
         Colorpicker:Update()
     end
 
@@ -817,9 +789,7 @@ Library.CreateColorpicker = function(self, Data)
         elseif type(Color) == "string" then Color = FromHex(Color) end
         Colorpicker.Hue, Colorpicker.Saturation, Colorpicker.Value = Color:ToHSV()
         Colorpicker.Alpha = Alpha or 0
-        -- FIX: sat=X (left to right), value=Y inverted (top=white, bottom=black)
-        Items["PaletteDragger"]:Tween(TweenInfo.new(0.1,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),
-            { Position = UDim2New(MathClamp(Colorpicker.Saturation,0,0.99),0,MathClamp(1-Colorpicker.Value,0,0.99),0) })
+        Items["PaletteDragger"]:Tween(TweenInfo.new(0.1,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), { Position = UDim2New(MathClamp(1-Colorpicker.Saturation,0,0.99),0,MathClamp(1-Colorpicker.Value,0,0.99),0) })
         Items["HueDragger"]:Tween(TweenInfo.new(0.1,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), { Position = UDim2New(0,0,MathClamp(Colorpicker.Hue,0,0.99),0) })
         Items["AlphaDragger"]:Tween(TweenInfo.new(0.1,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), { Position = UDim2New(MathClamp(Colorpicker.Alpha,0,0.99),0,0,0) })
         Colorpicker:Update(false)
@@ -855,7 +825,7 @@ Library.CreateColorpicker = function(self, Data)
     return Colorpicker, Items
 end
 
--- ============================================================
+-- =============================================
 -- Keybind
 Library.CreateKeybind = function(self, Data)
     local Keybind = {
@@ -1116,16 +1086,8 @@ Library.CreateKeybind = function(self, Data)
     return Keybind, Items
 end
 
--- ============================================================
--- FIXED + ANIMATED Watermark
--- Supports color-coded status segments: ON (green), OFF (red), WARN (yellow)
--- Usage:
---   local WM = Library:Watermark("MyScript")
---   WM:SetText("Silent Aim: ", false)    -- false = OFF (red)
---   WM:SetText("Silent Aim: ", true)     -- true = ON (green)
---   WM:SetText("Feature", "on"/"off"/"warn"/"active"/"inactive")
---   WM:SetSegments({ "GameName", " | ", {"Silent Aim: ", true}, {" Aimbot: ", false} })
--- ============================================================
+-- =============================================
+-- Watermark
 Library.Watermark = function(self, Name)
     local Watermark = {}
     local T = Library.Theme
@@ -1135,10 +1097,8 @@ Library.Watermark = function(self, Name)
         Parent = Library.Holder.Instance, Name = "\0",
         AnchorPoint = Vector2New(0.5, 0),
         Position = UDim2New(0.5, 0, 0, 12),
-        -- Start small, will auto-size via AbsoluteSize read
         Size = UDim2New(0, 180, 0, 26),
         BorderSizePixel = 0, ZIndex = 5,
-        ClipsDescendants = false,
         BackgroundColor3 = T.Surface
     })
     Corner(Items["Watermark"].Instance, 5)
@@ -1147,210 +1107,43 @@ Library.Watermark = function(self, Name)
         Color = T.Border, Thickness = 1
     }):AddToTheme({ Color = "Border" })
 
-    -- Accent dot on left
     local accentLine = Instances:Create("Frame", {
         Parent = Items["Watermark"].Instance, Name = "\0",
         Size = UDim2New(0, 3, 0.6, 0),
         AnchorPoint = Vector2New(0, 0.5),
         Position = UDim2New(0, 7, 0.5, 0),
-        BorderSizePixel = 0, ZIndex = 6,
+        BorderSizePixel = 0,
         BackgroundColor3 = T.Accent
     })
     Corner(accentLine.Instance, 2)
     accentLine:AddToTheme({ BackgroundColor3 = "Accent" })
 
-    -- Content row (holds all text segments)
-    Items["ContentRow"] = Instances:Create("Frame", {
+    Items["Text"] = Instances:Create("TextLabel", {
         Parent = Items["Watermark"].Instance, Name = "\0",
+        FontFace = Library.Font,
+        TextColor3 = T.Text,
+        Text = Name,
         AnchorPoint = Vector2New(0, 0.5),
-        Position = UDim2New(0, 16, 0.5, 0),
-        Size = UDim2New(1, -20, 0, 14),
+        Size = UDim2New(1, -22, 0, 14),
+        BackgroundTransparency = 1,
+        Position = UDim2New(0, 18, 0.5, 0),
+        BorderSizePixel = 0, ZIndex = 5,
         AutomaticSize = Enum.AutomaticSize.X,
-        BackgroundTransparency = 1, BorderSizePixel = 0,
-        ZIndex = 6,
+        TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left,
         BackgroundColor3 = FromRGB(255,255,255)
     })
-    Instances:Create("UIListLayout", {
-        Parent = Items["ContentRow"].Instance, Name = "\0",
-        FillDirection = Enum.FillDirection.Horizontal,
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDimNew(0, 0)
-    })
+    Items["Text"]:AddToTheme({ TextColor3 = "Text" })
 
-    -- Track active label instances for cleanup
-    local ActiveLabels = {}
-
-    -- Helper: resolve status color
-    local function StatusColor(status)
-        if status == true or status == "on" or status == "active" or status == "enabled" then
-            return Library.Theme.StatusOn or FromRGB(80, 220, 120)
-        elseif status == false or status == "off" or status == "inactive" or status == "disabled" then
-            return Library.Theme.StatusOff or FromRGB(220, 80, 80)
-        elseif status == "warn" or status == "warning" then
-            return Library.Theme.StatusWarn or FromRGB(220, 180, 60)
-        end
-        return nil -- plain text color
+    function Watermark:SetText(Text)
+        Items["Text"].Instance.Text = tostring(Text)
+        Items["Watermark"]:Tween(nil, { Size = UDim2New(0, Items["Text"].Instance.TextBounds.X + 28, 0, 26) })
     end
-
-    -- Helper: create a single text segment label
-    local function MakeSegment(text, color, order)
-        local lbl = Instances:Create("TextLabel", {
-            Parent = Items["ContentRow"].Instance, Name = "\0",
-            FontFace = Library.Font,
-            TextColor3 = color or Library.Theme.Text,
-            Text = tostring(text),
-            Size = UDim2New(0, 0, 1, 0),
-            AutomaticSize = Enum.AutomaticSize.X,
-            BackgroundTransparency = 1, BorderSizePixel = 0,
-            TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left,
-            ZIndex = 6, LayoutOrder = order or 0,
-            BackgroundColor3 = FromRGB(255,255,255)
-        })
-        return lbl
-    end
-
-    -- Clear all segments
-    local function ClearSegments()
-        for _, lbl in ActiveLabels do
-            if lbl and lbl.Instance then
-                lbl:Clean()
-            end
-        end
-        ActiveLabels = {}
-    end
-
-    -- Rebuild width after setting segments
-    local function RefreshWidth()
-        task.wait() -- yield one frame so AutomaticSize resolves
-        local contentWidth = Items["ContentRow"].Instance.AbsoluteSize.X
-        local targetWidth = contentWidth + 24 -- 16 left offset + 8 right padding
-        Tween:Create(Items["Watermark"], TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Size = UDim2New(0, targetWidth, 0, 26) })
-    end
-
-    -- -------------------------------------------------------
-    -- SetText(label, status)
-    -- Simplest API: single label + boolean/string status
-    -- e.g. WM:SetText("Silent Aim: ", false)  →  "Silent Aim: OFF"
-    -- -------------------------------------------------------
-    function Watermark:SetText(label, status)
-        ClearSegments()
-        local order = 0
-
-        if status == nil then
-            -- Plain text only
-            local lbl = MakeSegment(tostring(label), Library.Theme.Text, order)
-            TableInsert(ActiveLabels, lbl)
-        else
-            -- Label part
-            local lbl = MakeSegment(tostring(label), Library.Theme.TextMuted, order)
-            TableInsert(ActiveLabels, lbl)
-            order = order + 1
-
-            local statusColor = StatusColor(status)
-            local statusStr
-            if status == true or status == "on" or status == "active" or status == "enabled" then
-                statusStr = "ON"
-            elseif status == false or status == "off" or status == "inactive" or status == "disabled" then
-                statusStr = "OFF"
-            elseif status == "warn" or status == "warning" then
-                statusStr = "WARN"
-            else
-                statusStr = tostring(status)
-                statusColor = Library.Theme.Text
-            end
-
-            local statusLbl = MakeSegment(statusStr, statusColor or Library.Theme.Text, order)
-            TableInsert(ActiveLabels, statusLbl)
-        end
-
-        RefreshWidth()
-    end
-
-    -- -------------------------------------------------------
-    -- SetSegments(segments)
-    -- Advanced API: pass array of segments
-    -- Each segment can be:
-    --   "plain string"  → plain Text color
-    --   { "text", status }  → text + color-coded status label appended
-    --   { text = "...", color = Color3 }  → custom color
-    -- e.g.:
-    --   WM:SetSegments({
-    --       "MyScript",
-    --       " | ",
-    --       { "Silent Aim: ", true },
-    --       { " Aimbot: ", false },
-    --   })
-    -- -------------------------------------------------------
-    function Watermark:SetSegments(segments)
-        ClearSegments()
-        local order = 0
-
-        for _, seg in ipairs(segments) do
-            if type(seg) == "string" then
-                local lbl = MakeSegment(seg, Library.Theme.TextMuted, order)
-                TableInsert(ActiveLabels, lbl)
-                order = order + 1
-            elseif type(seg) == "table" then
-                if seg.text then
-                    -- { text = "...", color = Color3 } form
-                    local lbl = MakeSegment(seg.text, seg.color or Library.Theme.Text, order)
-                    TableInsert(ActiveLabels, lbl)
-                    order = order + 1
-                else
-                    -- { "label text", status } form
-                    local labelText = seg[1] or ""
-                    local status = seg[2]
-                    local lbl = MakeSegment(tostring(labelText), Library.Theme.TextMuted, order)
-                    TableInsert(ActiveLabels, lbl)
-                    order = order + 1
-
-                    if status ~= nil then
-                        local statusColor = StatusColor(status)
-                        local statusStr
-                        if status == true or status == "on" or status == "active" or status == "enabled" then
-                            statusStr = "ON"
-                        elseif status == false or status == "off" or status == "inactive" or status == "disabled" then
-                            statusStr = "OFF"
-                        elseif status == "warn" or status == "warning" then
-                            statusStr = "WARN"
-                        else
-                            statusStr = tostring(status)
-                            statusColor = Library.Theme.Text
-                        end
-                        local sLbl = MakeSegment(statusStr, statusColor or Library.Theme.Text, order)
-                        TableInsert(ActiveLabels, sLbl)
-                        order = order + 1
-                    end
-                end
-            end
-        end
-
-        RefreshWidth()
-    end
-
-    function Watermark:SetVisibility(Bool)
-        -- FIX: animate visibility with fade instead of hard-set
-        local frame = Items["Watermark"].Instance
-        if Bool then
-            frame.Visible = true
-            Tween:Create(Items["Watermark"], TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 0 })
-        else
-            local t = Tween:Create(Items["Watermark"], TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 1 })
-            t.Tween.Completed:Connect(function()
-                frame.Visible = false
-                -- restore for when it's shown again
-                frame.BackgroundTransparency = 0
-            end)
-        end
-    end
-
-    -- Init with name
+    function Watermark:SetVisibility(Bool) Items["Watermark"].Instance.Visible = Bool end
     Watermark:SetText(Name)
     return Watermark
 end
 
--- ============================================================
+-- =============================================
 -- KeybindList
 Library.KeybindList = function(self)
     local KL = {}
@@ -1445,7 +1238,7 @@ Library.KeybindList = function(self)
     return KL
 end
 
--- ============================================================
+-- =============================================
 -- ModeratorList
 Library.ModeratorList = function(self)
     local ML = {}
@@ -1531,8 +1324,8 @@ Library.ModeratorList = function(self)
     return ML
 end
 
--- ============================================================
--- Notification (animated slide-in)
+-- =============================================
+-- Notification
 Library.Notification = function(self, Name, Duration)
     local T = Library.Theme
     local Items = {}
@@ -1569,28 +1362,32 @@ Library.Notification = function(self, Name, Duration)
     })
     Items["Text"]:AddToTheme({ TextColor3 = "Text" })
 
-    -- Animate in
-    Items["Frame"].Instance.BackgroundTransparency = 1
-    Items["Text"].Instance.TextTransparency = 1
+    local sz = Items["Frame"].Instance.AbsoluteSize
+    for _, v in Items do
+        if v.Instance:IsA("Frame") then v.Instance.BackgroundTransparency = 1
+        elseif v.Instance:IsA("TextLabel") then v.Instance.TextTransparency = 1 end
+    end
+    Items["Frame"].Instance.AutomaticSize = Enum.AutomaticSize.None
 
     Library:Thread(function()
-        task.wait(0.05)
-        local sz = Items["Frame"].Instance.AbsoluteSize
-        Tween:Create(Items["Frame"], TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 0 })
-        Tween:Create(Items["Text"], TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { TextTransparency = 0 })
-
-        task.delay(Duration or 3, function()
-            Tween:Create(Items["Frame"], TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 1 })
-            local t = Tween:Create(Items["Text"], TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { TextTransparency = 1 })
-            t.Tween.Completed:Connect(function()
-                task.wait(0.1)
-                Items["Frame"]:Clean()
-            end)
+        for _, v in Items do
+            if v.Instance:IsA("Frame") then v:Tween(nil, { BackgroundTransparency = 0 })
+            elseif v.Instance:IsA("TextLabel") then v:Tween(nil, { TextTransparency = 0 }) end
+        end
+        Items["Frame"]:Tween(nil, { Size = UDim2New(0, sz.X, 0, sz.Y) })
+        task.delay(Duration + 0.1, function()
+            for _, v in Items do
+                if v.Instance:IsA("Frame") then v:Tween(nil, { BackgroundTransparency = 1 })
+                elseif v.Instance:IsA("TextLabel") then v:Tween(nil, { TextTransparency = 1 }) end
+            end
+            Items["Frame"]:Tween(nil, { Size = UDim2New(0,0,0,0) })
+            task.wait(0.5)
+            Items["Frame"]:Clean()
         end)
     end)
 end
 
--- ============================================================
+-- =============================================
 -- Window
 Library.Window = function(self, Data)
     Data = Data or {}
@@ -1603,6 +1400,7 @@ Library.Window = function(self, Data)
 
     local Items = {}
 
+    -- Main container
     Items["MainFrame"] = Instances:Create("Frame", {
         Parent = Library.Holder.Instance, Name = "\0",
         AnchorPoint = Vector2New(0.5, 0.5),
@@ -1618,6 +1416,7 @@ Library.Window = function(self, Data)
     }):AddToTheme({ Color = "Border" })
     Items["MainFrame"]:MakeDraggable()
 
+    -- Top bar
     Items["TopBar"] = Instances:Create("Frame", {
         Parent = Items["MainFrame"].Instance, Name = "\0",
         Size = UDim2New(1, 0, 0, 36),
@@ -1699,6 +1498,10 @@ Library.Window = function(self, Data)
 
     Window.Items = Items
 
+    -- Window size constants
+    local WINDOW_W = 580
+    local WINDOW_H = 440
+
     local Debounce = false
 
     function Window:SetCenter()
@@ -1708,41 +1511,79 @@ Library.Window = function(self, Data)
         Items["MainFrame"].Instance.Position = UDim2New(0, cp.X, 0, cp.Y)
     end
 
+    -- =============================================
+    -- WINDOW OPEN / CLOSE ANIMATION
+    -- Only animates the MainFrame itself (scale + fade).
+    -- No descendant traversal on toggle.
+    -- =============================================
     function Window:SetOpen(Bool)
+        -- Close any floating sub-menus (colorpickers, dropdowns, etc.)
         for _, v in Library.OpenFrames do v:SetOpen(false) end
+
         if Debounce then return end
         Window.IsOpen = Bool
         Debounce = true
-        if Window.IsOpen then Items["MainFrame"].Instance.Visible = true end
-        local desc = Items["MainFrame"].Instance:GetDescendants()
-        TableInsert(desc, Items["MainFrame"].Instance)
-        local nt
-        for _, v in desc do
-            local tp = Tween:GetProperty(v)
-            if not tp then continue end
-            if type(tp) == "table" then
-                for _, p in tp do nt = Tween:FadeItem(v, p, Bool, Library.FadeSpeed) end
-            else nt = Tween:FadeItem(v, tp, Bool, Library.FadeSpeed) end
+
+        local frame = Items["MainFrame"].Instance
+
+        if Bool then
+            -- Opening: scale up from 0 → full with Back easing, fade in
+            frame.Visible = true
+            frame.Size = UDim2New(0, 0, 0, 0)
+            frame.BackgroundTransparency = 1
+
+            local t = TweenService:Create(
+                frame,
+                TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+                { Size = UDim2New(0, WINDOW_W, 0, WINDOW_H), BackgroundTransparency = 0 }
+            )
+            t:Play()
+            t.Completed:Connect(function()
+                -- Restore in case tween overshoots
+                frame.Size = UDim2New(0, WINDOW_W, 0, WINDOW_H)
+                frame.BackgroundTransparency = 0
+                Debounce = false
+            end)
+        else
+            -- Closing: scale down to 0, fade out with Quart easing
+            local t = TweenService:Create(
+                frame,
+                TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
+                { Size = UDim2New(0, 0, 0, 0), BackgroundTransparency = 1 }
+            )
+            t:Play()
+            t.Completed:Connect(function()
+                frame.Visible = false
+                -- Reset size so next open starts correctly
+                frame.Size = UDim2New(0, WINDOW_W, 0, WINDOW_H)
+                frame.BackgroundTransparency = 0
+                Debounce = false
+            end)
         end
-        nt.Tween.Completed:Connect(function()
-            Debounce = false
-            Items["MainFrame"].Instance.Visible = Window.IsOpen
-        end)
     end
 
+    -- Keybind to toggle window
     Library:Connect(UserInputService.InputBegan, function(Input)
         if tostring(Input.KeyCode) == Library.MenuKeybind or tostring(Input.UserInputType) == Library.MenuKeybind then
-            Window:SetOpen(not Window.IsOpen)
+            if not Debounce then
+                Window:SetOpen(not Window.IsOpen)
+            end
         end
     end)
 
     Window:SetCenter()
     task.wait()
-    Window:SetOpen(true)
+
+    -- Open immediately on first load (no animation delay on spawn)
+    Window.IsOpen = true
+    Items["MainFrame"].Instance.Visible = true
+    Items["MainFrame"].Instance.Size = UDim2New(0, WINDOW_W, 0, WINDOW_H)
+    Items["MainFrame"].Instance.BackgroundTransparency = 0
+
     return setmetatable(Window, Library)
 end
 
--- ============================================================
+-- =============================================
 -- Page
 Library.Page = function(self, Data)
     Data = Data or {}
@@ -1795,43 +1636,38 @@ Library.Page = function(self, Data)
         BorderSizePixel = 0,
         BackgroundColor3 = FromRGB(255,255,255)
     })
-    -- FIXED: No UIFlexAlignment - use manual scale-based UDim2 sizing for columns
-    -- This is compatible with all executor environments
-    local function BuildColumns()
-        local cols = Page.Columns
-        local gapTotal = (cols - 1) * 8
-        for i = 1, cols do
-            local colWidth = 1 / cols
-            local offsetAdj = -(gapTotal / cols)
-            local posX = (i - 1) * colWidth
-            local posOffsetX = (i - 1) * 8
-            local col = Instances:Create("ScrollingFrame", {
-                Parent = Items["Page"].Instance, Name = "\0",
-                ScrollBarImageColor3 = T.Border,
-                Active = true,
-                AutomaticCanvasSize = Enum.AutomaticSize.Y,
-                BorderSizePixel = 0,
-                ScrollBarThickness = 2,
-                BackgroundTransparency = 1,
-                -- KEY FIX: explicit scale position + offset-adjusted width
-                Position = UDim2New(posX, posOffsetX, 0, 0),
-                Size = UDim2New(colWidth, offsetAdj - 4, 1, 0),
-                CanvasSize = UDim2New(0,0,0,0),
-            })
-            col:AddToTheme({ ScrollBarImageColor3 = "Border" })
-            Instances:Create("UIPadding", {
-                Parent = col.Instance, Name = "\0",
-                PaddingTop = UDimNew(0,6), PaddingBottom = UDimNew(0,8),
-                PaddingLeft = UDimNew(0,6), PaddingRight = UDimNew(0,6)
-            })
-            Instances:Create("UIListLayout", {
-                Parent = col.Instance, Name = "\0",
-                Padding = UDimNew(0,8), SortOrder = Enum.SortOrder.LayoutOrder
-            })
-            Page.ColumnsData[i] = col
-        end
+    Instances:Create("UIListLayout", {
+        Parent = Items["Page"].Instance, Name = "\0",
+        FillDirection = Enum.FillDirection.Horizontal,
+        HorizontalFlex = Enum.UIFlexAlignment.Fill,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        VerticalFlex = Enum.UIFlexAlignment.Fill
+    })
+
+    for i = 1, Page.Columns do
+        local col = Instances:Create("ScrollingFrame", {
+            Parent = Items["Page"].Instance, Name = "\0",
+            ScrollBarImageColor3 = T.Border,
+            Active = true,
+            AutomaticCanvasSize = Enum.AutomaticSize.Y,
+            BorderSizePixel = 0,
+            ScrollBarThickness = 2,
+            BackgroundTransparency = 1,
+            Size = UDim2New(0,100,0,100),
+            CanvasSize = UDim2New(0,0,0,0),
+        })
+        col:AddToTheme({ ScrollBarImageColor3 = "Border" })
+        Instances:Create("UIPadding", {
+            Parent = col.Instance, Name = "\0",
+            PaddingTop = UDimNew(0,6), PaddingBottom = UDimNew(0,8),
+            PaddingLeft = UDimNew(0,6), PaddingRight = UDimNew(0,6)
+        })
+        Instances:Create("UIListLayout", {
+            Parent = col.Instance, Name = "\0",
+            Padding = UDimNew(0,8), SortOrder = Enum.SortOrder.LayoutOrder
+        })
+        Page.ColumnsData[i] = col
     end
-    BuildColumns()
 
     Page.Items = Items
     local Debounce = false
@@ -1867,7 +1703,7 @@ Library.Page = function(self, Data)
     return setmetatable(Page, Library.Pages)
 end
 
--- ============================================================
+-- =============================================
 -- Section
 Library.Pages.Section = function(self, Data)
     Data = Data or {}
@@ -1968,8 +1804,8 @@ Library.Pages.Section = function(self, Data)
     return setmetatable(Section, Library.Sections)
 end
 
--- ============================================================
--- Toggle (FIXED: animated checkmark, color-coded text)
+-- =============================================
+-- Toggle
 Library.Sections.Toggle = function(self, Data)
     Data = Data or {}
     local T = Library.Theme
@@ -2012,14 +1848,13 @@ Library.Sections.Toggle = function(self, Data)
         Parent = Items["Box"].Instance, Name = "\0",
         AnchorPoint = Vector2New(0.5, 0.5),
         Position = UDim2New(0.5, 0, 0.5, 0),
-        -- FIX: start at 0x0, only expands when toggled ON
         Size = UDim2New(0, 0, 0, 0),
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        BackgroundColor3 = T.AccentGlow or T.Accent
+        BackgroundColor3 = T.Accent
     })
     Corner(Items["Check"].Instance, 2)
-    Items["Check"]:AddToTheme({ BackgroundColor3 = "AccentGlow" })
+    Items["Check"]:AddToTheme({ BackgroundColor3 = "Accent" })
 
     Items["Text"] = Instances:Create("TextLabel", {
         Parent = Items["Row"].Instance, Name = "\0",
@@ -2068,17 +1903,13 @@ Library.Sections.Toggle = function(self, Data)
         Toggle.Value = Value
         Library.Flags[Toggle.Flag] = Value
         if Toggle.Value then
-            -- Animated ON state
-            Items["Box"]:Tween(TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundColor3 = Library.Theme.Accent })
+            Items["Box"]:Tween(nil, { BackgroundColor3 = Library.Theme.Accent })
             Items["Check"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2New(0,8,0,8), BackgroundTransparency = 0 })
-            -- Text brightens to full Text color
-            Tween:Create(Items["Text"], TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { TextColor3 = Library.Theme.Text }, true)
+            Items["Text"].Instance.TextColor3 = Library.Theme.Text
         else
-            -- Animated OFF state
-            Items["Box"]:Tween(TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundColor3 = Library.Theme.Element })
-            Items["Check"]:Tween(TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Size = UDim2New(0,0,0,0), BackgroundTransparency = 1 })
-            -- Text dims to muted
-            Tween:Create(Items["Text"], TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { TextColor3 = Library.Theme.TextMuted }, true)
+            Items["Box"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
+            Items["Check"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Size = UDim2New(0,0,0,0), BackgroundTransparency = 1 })
+            Items["Text"].Instance.TextColor3 = Library.Theme.TextMuted
         end
         if Toggle.Callback then Library:SafeCall(Toggle.Callback, Toggle.Value) end
     end
@@ -2115,7 +1946,7 @@ Library.Sections.Toggle = function(self, Data)
     return Toggle
 end
 
--- ============================================================
+-- =============================================
 -- Button
 Library.Sections.Button = function(self, Data)
     Data = Data or {}
@@ -2151,21 +1982,17 @@ Library.Sections.Button = function(self, Data)
 
     function Button:SetVisibility(Bool) Items["Button"].Instance.Visible = Bool end
     function Button:Press()
-        -- Flash accent color then return
-        Items["Button"]:Tween(TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-            { BackgroundColor3 = Library.Theme.Accent })
+        Items["Button"]:Tween(nil, { BackgroundColor3 = Library.Theme.Accent })
         Library:SafeCall(Button.Callback)
-        task.delay(0.18, function()
-            Items["Button"]:Tween(TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-                { BackgroundColor3 = Library.Theme.Element })
-        end)
+        task.wait(0.12)
+        Items["Button"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
     end
 
     Items["Button"]:Connect("MouseButton1Down", function() Button:Press() end)
     return Button
 end
 
--- ============================================================
+-- =============================================
 -- Slider
 Library.Sections.Slider = function(self, Data)
     Data = Data or {}
@@ -2260,9 +2087,7 @@ Library.Sections.Slider = function(self, Data)
 
     function Slider:Get() return Slider.Value end
     function Slider:Set(Value)
-        -- FIX: inline round to avoid self confusion
-        local m = 1 / (Slider.Decimals or 1)
-        Slider.Value = MathClamp(MathFloor(Value * m) / m, Slider.Min, Slider.Max)
+        Slider.Value = MathClamp(Library:Round(Value, Slider.Decimals), Slider.Min, Slider.Max)
         Library.Flags[Slider.Flag] = Slider.Value
         local pct = (Slider.Value - Slider.Min) / (Slider.Max - Slider.Min)
         Items["Fill"]:Tween(TweenInfo.new(0.1, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
@@ -2295,7 +2120,7 @@ Library.Sections.Slider = function(self, Data)
     return Slider
 end
 
--- ============================================================
+-- =============================================
 -- Dropdown
 Library.Sections.Dropdown = function(self, Data)
     Data = Data or {}
@@ -2635,7 +2460,7 @@ Library.Sections.Dropdown = function(self, Data)
     return Dropdown
 end
 
--- ============================================================
+-- =============================================
 -- Label
 Library.Sections.Label = function(self, Name)
     local T = Library.Theme
@@ -2707,7 +2532,7 @@ Library.Sections.Label = function(self, Name)
     return Label
 end
 
--- ============================================================
+-- =============================================
 -- Textbox
 Library.Sections.Textbox = function(self, Data)
     Data = Data or {}
@@ -2801,8 +2626,8 @@ Library.Sections.Textbox = function(self, Data)
     return Textbox
 end
 
--- ============================================================
--- Settings page
+-- =============================================
+-- Settings page builder
 Library.CreateSettingsPage = function(self, Window, KeybindList, Watermark, ModeratorList)
     local SP = Window:Page({ Name = "Settings", Columns = 2 })
     local SS = SP:Section({ Name = "Settings", Side = 1 }) do
@@ -2857,7 +2682,7 @@ Library.CreateSettingsPage = function(self, Window, KeybindList, Watermark, Mode
     end
 end
 
--- ============================================================
+-- =============================================
 -- ArmorViewer
 Library.ArmorViewer = function(self)
     local AV = {}
@@ -2907,7 +2732,9 @@ Library.ArmorViewer = function(self)
     end
 
     function AV:ClearAllItems()
-        for _, slot in ipairs(ItemSlots) do slot:Destroy() end
+        for _, slot in ipairs(ItemSlots) do
+            slot:Destroy()
+        end
         ItemSlots = {}
     end
 
@@ -2916,7 +2743,7 @@ Library.ArmorViewer = function(self)
             Size = UDim2New(0,54,0,64), BackgroundColor3 = T.Background, BorderSizePixel = 0, ZIndex = 6 })
         Corner(slot.Instance, 4)
         Instances:Create("UIStroke", { Parent = slot.Instance, Name = "\0", Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
-        Instances:Create("ImageLabel", { Parent = slot.Instance, Name = "\0",
+        local img = Instances:Create("ImageLabel", { Parent = slot.Instance, Name = "\0",
             Image = image or "", Size = UDim2New(1,-4,0,44), Position = UDim2New(0,2,0,2),
             BackgroundTransparency = 1, ZIndex = 6 })
         local lbl = Instances:Create("TextLabel", { Parent = slot.Instance, Name = "\0",
@@ -2934,7 +2761,7 @@ Library.ArmorViewer = function(self)
     return AV
 end
 
--- ============================================================
+-- =============================================
 -- TargetHud
 Library.TargetHud = function(self)
     local TH = {}
