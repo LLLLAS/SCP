@@ -1,6 +1,3 @@
--- LinoriaStyle UI Library
--- Fixed + Animated Edition
--- Watermark supports color-coded status text, animated width
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
@@ -97,6 +94,11 @@ local Themes = {
         ["Element"]         = FromRGB(30, 30, 45),
         ["ElementHover"]    = FromRGB(38, 38, 55),
         ["TopBar"]          = FromRGB(18, 18, 28),
+        -- Status colors
+        ["StatusOn"]        = FromRGB(72, 210, 110),
+        ["StatusOff"]       = FromRGB(210, 72, 72),
+        ["StatusWarn"]      = FromRGB(210, 175, 55),
+        ["AccentGlow"]      = FromRGB(140, 120, 255),
         -- Status colors for watermark
         ["StatusOn"]        = FromRGB(80, 220, 120),
         ["StatusOff"]       = FromRGB(220, 80, 80),
@@ -145,6 +147,17 @@ local Tween = {} do
     end
 
     Tween.Get = function(self) return self.Tween, self.Info, self.Goal end
+
+    -- Preset animations for common uses
+    Tween.Spring = function(_, Item, Goal, Raw)
+        return Tween:Create(Item, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), Goal, Raw)
+    end
+    Tween.Quick = function(_, Item, Goal, Raw)
+        return Tween:Create(Item, TweenInfo.new(0.1, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), Goal, Raw)
+    end
+    Tween.Smooth = function(_, Item, Goal, Raw)
+        return Tween:Create(Item, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), Goal, Raw)
+    end
     Tween.Pause = function(self) if self.Tween then self.Tween:Pause() end end
     Tween.Play = function(self) if self.Tween then self.Tween:Play() end end
     Tween.Clean = function(self) if self.Tween then Tween:Pause() self = nil end end
@@ -460,13 +473,14 @@ Library.CreateColorpicker = function(self, Data)
     local T = Library.Theme
     local Items = {}
 
+    -- FIX: Swatch shows actual picked colour (not accent/placeholder)
     Items["ColorpickerButton"] = Instances:Create("TextButton", {
         Parent = Data.Parent.Instance, Name = "\0",
         FontFace = Library.Font, TextColor3 = FromRGB(0,0,0),
         Text = "", AutoButtonColor = false,
         Size = UDim2New(0, 16, 0, 16),
         BorderSizePixel = 0, TextSize = 13,
-        BackgroundColor3 = FromRGB(140,255,213)
+        BackgroundColor3 = FromRGB(255, 255, 255)  -- will be updated on Set()
     })
     Corner(Items["ColorpickerButton"].Instance, 3)
 
@@ -758,13 +772,15 @@ Library.CreateColorpicker = function(self, Data)
 
     function Colorpicker:SlidePalette(Input)
         if not Input or not SlidingPalette then return end
-        local sx = MathClamp(1 - (Input.Position.X - Items["Palette"].Instance.AbsolutePosition.X) / Items["Palette"].Instance.AbsoluteSize.X, 0, 1)
-        local sy = MathClamp(1 - (Input.Position.Y - Items["Palette"].Instance.AbsolutePosition.Y) / Items["Palette"].Instance.AbsoluteSize.Y, 0, 1)
-        Colorpicker.Saturation = sx
-        Colorpicker.Value = sy
-        local dx = MathClamp((Input.Position.X - Items["Palette"].Instance.AbsolutePosition.X) / Items["Palette"].Instance.AbsoluteSize.X, 0, 0.99)
-        local dy = MathClamp((Input.Position.Y - Items["Palette"].Instance.AbsolutePosition.Y) / Items["Palette"].Instance.AbsoluteSize.Y, 0, 0.99)
-        Items["PaletteDragger"]:Tween(TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2New(dx, 0, dy, 0) })
+        -- FIX: correct saturation/value calculation
+        local px = Items["Palette"].Instance.AbsolutePosition
+        local ps = Items["Palette"].Instance.AbsoluteSize
+        local dx = MathClamp((Input.Position.X - px.X) / ps.X, 0, 1)
+        local dy = MathClamp((Input.Position.Y - px.Y) / ps.Y, 0, 1)
+        Colorpicker.Saturation = dx          -- left=0 right=1
+        Colorpicker.Value      = 1 - dy      -- top=1 bottom=0
+        Items["PaletteDragger"]:Tween(TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+            { Position = UDim2New(MathClamp(dx,0,0.99), 0, MathClamp(dy,0,0.99), 0) })
         Colorpicker:Update()
     end
 
@@ -800,7 +816,9 @@ Library.CreateColorpicker = function(self, Data)
         elseif type(Color) == "string" then Color = FromHex(Color) end
         Colorpicker.Hue, Colorpicker.Saturation, Colorpicker.Value = Color:ToHSV()
         Colorpicker.Alpha = Alpha or 0
-        Items["PaletteDragger"]:Tween(TweenInfo.new(0.1,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), { Position = UDim2New(MathClamp(1-Colorpicker.Saturation,0,0.99),0,MathClamp(1-Colorpicker.Value,0,0.99),0) })
+        -- FIX: sat=X (left to right), value=Y inverted (top=white, bottom=black)
+        Items["PaletteDragger"]:Tween(TweenInfo.new(0.1,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),
+            { Position = UDim2New(MathClamp(Colorpicker.Saturation,0,0.99),0,MathClamp(1-Colorpicker.Value,0,0.99),0) })
         Items["HueDragger"]:Tween(TweenInfo.new(0.1,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), { Position = UDim2New(0,0,MathClamp(Colorpicker.Hue,0,0.99),0) })
         Items["AlphaDragger"]:Tween(TweenInfo.new(0.1,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), { Position = UDim2New(MathClamp(Colorpicker.Alpha,0,0.99),0,0,0) })
         Colorpicker:Update(false)
@@ -1776,38 +1794,43 @@ Library.Page = function(self, Data)
         BorderSizePixel = 0,
         BackgroundColor3 = FromRGB(255,255,255)
     })
-    Instances:Create("UIListLayout", {
-        Parent = Items["Page"].Instance, Name = "\0",
-        FillDirection = Enum.FillDirection.Horizontal,
-        HorizontalFlex = Enum.UIFlexAlignment.Fill,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        VerticalFlex = Enum.UIFlexAlignment.Fill
-    })
-
-    for i = 1, Page.Columns do
-        local col = Instances:Create("ScrollingFrame", {
-            Parent = Items["Page"].Instance, Name = "\0",
-            ScrollBarImageColor3 = T.Border,
-            Active = true,
-            AutomaticCanvasSize = Enum.AutomaticSize.Y,
-            BorderSizePixel = 0,
-            ScrollBarThickness = 2,
-            BackgroundTransparency = 1,
-            Size = UDim2New(0,100,0,100),
-            CanvasSize = UDim2New(0,0,0,0),
-        })
-        col:AddToTheme({ ScrollBarImageColor3 = "Border" })
-        Instances:Create("UIPadding", {
-            Parent = col.Instance, Name = "\0",
-            PaddingTop = UDimNew(0,6), PaddingBottom = UDimNew(0,8),
-            PaddingLeft = UDimNew(0,6), PaddingRight = UDimNew(0,6)
-        })
-        Instances:Create("UIListLayout", {
-            Parent = col.Instance, Name = "\0",
-            Padding = UDimNew(0,8), SortOrder = Enum.SortOrder.LayoutOrder
-        })
-        Page.ColumnsData[i] = col
+    -- FIXED: No UIFlexAlignment - use manual scale-based UDim2 sizing for columns
+    -- This is compatible with all executor environments
+    local function BuildColumns()
+        local cols = Page.Columns
+        local gapTotal = (cols - 1) * 8
+        for i = 1, cols do
+            local colWidth = 1 / cols
+            local offsetAdj = -(gapTotal / cols)
+            local posX = (i - 1) * colWidth
+            local posOffsetX = (i - 1) * 8
+            local col = Instances:Create("ScrollingFrame", {
+                Parent = Items["Page"].Instance, Name = "\0",
+                ScrollBarImageColor3 = T.Border,
+                Active = true,
+                AutomaticCanvasSize = Enum.AutomaticSize.Y,
+                BorderSizePixel = 0,
+                ScrollBarThickness = 2,
+                BackgroundTransparency = 1,
+                -- KEY FIX: explicit scale position + offset-adjusted width
+                Position = UDim2New(posX, posOffsetX, 0, 0),
+                Size = UDim2New(colWidth, offsetAdj - 4, 1, 0),
+                CanvasSize = UDim2New(0,0,0,0),
+            })
+            col:AddToTheme({ ScrollBarImageColor3 = "Border" })
+            Instances:Create("UIPadding", {
+                Parent = col.Instance, Name = "\0",
+                PaddingTop = UDimNew(0,6), PaddingBottom = UDimNew(0,8),
+                PaddingLeft = UDimNew(0,6), PaddingRight = UDimNew(0,6)
+            })
+            Instances:Create("UIListLayout", {
+                Parent = col.Instance, Name = "\0",
+                Padding = UDimNew(0,8), SortOrder = Enum.SortOrder.LayoutOrder
+            })
+            Page.ColumnsData[i] = col
+        end
     end
+    BuildColumns()
 
     Page.Items = Items
     local Debounce = false
@@ -1988,13 +2011,14 @@ Library.Sections.Toggle = function(self, Data)
         Parent = Items["Box"].Instance, Name = "\0",
         AnchorPoint = Vector2New(0.5, 0.5),
         Position = UDim2New(0.5, 0, 0.5, 0),
+        -- FIX: start at 0x0, only expands when toggled ON
         Size = UDim2New(0, 0, 0, 0),
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        BackgroundColor3 = T.Accent
+        BackgroundColor3 = T.AccentGlow or T.Accent
     })
     Corner(Items["Check"].Instance, 2)
-    Items["Check"]:AddToTheme({ BackgroundColor3 = "Accent" })
+    Items["Check"]:AddToTheme({ BackgroundColor3 = "AccentGlow" })
 
     Items["Text"] = Instances:Create("TextLabel", {
         Parent = Items["Row"].Instance, Name = "\0",
@@ -2126,10 +2150,14 @@ Library.Sections.Button = function(self, Data)
 
     function Button:SetVisibility(Bool) Items["Button"].Instance.Visible = Bool end
     function Button:Press()
-        Items["Button"]:Tween(nil, { BackgroundColor3 = Library.Theme.Accent })
+        -- Flash accent color then return
+        Items["Button"]:Tween(TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+            { BackgroundColor3 = Library.Theme.Accent })
         Library:SafeCall(Button.Callback)
-        task.wait(0.12)
-        Items["Button"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
+        task.delay(0.18, function()
+            Items["Button"]:Tween(TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+                { BackgroundColor3 = Library.Theme.Element })
+        end)
     end
 
     Items["Button"]:Connect("MouseButton1Down", function() Button:Press() end)
@@ -2231,7 +2259,9 @@ Library.Sections.Slider = function(self, Data)
 
     function Slider:Get() return Slider.Value end
     function Slider:Set(Value)
-        Slider.Value = MathClamp(Library:Round(Value, Slider.Decimals), Slider.Min, Slider.Max)
+        -- FIX: inline round to avoid self confusion
+        local m = 1 / (Slider.Decimals or 1)
+        Slider.Value = MathClamp(MathFloor(Value * m) / m, Slider.Min, Slider.Max)
         Library.Flags[Slider.Flag] = Slider.Value
         local pct = (Slider.Value - Slider.Min) / (Slider.Max - Slider.Min)
         Items["Fill"]:Tween(TweenInfo.new(0.1, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
