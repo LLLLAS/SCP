@@ -2673,6 +2673,84 @@ Library.CreateSettingsPage = function(self, Window, KeybindList, Watermark, Mode
 end
 
 -- =============================================
+-- ArmorViewer
+Library.ArmorViewer = function(self)
+    local AV = {}
+    local T = Library.Theme
+    local Items = {}
+    local ItemSlots = {}
+
+    Items["Frame"] = Instances:Create("Frame", {
+        Parent = Library.Holder.Instance, Name = "\0",
+        Size = UDim2New(0, 280, 0, 0),
+        Position = UDim2New(0, 10, 0.6, 0),
+        BorderSizePixel = 0, ZIndex = 6,
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundColor3 = T.Surface,
+        Visible = false,
+    })
+    Corner(Items["Frame"].Instance, 6)
+    Instances:Create("UIStroke", { Parent = Items["Frame"].Instance, Name = "\0",
+        Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
+    Items["Frame"]:MakeDraggable()
+
+    local acTop = Instances:Create("Frame", { Parent = Items["Frame"].Instance, Name = "\0",
+        Size = UDim2New(1,0,0,2), BorderSizePixel = 0, BackgroundColor3 = T.Accent })
+    Corner(acTop.Instance, 2)
+    acTop:AddToTheme({ BackgroundColor3 = "Accent" })
+
+    Items["Title"] = Instances:Create("TextLabel", { Parent = Items["Frame"].Instance, Name = "\0",
+        FontFace = Library.Fonts["GothamBold"] or Library.Font, TextColor3 = T.TextMuted,
+        Text = "Armor Viewer", Size = UDim2New(1,-16,0,14),
+        Position = UDim2New(0,8,0,6), BackgroundTransparency = 1,
+        TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6,
+        BackgroundColor3 = FromRGB(255,255,255) })
+    Items["Title"]:AddToTheme({ TextColor3 = "TextMuted" })
+
+    Items["Content"] = Instances:Create("Frame", { Parent = Items["Frame"].Instance, Name = "\0",
+        BorderSizePixel = 0, BackgroundTransparency = 1, ZIndex = 6,
+        Position = UDim2New(0,8,0,26), Size = UDim2New(1,-16,0,0),
+        AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = FromRGB(255,255,255) })
+    Instances:Create("UIListLayout", { Parent = Items["Content"].Instance, Name = "\0",
+        FillDirection = Enum.FillDirection.Horizontal, Padding = UDimNew(0,4),
+        Wraps = true, HorizontalAlignment = Enum.HorizontalAlignment.Left })
+    Instances:Create("UIPadding", { Parent = Items["Frame"].Instance, Name = "\0",
+        PaddingBottom = UDimNew(0,8) })
+
+    function AV:SetTitle(text)
+        Items["Title"].Instance.Text = text or "Armor Viewer"
+    end
+
+    function AV:ClearAllItems()
+        for _, slot in ipairs(ItemSlots) do
+            slot:Destroy()
+        end
+        ItemSlots = {}
+    end
+
+    function AV:Add(name, image)
+        local slot = Instances:Create("Frame", { Parent = Items["Content"].Instance, Name = "\0",
+            Size = UDim2New(0,54,0,64), BackgroundColor3 = T.Background, BorderSizePixel = 0, ZIndex = 6 })
+        Corner(slot.Instance, 4)
+        Instances:Create("UIStroke", { Parent = slot.Instance, Name = "\0", Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
+        local img = Instances:Create("ImageLabel", { Parent = slot.Instance, Name = "\0",
+            Image = image or "", Size = UDim2New(1,-4,0,44), Position = UDim2New(0,2,0,2),
+            BackgroundTransparency = 1, ZIndex = 6 })
+        local lbl = Instances:Create("TextLabel", { Parent = slot.Instance, Name = "\0",
+            FontFace = Library.Font, TextColor3 = T.TextMuted, Text = name or "",
+            Size = UDim2New(1,0,0,16), Position = UDim2New(0,0,0,46),
+            BackgroundTransparency = 1, TextSize = 9, ZIndex = 6, BackgroundColor3 = FromRGB(255,255,255) })
+        lbl:AddToTheme({ TextColor3 = "TextMuted" })
+        table.insert(ItemSlots, slot.Instance)
+    end
+
+    function AV:SetVisibility(bool)
+        Items["Frame"].Instance.Visible = bool and true or false
+    end
+
+    return AV
+end
+
 -- ArmorViewer / TargetHud kept with same interface
 -- (abbreviated versions with Linoria styling)
 
