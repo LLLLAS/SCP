@@ -323,7 +323,7 @@ Library.SafeCall = function(self, Function, ...)
     local args = { ... }
     local ok, res = pcall(Function, TableUnpack(args))
     if not ok then
-        LocalPlayer:Kick("LinoriaStyle Error: " .. tostring(res))
+        warn("LinoriaStyle Error: " .. tostring(res))
         return false
     end
     return ok
@@ -394,14 +394,15 @@ Library.IsMouseOverFrame = function(self, Frame)
 end
 
 Library.GetConfig = function(self)
+    if not Library or Library.Unloaded then return "{}" end
     local Config = {}
     Library:SafeCall(function()
         for i, v in Library.Flags do
             if type(v) == "table" and v.Key then
                 Config[i] = { Key = tostring(v.Key), Mode = v.Mode, Toggled = v.Toggled }
-            elseif type(v) == "table" and v.Color then
-                Config[i] = { Color = "#" .. v.HexValue, Alpha = v.Alpha }
-            else
+            elseif type(v) == "table" and v.Color and v.HexValue then
+                Config[i] = { Color = "#" .. v.HexValue, Alpha = v.Alpha or 1 }
+            elseif type(v) ~= "function" then
                 Config[i] = v
             end
         end
