@@ -1547,26 +1547,34 @@ Library.Window = function(self, Data)
         ["Toggle Off"] = true, ["Toggle On"] = true,
     }
 
+    -- Apply transparency to a single instance list
+    local function ApplyTransparencyToList(list, a, ti)
+        for _, v in list do
+            if not (v:IsA("Frame") or v:IsA("ScrollingFrame")) then continue end
+            if v.BackgroundTransparency >= 0.99 then continue end
+            TweenService:Create(v, ti, { BackgroundTransparency = a }):Play()
+        end
+    end
+
     function Window:SetTransparency(Alpha)
         Window.Transparency = MathClamp(Alpha, 0, 1)
         local a  = Window.Transparency
         local ti = TweenInfo.new(0.14, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
-        -- Walk ALL descendants including the MainFrame itself.
-        -- For each Frame/ScrollingFrame check if its current bg is non-1
-        -- (meaning it was intentionally visible) then apply transparency.
-        -- We do NOT snapshot - instead we rely on the fact that at call time
-        -- all panels are at their natural opacity (or already at prev transparency level).
-        -- We ALWAYS set exactly `a` for opaque panels, keep transparent ones at 1.
-        local all = Items["MainFrame"].Instance:GetDescendants()
-        TableInsert(all, Items["MainFrame"].Instance)
+        -- Walk MainFrame (active content)
+        local mainList = Items["MainFrame"].Instance:GetDescendants()
+        TableInsert(mainList, Items["MainFrame"].Instance)
+        ApplyTransparencyToList(mainList, a, ti)
 
-        for _, v in all do
-            if not (v:IsA("Frame") or v:IsA("ScrollingFrame")) then continue end
-            -- Skip fully-transparent decorator/layout frames
-            if v.BackgroundTransparency >= 0.99 then continue end
-            -- Skip UIStroke parents that aren't real panels (size 0 helpers etc)
-            TweenService:Create(v, ti, { BackgroundTransparency = a }):Play()
+        -- ALSO walk all Pages (including inactive ones in UnusedHolder)
+        -- so they're already correct when switched to
+        for _, page in Window.Pages do
+            if page.Items and page.Items["Page"] then
+                local pageInst = page.Items["Page"].Instance
+                local pageList = pageInst:GetDescendants()
+                TableInsert(pageList, pageInst)
+                ApplyTransparencyToList(pageList, a, ti)
+            end
         end
     end
 
@@ -1592,13 +1600,23 @@ Library.Window = function(self, Data)
         local frame = Items["MainFrame"].Instance
 
         if Bool then
-            -- Before showing: snap ALL panels to user's transparency instantly
-            -- so they don't flash opaque during the open animation
-            local all = frame:GetDescendants()
-            TableInsert(all, frame)
-            for _, v in all do
-                if (v:IsA("Frame") or v:IsA("ScrollingFrame")) and v.BackgroundTransparency < 0.99 then
-                    v.BackgroundTransparency = Window.Transparency
+            -- Before showing: snap ALL panels (incl. inactive pages) instantly
+            local function SnapFrames(list)
+                for _, v in list do
+                    if (v:IsA("Frame") or v:IsA("ScrollingFrame")) and v.BackgroundTransparency < 0.99 then
+                        v.BackgroundTransparency = Window.Transparency
+                    end
+                end
+            end
+            local mainAll = frame:GetDescendants()
+            TableInsert(mainAll, frame)
+            SnapFrames(mainAll)
+            for _, page in Window.Pages do
+                if page.Items and page.Items["Page"] then
+                    local pi = page.Items["Page"].Instance
+                    local pl = pi:GetDescendants()
+                    TableInsert(pl, pi)
+                    SnapFrames(pl)
                 end
             end
 
@@ -1756,6 +1774,19 @@ Library.Page = function(self, Data)
             Items["Page"].Instance.Parent = Page.Window.Items["Content"].Instance
             Items["Page"].Instance.Visible = true
             Items["Page"].Instance.Position = UDim2New(0.05, 0, 0, 0)
+
+            -- Re-apply window transparency to this page's frames
+            if Page.Window.Transparency > 0 then
+                local ti2 = TweenInfo.new(0.14, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+                local pageList = Items["Page"].Instance:GetDescendants()
+                TableInsert(pageList, Items["Page"].Instance)
+                for _, v in pageList do
+                    if (v:IsA("Frame") or v:IsA("ScrollingFrame")) and v.BackgroundTransparency < 0.99 then
+                        TweenService:Create(v, ti2, { BackgroundTransparency = Page.Window.Transparency }):Play()
+                    end
+                end
+            end
+
             TweenService:Create(Items["Page"].Instance,
                 TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
                 { Position = UDim2New(0, 0, 0, 0) }
