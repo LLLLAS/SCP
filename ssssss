@@ -94,6 +94,7 @@ local Themes = {
         ["Element"]         = FromRGB(30, 30, 45),
         ["ElementHover"]    = FromRGB(38, 38, 55),
         ["TopBar"]          = FromRGB(18, 18, 28),
+        ["SlotBackground"]  = FromRGB(15, 15, 23),
     }
 }
 
@@ -203,11 +204,27 @@ Instances = {} do
         if not self.Instance then return end
         local Gui = self.Instance
         local Dragging, DragStart, StartPos = false, nil, nil
+        -- Track current active tween so we can cancel it mid-drag
+        local dragTween = nil
         local function Set(Input)
             local d = Input.Position - DragStart
             local nx = MathClamp(StartPos.X.Offset + d.X, 0, Gui.Parent.AbsoluteSize.X - Gui.AbsoluteSize.X)
             local ny = MathClamp(StartPos.Y.Offset + d.Y, 0, Gui.Parent.AbsoluteSize.Y - Gui.AbsoluteSize.Y)
-            self:Tween(TweenInfo.new(0.1, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2New(0, nx, 0, ny) })
+            -- Direct position during drag = zero lag, feels responsive
+            Gui.Position = UDim2New(0, nx, 0, ny)
+        end
+        local function Release(Input)
+            -- Tiny settle bounce on release
+            local cx = Gui.Position.X.Offset
+            local cy = Gui.Position.Y.Offset
+            local nx = MathClamp(cx, 0, Gui.Parent.AbsoluteSize.X - Gui.AbsoluteSize.X)
+            local ny = MathClamp(cy, 0, Gui.Parent.AbsoluteSize.Y - Gui.AbsoluteSize.Y)
+            if dragTween then dragTween:Cancel() end
+            dragTween = TweenService:Create(Gui,
+                TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+                { Position = UDim2New(0, nx, 0, ny) }
+            )
+            dragTween:Play()
         end
         local ic
         self:Connect("InputBegan", function(Input)
@@ -219,6 +236,7 @@ Instances = {} do
                 ic = Input.Changed:Connect(function()
                     if Input.UserInputState == Enum.UserInputState.End then
                         Dragging = false
+                        Release(Input)
                         ic:Disconnect()
                         ic = nil
                     end
@@ -1095,8 +1113,8 @@ Library.Watermark = function(self, Name)
 
     Items["Watermark"] = Instances:Create("Frame", {
         Parent = Library.Holder.Instance, Name = "\0",
-        AnchorPoint = Vector2New(0.5, 0),
-        Position = UDim2New(0.5, 0, 0, 12),
+        AnchorPoint = Vector2New(0, 0),
+        Position = UDim2New(0, 12, 0, 12),
         Size = UDim2New(0, 180, 0, 26),
         BorderSizePixel = 0, ZIndex = 5,
         BackgroundColor3 = T.Surface
@@ -1106,6 +1124,7 @@ Library.Watermark = function(self, Name)
         Parent = Items["Watermark"].Instance, Name = "\0",
         Color = T.Border, Thickness = 1
     }):AddToTheme({ Color = "Border" })
+    Items["Watermark"]:MakeDraggable()
 
     local accentLine = Instances:Create("Frame", {
         Parent = Items["Watermark"].Instance, Name = "\0",
@@ -1153,8 +1172,8 @@ Library.KeybindList = function(self)
 
     Items["Frame"] = Instances:Create("Frame", {
         Parent = Library.Holder.Instance, Name = "\0",
-        AnchorPoint = Vector2New(0, 0.5),
-        Position = UDim2New(0, 12, 0.5, 0),
+        AnchorPoint = Vector2New(0, 0),
+        Position = UDim2New(0, 12, 0.5, -50),
         BorderSizePixel = 0,
         AutomaticSize = Enum.AutomaticSize.XY,
         BackgroundColor3 = T.Surface
@@ -1169,6 +1188,7 @@ Library.KeybindList = function(self)
         PaddingTop = UDimNew(0,8), PaddingBottom = UDimNew(0,8),
         PaddingLeft = UDimNew(0,10), PaddingRight = UDimNew(0,10)
     })
+    Items["Frame"]:MakeDraggable()
 
     local acLine = Instances:Create("Frame", {
         Parent = Items["Frame"].Instance, Name = "\0",
@@ -1410,6 +1430,7 @@ Library.Window = function(self, Data)
         BackgroundColor3 = T.Background
     })
     Corner(Items["MainFrame"].Instance, 8)
+    Items["MainFrame"]:AddToTheme({ BackgroundColor3 = "Background" })
     Instances:Create("UIStroke", {
         Parent = Items["MainFrame"].Instance, Name = "\0",
         Color = T.Border, Thickness = 1
@@ -1676,17 +1697,38 @@ Library.Page = function(self, Data)
         if Debounce then return end
         Page.Active = Bool
         Debounce = true
-        Items["Page"].Instance.Visible = Bool
-        Items["Page"].Instance.Parent = Bool and Page.Window.Items["Content"].Instance or Library.UnusedHolder.Instance
 
-        if Page.Active then
-            Items["Tab"]:Tween(nil, { BackgroundTransparency = 0 })
-            Items["Liner"]:Tween(TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2New(0.7, 0, 0, 2) })
+        if Bool then
+            -- Activate tab indicator
+            Items["Tab"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 0 })
+            Items["Liner"]:Tween(TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2New(0.7, 0, 0, 2) })
+            Items["Tab"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { TextTransparency = 0 })
             Items["Tab"].Instance.TextColor3 = Library.Theme.Text
+
+            -- Slide in from slightly right with fade
+            Items["Page"].Instance.Parent = Page.Window.Items["Content"].Instance
+            Items["Page"].Instance.Visible = true
+            Items["Page"].Instance.Position = UDim2New(0.04, 0, 0, 0)
+            local desc = Items["Page"].Instance:GetDescendants()
+            table.insert(desc, Items["Page"].Instance)
+            for _, v in desc do
+                if v:IsA("TextLabel") or v:IsA("TextButton") or v:IsA("Frame") or v:IsA("ScrollingFrame") or v:IsA("ImageLabel") then
+                    local prop = v:IsA("TextLabel") and "TextTransparency" or nil
+                    if prop then v[prop] = 1 end
+                end
+            end
+            TweenService:Create(Items["Page"].Instance,
+                TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+                { Position = UDim2New(0, 0, 0, 0) }
+            ):Play()
         else
-            Items["Tab"]:Tween(nil, { BackgroundTransparency = 1 })
-            Items["Liner"]:Tween(TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2New(0, 0, 0, 2) })
+            -- Deactivate tab
+            Items["Tab"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 1 })
+            Items["Liner"]:Tween(TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2New(0, 0, 0, 2) })
             Items["Tab"].Instance.TextColor3 = Library.Theme.TextMuted
+
+            Items["Page"].Instance.Visible = false
+            Items["Page"].Instance.Parent = Library.UnusedHolder.Instance
         end
         Debounce = false
     end
@@ -1903,12 +1945,20 @@ Library.Sections.Toggle = function(self, Data)
         Toggle.Value = Value
         Library.Flags[Toggle.Flag] = Value
         if Toggle.Value then
-            Items["Box"]:Tween(nil, { BackgroundColor3 = Library.Theme.Accent })
-            Items["Check"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2New(0,8,0,8), BackgroundTransparency = 0 })
+            -- Box: animate to accent color
+            Items["Box"]:Tween(TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundColor3 = Library.Theme.Accent })
+            -- Checkmark: bounce scale in
+            Items["Check"]:Tween(TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2New(0,8,0,8), BackgroundTransparency = 0 })
+            -- Label: fade to full color
+            Items["Text"]:Tween(TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { TextTransparency = 0 })
             Items["Text"].Instance.TextColor3 = Library.Theme.Text
         else
-            Items["Box"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
-            Items["Check"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Size = UDim2New(0,0,0,0), BackgroundTransparency = 1 })
+            -- Box: animate back to element color
+            Items["Box"]:Tween(TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundColor3 = Library.Theme.Element })
+            -- Checkmark: bounce scale out
+            Items["Check"]:Tween(TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Size = UDim2New(0,0,0,0), BackgroundTransparency = 1 })
+            -- Label: fade to muted
+            Items["Text"]:Tween(TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { TextTransparency = 0.35 })
             Items["Text"].Instance.TextColor3 = Library.Theme.TextMuted
         end
         if Toggle.Callback then Library:SafeCall(Toggle.Callback, Toggle.Value) end
@@ -2740,7 +2790,7 @@ Library.ArmorViewer = function(self)
 
     function AV:Add(name, image)
         local slot = Instances:Create("Frame", { Parent = Items["Content"].Instance, Name = "\0",
-            Size = UDim2New(0,54,0,64), BackgroundColor3 = T.Background, BorderSizePixel = 0, ZIndex = 6 })
+            Size = UDim2New(0,54,0,64), BackgroundColor3 = T.SlotBackground, BorderSizePixel = 0, ZIndex = 6 })
         Corner(slot.Instance, 4)
         Instances:Create("UIStroke", { Parent = slot.Instance, Name = "\0", Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
         local img = Instances:Create("ImageLabel", { Parent = slot.Instance, Name = "\0",
