@@ -1,0 +1,550 @@
+loadstring(game:HttpGet('https://raw.githubusercontent.com/Pixeluted/adoniscries/main/Source.lua'))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/LLLLAS/SCP/refs/heads/main/SCP%20SCRIPT%20V1"))()
+
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService     = game:GetService("TweenService")
+local Lighting         = game:GetService("Lighting")
+local LocalPlayer      = Players.LocalPlayer
+local Camera           = workspace.CurrentCamera
+
+local function IsAlive(char)
+    if not char then return false end
+    local h = char:FindFirstChildOfClass("Humanoid")
+    return h and h.Health > 0
+end
+local function GetHealthPct(char)
+    local h = char:FindFirstChildOfClass("Humanoid")
+    if h and h.MaxHealth > 0 then return h.Health/h.MaxHealth, h.Health, h.MaxHealth end
+    return 1, 100, 100
+end
+local function GetChar()  return LocalPlayer.Character end
+local function GetRoot()  local c=GetChar(); return c and c:FindFirstChild("HumanoidRootPart") end
+local function GetHuman() local c=GetChar(); return c and c:FindFirstChildOfClass("Humanoid") end
+
+-- Team
+local TeamCache, TeamColorCache = {}, {}
+local function GetTeamValue(p)
+    if p.Team then return tostring(p.Team.Name) end
+    local ls = p:FindFirstChild("leaderstats")
+    if ls then
+        for _, k in ipairs({"Team","Class","Side","Faction","Role","Job"}) do
+            local v = ls:FindFirstChild(k)
+            if v and tostring(v.Value) ~= "" then return tostring(v.Value) end
+        end
+    end
+    return "Unknown"
+end
+local function GetTeamColor(p)
+    if p.Team then return p.Team.TeamColor.Color end
+    return Color3.fromRGB(255,50,50)
+end
+local function UpdateTeamCache()
+    for _, p in ipairs(Players:GetPlayers()) do
+        TeamCache[p] = GetTeamValue(p)
+        TeamColorCache[p] = GetTeamColor(p)
+    end
+end
+UpdateTeamCache()
+task.spawn(function() while true do task.wait(5) UpdateTeamCache() end end)
+local function IsTeammate(p)
+    if p == LocalPlayer then return true end
+    local my, their = TeamCache[LocalPlayer], TeamCache[p]
+    if not my or not their or my=="Unknown" or their=="Unknown" then return false end
+    return my == their
+end
+
+local function GetHitPart(player, partName)
+    if not player then return nil end
+    local char = player.Character
+    if not char then return nil end
+    return char:FindFirstChild(partName)
+        or char:FindFirstChild("Head")
+        or char:FindFirstChild("UpperTorso")
+        or char:FindFirstChild("Torso")
+        or char:FindFirstChild("HumanoidRootPart")
+end
+
+-- Wall check
+local WallCheckEnabled = false
+local WallParams = RaycastParams.new()
+WallParams.FilterType = Enum.RaycastFilterType.Exclude
+local function HasWall(part)
+    if not WallCheckEnabled then return false end
+    local chars = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Character then table.insert(chars, p.Character) end
+    end
+    WallParams.FilterDescendantsInstances = chars
+    local origin = Camera.CFrame.Position
+    local dir = part.Position - origin
+    local result = workspace:Raycast(origin, dir, WallParams)
+    return result ~= nil
+end
+
+local SA_HitPart = "Head"  -- Default to Head
+local SA_FOV = 150
+local function GetBestTarget(currentTarget)
+    local myRoot = GetRoot()
+    if not myRoot then return nil end
+    if currentTarget then
+        local ok, alive = pcall(function() return currentTarget.Character and IsAlive(currentTarget.Character) end)
+        if ok and alive then
+            local part = GetHitPart(currentTarget, SA_HitPart)
+            if part and not HasWall(part) then return currentTarget end
+        end
+    end
+    local best, bestD = nil, math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p==LocalPlayer or IsTeammate(p) then continue end
+        local char = p.Character
+        if not char or not IsAlive(char) then continue end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then continue end
+        local d = (root.Position - myRoot.Position).Magnitude
+        if d >= bestD then continue end
+        local part = GetHitPart(p, SA_HitPart)
+        if part and not HasWall(part) then bestD=d; best=p end
+    end
+    return best
+end
+
+-- FOV Circle
+local FOVCircle
+pcall(function()
+    FOVCircle = Drawing.new("Circle")
+    FOVCircle.Visible=false; FOVCircle.Thickness=1
+    FOVCircle.Color=Color3.fromRGB(255,255,255); FOVCircle.Filled=false
+end)
+local FOV = {Enabled=false, Radius=150}
+RunService.RenderStepped:Connect(function()
+    if FOVCircle then
+        FOVCircle.Visible  = FOV.Enabled
+        FOVCircle.Radius   = FOV.Radius
+        FOVCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    end
+end)
+
+local SA = { Enabled=false, Target=nil }
+local Aimbot = SA
+
+local BridgeRemote = nil
+task.spawn(function()
+    local ok, r = pcall(function()
+        return game:GetService("ReplicatedStorage")
+            :WaitForChild("BridgeNet2", 10)
+            :WaitForChild("dataRemoteEvent", 10)
+    end)
+    if ok and r then BridgeRemote = r end
+end)
+
+local function GetFOVTarget()
+    local bestPlayer = nil
+    local bestDist   = SA_FOV
+    local center     = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LocalPlayer or IsTeammate(p) then continue end
+        local char = p.Character
+        if not char or not IsAlive(char) then continue end
+        -- Always aim at Head for FOV check
+        local part = char:FindFirstChild("Head")
+                  or char:FindFirstChild("UpperTorso")
+                  or char:FindFirstChild("HumanoidRootPart")
+        if not part then continue end
+        if WallCheckEnabled and HasWall(part) then continue end
+        local sp, onScreen = Camera:WorldToViewportPoint(part.Position)
+        if not onScreen then continue end
+        local d = (Vector2.new(sp.X, sp.Y) - center).Magnitude
+        if d < bestDist then
+            bestDist   = d
+            bestPlayer = p
+        end
+    end
+    return bestPlayer
+end
+
+RunService.Heartbeat:Connect(function()
+    if not SA.Enabled then SA.Target=nil; return end
+    SA.Target = GetFOVTarget()
+end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+    if not SA.Enabled then return end
+    if not BridgeRemote then return end
+
+    local target = GetFOVTarget()
+    if not target or not target.Character then return end
+
+    local root = GetRoot()
+    if not root then return end
+
+    -- Always hit Head first
+    local hitPart = target.Character:FindFirstChild("Head")
+                 or target.Character:FindFirstChild("UpperTorso")
+                 or target.Character:FindFirstChild("Torso")
+                 or target.Character:FindFirstChild("HumanoidRootPart")
+    if not hitPart then return end
+
+    local startPos = root.Position + Vector3.new(0, 1.5, 0)
+    local endPos   = hitPart.Position
+    local dir      = endPos - startPos
+    local mouseVec = dir.Unit
+
+    pcall(function()
+        BridgeRemote:FireServer(unpack({
+            {
+                {
+                    args1 = {
+                        {
+                            direction     = dir,
+                            startPosition = startPos,
+                            hitPart       = hitPart,
+                            mouseVector   = mouseVec,
+                            endPosition   = endPos,
+                        }
+                    }
+                },
+                "\11",
+                { soundName = "Fire" },
+                "\t"
+            }
+        }))
+    end)
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    TeamCache[p]=nil; TeamColorCache[p]=nil
+    if SA.Target==p then SA.Target=nil end
+end)
+
+
+--------------------------------------------------
+-- INFINITE AMMO
+--------------------------------------------------
+local InfAmmo = { Enabled=false }
+local function PatchAmmo(tool)
+    if not tool then return end
+    for _, v in ipairs(tool:GetDescendants()) do
+        if (v:IsA("NumberValue") or v:IsA("IntValue") or v:IsA("IntConstrainedValue")) then
+            local n = v.Name:lower()
+            if n:find("ammo") or n:find("mag") or n:find("clip") or n:find("reserve") or n:find("bullet") then
+                if v:IsA("IntConstrainedValue") then
+                    v.Value = v.MaxValue > 0 and v.MaxValue or 999
+                else
+                    v.Value = 999
+                end
+                if not v:GetAttribute("InfHooked") then
+                    v:GetAttribute("InfHooked")
+                    v:GetPropertyChangedSignal("Value"):Connect(function()
+                        if InfAmmo.Enabled then
+                            if v:IsA("IntConstrainedValue") then v.Value = v.MaxValue > 0 and v.MaxValue or 999
+                            else v.Value = 999 end
+                        end
+                    end)
+                    v:SetAttribute("InfHooked", true)
+                end
+            end
+        end
+    end
+end
+RunService.Heartbeat:Connect(function()
+    if not InfAmmo.Enabled then return end
+    local c = GetChar(); if not c then return end
+    local tool = c:FindFirstChildOfClass("Tool"); if not tool then return end
+    pcall(PatchAmmo, tool)
+end)
+LocalPlayer.CharacterAdded:Connect(function(c)
+    c.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") and InfAmmo.Enabled then task.wait(0.1); PatchAmmo(child) end
+    end)
+end)
+
+--------------------------------------------------
+-- RAPID FIRE
+--------------------------------------------------
+local RapidFire = { Enabled=false, _t=0 }
+RunService.Heartbeat:Connect(function(dt)
+    if not RapidFire.Enabled then return end
+    RapidFire._t = RapidFire._t + dt
+    if RapidFire._t < 0.05 then return end
+    RapidFire._t = 0
+    if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+        pcall(function() mouse1click() end)
+    end
+end)
+
+--------------------------------------------------
+-- FLY
+--------------------------------------------------
+local Fly = { Enabled=false, Speed=50, _bv=nil, _bg=nil }
+local function EnableFly()
+    local root = GetRoot(); if not root then return end
+    if Fly._bv then Fly._bv:Destroy() end
+    if Fly._bg then Fly._bg:Destroy() end
+    Fly._bv = Instance.new("BodyVelocity")
+    Fly._bv.Velocity = Vector3.zero
+    Fly._bv.MaxForce = Vector3.new(9999,9999,9999)
+    Fly._bv.Parent = root
+    Fly._bg = Instance.new("BodyGyro")
+    Fly._bg.MaxTorque = Vector3.new(9999,9999,9999)
+    Fly._bg.P = 1e4; Fly._bg.D = 100
+    Fly._bg.CFrame = root.CFrame
+    Fly._bg.Parent = root
+    local h = GetHuman(); if h then h.PlatformStand=true end
+end
+local function DisableFly()
+    if Fly._bv then Fly._bv:Destroy(); Fly._bv=nil end
+    if Fly._bg then Fly._bg:Destroy(); Fly._bg=nil end
+    local h = GetHuman(); if h then h.PlatformStand=false end
+end
+local function SetFly(v)
+    Fly.Enabled=v
+    if v then EnableFly() else DisableFly() end
+    Library:Notification("Fly: "..(v and "ON" or "OFF"),1)
+end
+RunService.RenderStepped:Connect(function()
+    if not Fly.Enabled or not Fly._bv or not Fly._bv.Parent then return end
+    local cf = Camera.CFrame
+    local dir = Vector3.zero
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir=dir+cf.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir=dir-cf.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir=dir-cf.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir=dir+cf.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir=dir+Vector3.new(0,1,0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir=dir-Vector3.new(0,1,0) end
+    Fly._bv.Velocity = dir.Magnitude>0 and dir.Unit*Fly.Speed or Vector3.zero
+    Fly._bg.CFrame = cf
+end)
+LocalPlayer.CharacterAdded:Connect(function()
+    Fly._bv=nil; Fly._bg=nil
+    if Fly.Enabled then task.wait(1); EnableFly() end
+end)
+
+--------------------------------------------------
+-- NOCLIP
+--------------------------------------------------
+local Noclip={Enabled=false}
+RunService.Stepped:Connect(function()
+    if not Noclip.Enabled then return end
+    local c=GetChar(); if not c then return end
+    for _,p in ipairs(c:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide=false end end
+end)
+local function SetNoclip(v)
+    Noclip.Enabled=v
+    if not v then local c=GetChar(); if c then for _,p in ipairs(c:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide=true end end end end
+    Library:Notification("Noclip: "..(v and "ON" or "OFF"),1)
+end
+
+--------------------------------------------------
+-- SPEED
+--------------------------------------------------
+local Speed={Enabled=false,Value=50}
+RunService.Heartbeat:Connect(function()
+    if not Speed.Enabled then return end
+    local h=GetHuman(); if h then h.WalkSpeed=Speed.Value end
+end)
+
+--------------------------------------------------
+-- FULLBRIGHT
+--------------------------------------------------
+local FB={Enabled=false,orig={}}
+local function SetFullbright(v)
+    FB.Enabled=v
+    if v then
+        FB.orig={Ambient=Lighting.Ambient,Brightness=Lighting.Brightness,OutdoorAmbient=Lighting.OutdoorAmbient}
+        Lighting.Ambient=Color3.new(1,1,1); Lighting.Brightness=2; Lighting.OutdoorAmbient=Color3.new(1,1,1)
+    else
+        if FB.orig.Ambient then Lighting.Ambient=FB.orig.Ambient; Lighting.Brightness=FB.orig.Brightness; Lighting.OutdoorAmbient=FB.orig.OutdoorAmbient end
+    end
+end
+
+--------------------------------------------------
+-- ESP
+--------------------------------------------------
+local ESP={Enabled=false,TeamCheck=true,TeamColors=true,ShowBoxes=true,ShowNames=true,ShowHealth=true,ShowDistance=true,BoxColor=Color3.fromRGB(255,50,50),MaxDistance=2000,Objects={}}
+local function GetBoxOnScreen(char)
+    local mnX,mnY,mxX,mxY=math.huge,math.huge,-math.huge,-math.huge; local found=false
+    for _,p in ipairs(char:GetDescendants()) do
+        if p:IsA("BasePart") and p.Name~="HumanoidRootPart" then
+            found=true; local cf,sz=p.CFrame,p.Size/2
+            for x=-1,1,2 do for y=-1,1,2 do for z=-1,1,2 do
+                local sp=Camera:WorldToViewportPoint((cf*CFrame.new(sz.X*x,sz.Y*y,sz.Z*z)).Position)
+                mnX=math.min(mnX,sp.X);mnY=math.min(mnY,sp.Y);mxX=math.max(mxX,sp.X);mxY=math.max(mxY,sp.Y)
+            end end end
+        end
+    end
+    return found and mnX,mnY,mxX,mxY or nil
+end
+local function NewDraw()
+    local d={Box=Drawing.new("Square"),Name=Drawing.new("Text"),Health=Drawing.new("Line"),HealthBg=Drawing.new("Line"),HealthText=Drawing.new("Text"),Distance=Drawing.new("Text")}
+    d.Box.Visible=false;d.Box.Thickness=1;d.Box.Filled=false
+    d.Name.Visible=false;d.Name.Size=13;d.Name.Center=true;d.Name.Outline=true;d.Name.OutlineColor=Color3.fromRGB(0,0,0);d.Name.Font=2
+    d.HealthBg.Visible=false;d.HealthBg.Color=Color3.fromRGB(0,0,0);d.HealthBg.Thickness=4
+    d.Health.Visible=false;d.Health.Thickness=2
+    d.HealthText.Visible=false;d.HealthText.Size=10;d.HealthText.Center=true;d.HealthText.Outline=true;d.HealthText.OutlineColor=Color3.fromRGB(0,0,0);d.HealthText.Font=2
+    d.Distance.Visible=false;d.Distance.Size=11;d.Distance.Center=true;d.Distance.Color=Color3.fromRGB(200,200,200);d.Distance.Outline=true;d.Distance.OutlineColor=Color3.fromRGB(0,0,0);d.Distance.Font=2
+    return d
+end
+local function HideDraw(d) for _,v in pairs(d) do v.Visible=false end end
+local function RemDraw(d)  for _,v in pairs(d) do v:Remove() end end
+RunService.RenderStepped:Connect(function()
+    if not ESP.Enabled then for _,d in pairs(ESP.Objects) do HideDraw(d) end return end
+    local myRoot=GetRoot()
+    local seen={}
+    for _,player in ipairs(Players:GetPlayers()) do
+        if player==LocalPlayer then continue end
+        local char=player.Character; if not char or not IsAlive(char) or not myRoot then continue end
+        local root=char:FindFirstChild("HumanoidRootPart"); if not root then continue end
+        if not ESP.Objects[player] then ESP.Objects[player]=NewDraw() end
+        local d=ESP.Objects[player]; seen[player]=true
+        if ESP.TeamCheck and IsTeammate(player) then HideDraw(d) continue end
+        local dist=(root.Position-myRoot.Position).Magnitude
+        if dist>ESP.MaxDistance then HideDraw(d) continue end
+        local sp3=Camera:WorldToViewportPoint(root.Position); if sp3.Z<=0 then HideDraw(d) continue end
+        local mnX,mnY,mxX,mxY=GetBoxOnScreen(char); if not mnX then HideDraw(d) continue end
+        local W,H=mxX-mnX,mxY-mnY; if W<1 or H<1 or W>2000 or H>2000 then HideDraw(d) continue end
+        local col=ESP.TeamColors and (TeamColorCache[player] or ESP.BoxColor) or ESP.BoxColor
+        if ESP.ShowBoxes then d.Box.Visible=true;d.Box.Position=Vector2.new(mnX,mnY);d.Box.Size=Vector2.new(W,H);d.Box.Color=col else d.Box.Visible=false end
+        if ESP.ShowNames then d.Name.Visible=true;d.Name.Position=Vector2.new((mnX+mxX)/2,mnY-16);d.Name.Text=player.DisplayName;d.Name.Color=col else d.Name.Visible=false end
+        if ESP.ShowDistance then d.Distance.Visible=true;d.Distance.Position=Vector2.new((mnX+mxX)/2,mxY+2);d.Distance.Text=string.format("[%.0fm]",dist) else d.Distance.Visible=false end
+        if ESP.ShowHealth then
+            local pct,hp=GetHealthPct(char); pct=math.clamp(pct,0,1); local bx=mnX-6
+            d.HealthBg.Visible=true;d.HealthBg.From=Vector2.new(bx,mnY);d.HealthBg.To=Vector2.new(bx,mxY)
+            d.Health.Visible=true;d.Health.From=Vector2.new(bx,mxY);d.Health.To=Vector2.new(bx,mxY-H*pct)
+            d.Health.Color=Color3.fromRGB(math.floor((1-pct)*255),math.floor(pct*255),0)
+            d.HealthText.Visible=true;d.HealthText.Position=Vector2.new(bx,mnY-12);d.HealthText.Text=tostring(math.floor(hp));d.HealthText.Color=Color3.fromRGB(255,255,255)
+        else d.Health.Visible=false;d.HealthBg.Visible=false;d.HealthText.Visible=false end
+    end
+    for p,d in pairs(ESP.Objects) do if not seen[p] then HideDraw(d) end end
+end)
+Players.PlayerRemoving:Connect(function(p)
+    if ESP.Objects[p] then RemDraw(ESP.Objects[p]); ESP.Objects[p]=nil end
+    TeamCache[p]=nil; TeamColorCache[p]=nil
+end)
+
+-- Target dot
+local TDot=Drawing.new("Circle"); TDot.Visible=false; TDot.Radius=4; TDot.Thickness=2; TDot.Filled=true; TDot.Color=Color3.fromRGB(255,50,50)
+local TLabel=Drawing.new("Text"); TLabel.Visible=false; TLabel.Size=12; TLabel.Center=true; TLabel.Outline=true; TLabel.OutlineColor=Color3.fromRGB(0,0,0); TLabel.Color=Color3.fromRGB(255,100,100); TLabel.Font=2
+local ShowIndicator=true
+RunService.RenderStepped:Connect(function()
+    local t = Aimbot.Target
+    if t and ShowIndicator then
+        local part = t.Character and t.Character:FindFirstChild("Head")
+                  or GetHitPart(t, SA_HitPart)
+        if part then
+            local sp=Camera:WorldToViewportPoint(part.Position)
+            if sp.Z>0 then
+                local p2=Vector2.new(sp.X,sp.Y)
+                TDot.Visible=true; TDot.Position=p2
+                TLabel.Visible=true; TLabel.Position=Vector2.new(p2.X,p2.Y-18)
+                local ok,name=pcall(function() return t.DisplayName end)
+                TLabel.Text=ok and name or "?"; return
+            end
+        end
+    end
+    TDot.Visible=false; TLabel.Visible=false
+end)
+
+--------------------------------------------------
+-- UI
+--------------------------------------------------
+local Watermark   = Library:Watermark("SCP retroBreach")
+local KeybindList = Library:KeybindList()
+local Window      = Library:Window({ Name="SCP retroBreach" })
+
+-- PAGE 1: Combat
+local P1   = Window:Page({ Name="Combat", Columns=2 })
+local S_SA = P1:Section({ Name="Silent Aim", Side=1 })
+S_SA:Label("Hold LMB = locks to target.")
+S_SA:Label("Release = free look again.")
+S_SA:Toggle({Name="Enable Silent Aim", Flag="SA_En", Default=false, Callback=function(v)
+    Aimbot.Enabled=v
+    if not v then Aimbot.Target=nil end
+    Library:Notification("Silent Aim: "..(v and "ON" or "OFF"),2)
+end})
+S_SA:Label("Toggle Key"):Keybind({Flag="SA_KB", Default=Enum.KeyCode.CapsLock, Mode="Toggle", Callback=function(t)
+    Aimbot.Enabled=t
+    if not t then Aimbot.Target=nil end
+    Library:Notification("Silent Aim: "..(t and "ON" or "OFF"),1)
+end})
+S_SA:Toggle({Name="Show Target Dot", Flag="SA_VIS", Default=true, Callback=function(v) ShowIndicator=v end})
+S_SA:Toggle({Name="Wall Check",      Flag="SA_WC",  Default=false, Callback=function(v) WallCheckEnabled=v; Aimbot.Target=nil end})
+S_SA:Slider({Name="FOV Size", Flag="SA_FOV", Min=50, Max=800, Default=150, Decimals=1, Suffix="px", Callback=function(v) SA_FOV=v end})
+S_SA:Dropdown({Name="Hit Part", Flag="SA_HP", Options={"Head","UpperTorso","Torso","HumanoidRootPart"}, Default="Head", Callback=function(v) SA_HitPart=v; Aimbot.Target=nil end})
+
+
+-- PAGE 2: Weapon
+local P2    = Window:Page({ Name="Weapon", Columns=2 })
+local S_WPN = P2:Section({ Name="Infinite Ammo", Side=1 })
+S_WPN:Label("Keeps ammo at max always.")
+S_WPN:Toggle({Name="Enable Inf Ammo", Flag="IA_En", Default=false, Callback=function(v)
+    InfAmmo.Enabled=v
+    Library:Notification("Inf Ammo: "..(v and "ON" or "OFF"),2)
+end})
+local S_RF = P2:Section({ Name="Rapid Fire", Side=2 })
+S_RF:Label("Hold LMB to rapid fire.")
+S_RF:Toggle({Name="Enable Rapid Fire", Flag="RF_En", Default=false, Callback=function(v)
+    RapidFire.Enabled=v
+    Library:Notification("Rapid Fire: "..(v and "ON" or "OFF"),2)
+end})
+
+-- PAGE 3: Movement
+local P3    = Window:Page({ Name="Movement", Columns=2 })
+local S_FLY = P3:Section({ Name="Fly", Side=1 })
+S_FLY:Label("WASD + Space/Ctrl to fly.")
+S_FLY:Toggle({Name="Enable Fly", Flag="FLY_En", Default=false, Callback=function(v) SetFly(v) end})
+S_FLY:Slider({Name="Fly Speed", Flag="FLY_SP", Min=10, Max=200, Default=50, Decimals=1, Callback=function(v) Fly.Speed=v end})
+S_FLY:Label("Fly Key"):Keybind({Flag="FLY_KB", Default=Enum.KeyCode.G, Mode="Toggle", Callback=function(t) SetFly(t) end})
+local S_MOV = P3:Section({ Name="Movement", Side=2 })
+S_MOV:Toggle({Name="Noclip", Flag="NC_En", Default=false, Callback=function(v) SetNoclip(v) end})
+S_MOV:Label("Noclip Key"):Keybind({Flag="NC_KB", Default=Enum.KeyCode.V, Mode="Toggle", Callback=function(t) SetNoclip(t) end})
+S_MOV:Toggle({Name="Speed Hack", Flag="SP_En", Default=false, Callback=function(v)
+    Speed.Enabled=v
+    if not v then local h=GetHuman(); if h then h.WalkSpeed=16 end end
+end})
+S_MOV:Slider({Name="Walk Speed", Flag="SP_Val", Min=16, Max=300, Default=60, Decimals=1, Callback=function(v) Speed.Value=v end})
+
+-- PAGE 4: Visuals
+local P4    = Window:Page({ Name="Visuals", Columns=2 })
+local S_ESP = P4:Section({ Name="ESP", Side=1 })
+S_ESP:Toggle({Name="Enable ESP",    Flag="ESP_En",Default=false,Callback=function(v) ESP.Enabled=v end})
+S_ESP:Toggle({Name="Show Boxes",    Flag="ESP_Bx",Default=true, Callback=function(v) ESP.ShowBoxes=v end})
+S_ESP:Toggle({Name="Show Names",    Flag="ESP_Nm",Default=true, Callback=function(v) ESP.ShowNames=v end})
+S_ESP:Toggle({Name="Show Health",   Flag="ESP_Hp",Default=true, Callback=function(v) ESP.ShowHealth=v end})
+S_ESP:Toggle({Name="Show Distance", Flag="ESP_Ds",Default=true, Callback=function(v) ESP.ShowDistance=v end})
+S_ESP:Toggle({Name="Team Colors",   Flag="ESP_Tc",Default=true, Callback=function(v) ESP.TeamColors=v end})
+S_ESP:Toggle({Name="Hide Teammates",Flag="ESP_Tm",Default=true, Callback=function(v) ESP.TeamCheck=v end})
+S_ESP:Slider({Name="Max Distance",  Flag="ESP_Md",Min=100,Max=5000,Default=2000,Decimals=1,Suffix="m",Callback=function(v) ESP.MaxDistance=v end})
+local S_VIS = P4:Section({ Name="World", Side=2 })
+S_VIS:Toggle({Name="Fullbright",  Flag="FB_En",  Default=false, Callback=function(v) SetFullbright(v) end})
+S_VIS:Toggle({Name="FOV Circle",  Flag="FOV_En", Default=false, Callback=function(v) FOV.Enabled=v end})
+S_VIS:Slider({Name="FOV Radius",  Flag="FOV_R",  Min=50, Max=800, Default=150, Decimals=1, Suffix="px", Callback=function(v) FOV.Radius=v end})
+S_VIS:Label("Box Color"):Colorpicker({Flag="ESP_Bc",Default=Color3.fromRGB(255,50,50),Callback=function(c) ESP.BoxColor=c end})
+
+-- PAGE 5: Misc
+local P5    = Window:Page({ Name="Misc", Columns=2 })
+local S_GEN = P5:Section({ Name="General", Side=1 })
+S_GEN:Button({Name="Rejoin", Callback=function() game:GetService("TeleportService"):Teleport(game.PlaceId,LocalPlayer) end})
+S_GEN:Button({Name="Reset Character", Callback=function() local h=GetHuman(); if h then h.Health=0 end end})
+
+Library:CreateSettingsPage(Window, KeybindList, Watermark)
+
+local lastTime=tick(); local fps=60
+RunService.RenderStepped:Connect(function()
+    local now=tick(); fps=math.floor(0.9*fps+0.1/(math.max(now-lastTime,0.001))); lastTime=now
+    local t = Aimbot.Target
+    local name = t and pcall(function() return t.DisplayName end) and t.DisplayName or nil
+    local status = Aimbot.Enabled and (name and "► "..name or "scanning...") or "OFF"
+    Watermark:SetText(string.format("retroBreach | FPS:%d | %s%s%s%s",
+        fps, status,
+        Fly.Enabled and " | FLY" or "",
+        InfAmmo.Enabled and " | INF" or "",
+        RapidFire.Enabled and " | RAPID" or ""
+    ))
+end)
+
+Library:Notification("Loaded! No hooks - everything works!", 3)
