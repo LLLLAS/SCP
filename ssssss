@@ -1536,42 +1536,52 @@ Library.Window = function(self, Data)
         Items["MainFrame"].Instance.Position = UDim2New(0, cp.X, 0, cp.Y)
     end
 
-    -- Stores { [instance] = baseTransparency } so we can blend on top
-    local TransparencyMap = {}
+    -- Stores original BackgroundTransparency per instance (snapshot once)
+    local TransparencyBase = {}
+    local TransparencySnapped = false
 
-    local function SnapshotTransparencies()
-        TransparencyMap = {}
+    local function DoSnapshot()
+        TransparencyBase = {}
         local all = Items["MainFrame"].Instance:GetDescendants()
         TableInsert(all, Items["MainFrame"].Instance)
         for _, v in all do
             if v:IsA("Frame") or v:IsA("ScrollingFrame") then
-                -- Only snapshot items that naturally have a visible bg (base < 1)
-                -- and are not purely decorative transparent overlays
-                local bt = v.BackgroundTransparency
-                TransparencyMap[v] = bt
+                TransparencyBase[v] = v.BackgroundTransparency
+            end
+        end
+        TransparencySnapped = true
+    end
+
+    -- Snapshot once after UI is fully built
+    task.defer(function() task.wait(0.1) DoSnapshot() end)
+
+    function Window:SetTransparency(Alpha)
+        Window.Transparency = MathClamp(Alpha, 0, 1)
+        local a = Window.Transparency
+        local ti = TweenInfo.new(0.14, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+
+        -- Ensure we have a snapshot; add any new instances not yet tracked
+        if not TransparencySnapped then DoSnapshot() end
+        local all = Items["MainFrame"].Instance:GetDescendants()
+        TableInsert(all, Items["MainFrame"].Instance)
+        for _, v in all do
+            if (v:IsA("Frame") or v:IsA("ScrollingFrame")) and not TransparencyBase[v] then
+                TransparencyBase[v] = v.BackgroundTransparency
+            end
+        end
+
+        for inst, base in TransparencyBase do
+            if inst and inst.Parent then
+                -- base=0 (solid) → target=a; base=1 (transparent) → stays 1
+                local target = MathClamp(base + (1 - base) * a, 0, 1)
+                TweenService:Create(inst, ti, { BackgroundTransparency = target }):Play()
             end
         end
     end
 
-    -- Call once after window is fully built to record baseline
-    task.defer(function() SnapshotTransparencies() end)
-
-    function Window:SetTransparency(Alpha)
-        Window.Transparency = MathClamp(Alpha, 0, 1)
-        local a  = Window.Transparency
-        local ti = TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-
-        -- Re-snapshot to catch any new elements added since last call
-        SnapshotTransparencies()
-
-        for inst, base in TransparencyMap do
-            if inst and inst.Parent then
-                -- Blend: fully transparent items stay transparent (base=1 stays 1)
-                -- Opaque items (base=0) get pushed to `a`
-                -- Semi-transparent items scale proportionally
-                local target = MathClamp(base + (1 - base) * a, 0, 1)
-                TweenService:Create(inst, ti, { BackgroundTransparency = target }):Play()
-            end
+    function Window:RefreshTransparency()
+        if Window.Transparency > 0 then
+            Window:SetTransparency(Window.Transparency)
         end
     end
 
@@ -1603,10 +1613,15 @@ Library.Window = function(self, Data)
             )
             t:Play()
             t.Completed:Connect(function()
-                -- Restore in case tween overshoots
                 frame.Size = UDim2New(0, WINDOW_W, 0, WINDOW_H)
                 frame.BackgroundTransparency = 0
                 Debounce = false
+                -- Re-apply user transparency after open animation
+                task.defer(function()
+                    if Window.Transparency > 0 then
+                        Window:SetTransparency(Window.Transparency)
+                    end
+                end)
             end)
         else
             -- Closing: scale down to 0, fade out with Quart easing
@@ -2723,7 +2738,7 @@ Library.CreateSettingsPage = function(self, Window, KeybindList, Watermark, Mode
         SS:Toggle({ Name = "Keybind List", Flag = "Keybind list", Default = true, Callback = function(v) KeybindList:SetVisibility(v) end })
         SS:Toggle({ Name = "Moderator List", Flag = "Moderator list", Default = true, Callback = function(v) if ModeratorList then ModeratorList:SetVisibility(v) end end })
         SS:Label("Menu Keybind"):Keybind({ Name = "Menu Keybind", Flag = "MenuKeybind", Default = Library.MenuKeybind, Mode = "Toggle", Callback = function() Library.MenuKeybind = Library.Flags["MenuKeybind"].Key end })
-        SS:Slider({ Name = "UI Transparency", Default = 0, Flag = "UI Transparency", Decimals = 0.05, Suffix = "", Max = 0.9, Min = 0, Callback = function(v) Window:SetTransparency(v) end })
+        SS:Slider({ Name = "UI Transparency", Default = 0, Flag = "UITransparency", Decimals = 0.05, Suffix = "", Max = 0.9, Min = 0, Callback = function(v) Window:SetTransparency(v) end })
         SS:Slider({ Name = "Tween Speed", Default = 0.18, Flag = "Tween Speed", Decimals = 0.01, Suffix = "s", Max = 2, Min = 0, Callback = function(v) Library.Tween.Time = v end })
         SS:Dropdown({ Name = "Tween Style", Flag = "Tween style", MaxSize = 200, Items = { "Linear", "Quad", "Quart", "Back", "Bounce", "Circular", "Cubic", "Elastic", "Exponential", "Sine", "Quint" }, Default = "Quart", Callback = function(v) if not v then v = "Quart" end Library.Tween.Style = Enum.EasingStyle[v] end })
         SS:Dropdown({ Name = "Tween Direction", Flag = "Tween direction", Items = { "In", "Out", "InOut" }, Default = "Out", Callback = function(v) if not v then v = "Out" end Library.Tween.Direction = Enum.EasingDirection[v] end })
