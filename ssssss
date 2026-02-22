@@ -348,12 +348,47 @@ Instances:Create("UIListLayout", {
 
 -- Library methods
 Library.Unload = function(self)
-    self.Unloaded = true  -- flag checked by async callbacks
-    for _, c in self.Connections do c.Connection:Disconnect() end
-    for _, t in self.Threads do coroutine.close(t) end
-    if self.Holder then self.Holder:Clean() end
-    Library = nil
+    self.Unloaded = true
+    -- disconnect all connections safely
+    for _, c in self.Connections do
+        if c.Connection then
+            pcall(function() c.Connection:Disconnect() end)
+        end
+    end
+    -- close all threads safely
+    for _, t in self.Threads do
+        pcall(function() coroutine.close(t) end)
+    end
+    -- destroy all ScreenGuis (Holder, UnusedHolder, any splash guis)
+    if self.Holder then
+        pcall(function() self.Holder.Instance:Destroy() end)
+    end
+    if self.UnusedHolder then
+        pcall(function() self.UnusedHolder.Instance:Destroy() end)
+    end
+    -- destroy any lingering splash/notif guis parented to gethui/CoreGui
+    pcall(function()
+        local hui = gethui and gethui() or game:GetService("CoreGui")
+        for _, v in hui:GetChildren() do
+            if v.Name == "LibSplash" or v.Name == "SplashReveal" then
+                v:Destroy()
+            end
+        end
+    end)
+    -- destroy any splash parented to PlayerGui
+    pcall(function()
+        local pg = game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui")
+        if pg then
+            for _, v in pg:GetChildren() do
+                if v.Name == "LibSplash" or v.Name == "SplashReveal" then
+                    v:Destroy()
+                end
+            end
+        end
+    end)
+    -- clear global reference
     pcall(function() getgenv().Library = nil end)
+    Library = nil
 end
 
 Library.Round = function(self, Number, Float)
@@ -1598,6 +1633,106 @@ Library.Window = function(self, Data)
         task.wait()
         Items["MainFrame"].Instance.AnchorPoint = Vector2New(0, 0)
         Items["MainFrame"].Instance.Position = UDim2New(0, cp.X, 0, cp.Y)
+    end
+
+    -- Video background (VideoFrame inside MainFrame, behind everything)
+    -- VideoFrame sits at ZIndex 0, clipped by the window corners
+    local videoFrame = nil
+
+    function Window:SetVideo(assetId, volume)
+        volume = volume or 0  -- muted by default
+        -- remove old if exists
+        if videoFrame then videoFrame:Destroy() videoFrame = nil end
+
+        local mf = Items["MainFrame"].Instance
+
+        -- clip container (matches window exactly, behind all content)
+        local clip = InstanceNew("Frame")
+        clip.Name               = "VideoBG"
+        clip.Size               = UDim2New(1, 0, 1, 0)
+        clip.Position           = UDim2New(0, 0, 0, 0)
+        clip.BackgroundTransparency = 1
+        clip.BorderSizePixel    = 0
+        clip.ZIndex             = 0
+        clip.ClipsDescendants   = true
+        clip.Parent             = mf
+
+        -- round corners to match window
+        local corner = InstanceNew("UICorner")
+        corner.CornerRadius = UDim.new(0, 8)
+        corner.Parent = clip
+
+        -- the actual VideoFrame
+        local vf = InstanceNew("VideoFrame")
+        vf.Name             = "Video"
+        vf.Size             = UDim2New(1.06, 0, 1.06, 0)  -- slight oversize to hide edges
+        vf.Position         = UDim2New(-0.03, 0, -0.03, 0)
+        vf.BackgroundTransparency = 1
+        vf.BorderSizePixel  = 0
+        vf.ZIndex           = 0
+        vf.Looped           = true
+        vf.Volume           = volume
+        -- normalize assetId
+        local id = tostring(assetId)
+        if not id:find("rbxassetid://") then
+            id = "rbxassetid://" .. id:match("%d+")
+        end
+        vf.Video  = id
+        vf.Parent = clip
+
+        videoFrame = clip
+
+        -- dim overlay so content stays readable
+        local dim = InstanceNew("Frame")
+        dim.Name             = "VideoDim"
+        dim.Size             = UDim2New(1, 0, 1, 0)
+        dim.BackgroundColor3 = FromRGB(0, 0, 0)
+        dim.BackgroundTransparency = 0.45
+        dim.BorderSizePixel  = 0
+        dim.ZIndex           = 1
+        dim.Parent           = clip
+
+        -- make MainFrame background transparent so video shows through
+        mf.BackgroundTransparency = 1
+
+        -- play once loaded
+        vf:GetPropertyChangedSignal("IsLoaded"):Connect(function()
+            if vf.IsLoaded then vf:Play() end
+        end)
+        if vf.IsLoaded then vf:Play() end
+
+        -- also keep playing on window reopen
+        Library:Connect(vf.DidLoop, function() end)  -- keep alive ref
+
+        Window.VideoFrame = vf
+        return vf
+    end
+
+    function Window:SetVideoVolume(vol)
+        if Window.VideoFrame then
+            Window.VideoFrame.Volume = MathClamp(vol, 0, 1)
+        end
+    end
+
+    function Window:SetVideoDim(alpha)
+        -- alpha: 0=fully visible, 1=fully dimmed
+        if videoFrame then
+            local dim = videoFrame:FindFirstChild("VideoDim")
+            if dim then
+                TweenService:Create(dim, TweenInfo.new(0.3),
+                    { BackgroundTransparency = MathClamp(alpha, 0, 1) }):Play()
+            end
+        end
+    end
+
+    function Window:RemoveVideo()
+        if videoFrame then
+            videoFrame:Destroy()
+            videoFrame = nil
+            Window.VideoFrame = nil
+            -- restore bg
+            Items["MainFrame"].Instance.BackgroundTransparency = Window.Transparency
+        end
     end
 
     -- No snapshot needed: we use ThemeMap color keys to identify panel frames.
@@ -2870,6 +3005,22 @@ Library.CreateSettingsPage = function(self, Window, KeybindList, Watermark, Mode
         SS:Slider({ Name = "Tween Speed", Default = 0.18, Flag = "Tween Speed", Decimals = 0.01, Suffix = "s", Max = 2, Min = 0, Callback = function(v) Library.Tween.Time = v end })
         SS:Dropdown({ Name = "Tween Style", Flag = "Tween style", MaxSize = 200, Items = { "Linear", "Quad", "Quart", "Back", "Bounce", "Circular", "Cubic", "Elastic", "Exponential", "Sine", "Quint" }, Default = "Quart", Callback = function(v) if not v then v = "Quart" end Library.Tween.Style = Enum.EasingStyle[v] end })
         SS:Dropdown({ Name = "Tween Direction", Flag = "Tween direction", Items = { "In", "Out", "InOut" }, Default = "Out", Callback = function(v) if not v then v = "Out" end Library.Tween.Direction = Enum.EasingDirection[v] end })
+
+        -- Video background settings
+        local VS = SP:Section({ Name = "Video Background", Side = 2 }) do
+            local videoIdInput = ""
+            VS:Textbox({ Name = "Video Asset ID", Default = "", Flag = "VideoID", Placeholder = "rbxassetid://...", Callback = function(v) videoIdInput = v end })
+            VS:Slider({ Name = "Video Dim", Default = 0.45, Flag = "VideoDim", Decimals = 0.05, Suffix = "", Max = 0.95, Min = 0, Callback = function(v) Window:SetVideoDim(v) end })
+            VS:Slider({ Name = "Video Volume", Default = 0, Flag = "VideoVolume", Decimals = 0.05, Suffix = "", Max = 1, Min = 0, Callback = function(v) Window:SetVideoVolume(v) end })
+            VS:Button({ Name = "Apply Video", Callback = function()
+                if videoIdInput and videoIdInput ~= "" then
+                    Window:SetVideo(videoIdInput, Library.Flags["VideoVolume"] or 0)
+                end
+            end })
+            VS:Button({ Name = "Remove Video", Callback = function()
+                Window:RemoveVideo()
+            end })
+        end
     end
 
     local CS = SP:Section({ Name = "Configs", Side = 2 }) do
