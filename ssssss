@@ -45,7 +45,22 @@ local Library do
     Library.Pages.__index = Library.Pages
 end
 
-gethui = gethui or function() return CoreGui end
+-- Executor compatibility layer
+local function GetHUI()
+    if gethui then return gethui() end
+    -- Delta / executors without gethui: parent to CoreGui directly
+    -- and use protect_gui if available
+    local sg = Instance.new("ScreenGui")
+    if syn and syn.protect_gui then syn.protect_gui(sg) end
+    if gethiddenproperty then -- some executors
+        pcall(function() gethiddenproperty(sg, "InternalTransparency") end)
+    end
+    sg.Parent = game:GetService("CoreGui")
+    sg:Destroy() -- destroy the test, return CoreGui
+    return game:GetService("CoreGui")
+end
+
+gethui = GetHUI
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -100,8 +115,16 @@ local Themes = {
 
 Library.Theme = TableClone(Themes["Preset"])
 
+-- Safe filesystem wrappers (Delta and other executors may not have all of these)
+local function SafeIsfolder(p) return isfolder and isfolder(p) or false end
+local function SafeMakefolder(p) if makefolder then pcall(makefolder, p) end end
+local function SafeIsfile(p) return isfile and isfile(p) or false end
+local function SafeWritefile(p, d) if writefile then pcall(writefile, p, d) end end
+local function SafeReadfile(p) if readfile then local ok,r = pcall(readfile, p) return ok and r or nil end end
+local function SafeDelfile(p) if delfile then pcall(delfile, p) end end
+
 for _, v in Library.Folders do
-    if not isfolder(v) then makefolder(v) end
+    if not SafeIsfolder(v) then SafeMakefolder(v) end
 end
 
 -- Tween system
@@ -252,12 +275,18 @@ Instances = {} do
 
     Instances.OnHover = function(self, fn)
         if not self.Instance then return end
-        return Library:Connect(self.Instance.MouseEnter, fn)
+        Library:Connect(self.Instance.MouseEnter, fn)
+        Library:Connect(self.Instance.InputBegan, function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then fn() end
+        end)
     end
 
     Instances.OnHoverLeave = function(self, fn)
         if not self.Instance then return end
-        return Library:Connect(self.Instance.MouseLeave, fn)
+        Library:Connect(self.Instance.MouseLeave, fn)
+        Library:Connect(self.Instance.InputEnded, function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then fn() end
+        end)
     end
 end
 
@@ -269,13 +298,33 @@ Library.Fonts["Montserrat"] = Font.new("rbxasset://fonts/families/Montserrat.jso
 Library.espfont = Library.Fonts["Gotham"]
 
 -- Holders
-Library.Holder = Instances:Create("ScreenGui", {
-    Parent = gethui(), Name = "\0",
+-- Create protected ScreenGuis (Delta-compatible)
+local function CreateProtectedGui(props)
+    local sg = Instance.new("ScreenGui")
+    for k, v in props do
+        if k ~= "Parent" then
+            pcall(function() sg[k] = v end)
+        end
+    end
+    -- Try syn.protect_gui first (Synapse), then cloneref trick (Delta)
+    if syn and syn.protect_gui then
+        pcall(function() syn.protect_gui(sg) end)
+    end
+    -- Parent last (after protection)
+    local ok = pcall(function() sg.Parent = gethui() end)
+    if not ok then
+        pcall(function() sg.Parent = game:GetService("CoreGui") end)
+    end
+    return { Instance = sg }
+end
+
+Library.Holder = CreateProtectedGui({
+    Name = "LinoriaHolder",
     ZIndexBehavior = Enum.ZIndexBehavior.Global,
     DisplayOrder = 2, IgnoreGuiInset = true, ResetOnSpawn = false
 })
-Library.UnusedHolder = Instances:Create("ScreenGui", {
-    Parent = gethui(), Name = "\0",
+Library.UnusedHolder = CreateProtectedGui({
+    Name = "LinoriaUnused",
     ZIndexBehavior = Enum.ZIndexBehavior.Global,
     Enabled = false, ResetOnSpawn = false
 })
@@ -304,7 +353,7 @@ Library.Unload = function(self)
     for _, t in self.Threads do coroutine.close(t) end
     if self.Holder then self.Holder:Clean() end
     Library = nil
-    getgenv().Library = nil
+    pcall(function() getgenv().Library = nil end)
 end
 
 Library.Round = function(self, Number, Float)
@@ -330,7 +379,7 @@ Library.SafeCall = function(self, Function, ...)
 end
 
 Library.Connect = function(self, Event, Callback, Name)
-    Name = Name or StringFormat("conn_%s_%s", self.UnnamedConnections + 1, HttpService:GenerateGUID(false))
+    Name = Name or StringFormat("conn_%s_%s", self.UnnamedConnections + 1, (pcall(function() return HttpService:GenerateGUID(false) end) and HttpService:GenerateGUID(false) or tostring(math.random(100000, 999999))))
     local c = { Event = Event, Callback = Callback, Name = Name, Connection = nil }
     Library:Thread(function() c.Connection = Event:Connect(Callback) end)
     TableInsert(self.Connections, c)
@@ -351,7 +400,7 @@ Library.EscapePattern = function(self, s)
 end
 
 Library.NextFlag = function(self)
-    return StringFormat("flag_%s_%s", self.UnnamedFlags + 1, HttpService:GenerateGUID(false))
+    return StringFormat("flag_%s_%s", self.UnnamedFlags + 1, (pcall(function() return HttpService:GenerateGUID(false) end) and HttpService:GenerateGUID(false) or tostring(math.random(100000, 999999))))
 end
 
 Library.AddToTheme = function(self, Item, Properties)
@@ -388,7 +437,13 @@ end
 
 Library.IsMouseOverFrame = function(self, Frame)
     Frame = Frame.Instance
-    local mp = Vector2New(Mouse.X, Mouse.Y)
+    local mp
+    if UserInputService.TouchEnabled then
+        local touches = UserInputService:GetTouches()
+        mp = #touches > 0 and touches[1].Position or Vector2New(Mouse.X, Mouse.Y)
+    else
+        mp = Vector2New(Mouse.X, Mouse.Y)
+    end
     return mp.X >= Frame.AbsolutePosition.X and mp.X <= Frame.AbsolutePosition.X + Frame.AbsoluteSize.X
         and mp.Y >= Frame.AbsolutePosition.Y and mp.Y <= Frame.AbsolutePosition.Y + Frame.AbsoluteSize.Y
 end
@@ -425,7 +480,7 @@ end
 
 Library.DeleteConfig = function(self, Config)
     local path = Library.Folders.Configs .. "/" .. Config
-    if isfile(path) then delfile(path) end
+    if SafeIsfile(path) then SafeDelfile(path) end
 end
 
 Library.RefreshConfigsList = function(self, Element)
@@ -815,25 +870,28 @@ Library.CreateColorpicker = function(self, Data)
         Colorpicker:Update(false)
     end
 
-    Items["Palette"]:Connect("InputBegan", function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then SlidingPalette = true Colorpicker:SlidePalette(i) end end)
-    Items["Palette"]:Connect("InputEnded", function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then SlidingPalette = false end end)
-    Items["HueInline"]:Connect("InputBegan", function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then SlidingHue = true Colorpicker:SlideHue(i) end end)
-    Items["HueInline"]:Connect("InputEnded", function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then SlidingHue = false end end)
-    Items["Alpha"]:Connect("InputBegan", function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then SlidingAlpha = true Colorpicker:SlideAlpha(i) end end)
-    Items["Alpha"]:Connect("InputEnded", function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then SlidingAlpha = false end end)
+    local function IsTM(t) return t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch end
+    Items["Palette"]:Connect("InputBegan", function(i) if IsTM(i.UserInputType) then SlidingPalette = true Colorpicker:SlidePalette(i) end end)
+    Items["Palette"]:Connect("InputEnded", function(i) if IsTM(i.UserInputType) then SlidingPalette = false end end)
+    Items["HueInline"]:Connect("InputBegan", function(i) if IsTM(i.UserInputType) then SlidingHue = true Colorpicker:SlideHue(i) end end)
+    Items["HueInline"]:Connect("InputEnded", function(i) if IsTM(i.UserInputType) then SlidingHue = false end end)
+    Items["Alpha"]:Connect("InputBegan", function(i) if IsTM(i.UserInputType) then SlidingAlpha = true Colorpicker:SlideAlpha(i) end end)
+    Items["Alpha"]:Connect("InputEnded", function(i) if IsTM(i.UserInputType) then SlidingAlpha = false end end)
     Items["HexInput"]:Connect("FocusLost", function() Colorpicker:Set(tostring(Items["HexInput"].Instance.Text), Colorpicker.Alpha) end)
-    Items["ColorpickerButton"]:Connect("MouseButton1Down", function() Colorpicker:SetOpen(not Colorpicker.IsOpen) end)
+    Items["ColorpickerButton"]:Connect("InputBegan", function(i)
+        if IsTM(i.UserInputType) then Colorpicker:SetOpen(not Colorpicker.IsOpen) end
+    end)
     Items["ColorpickerButton"]:Connect("MouseButton2Down", function() Colorpicker:SetOpen2(not Colorpicker.IsOpen2) end)
 
     Library:Connect(UserInputService.InputChanged, function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseMovement then
+        if Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch then
             if SlidingPalette then Colorpicker:SlidePalette(Input)
             elseif SlidingHue then Colorpicker:SlideHue(Input)
             elseif SlidingAlpha then Colorpicker:SlideAlpha(Input) end
         end
     end)
     Library:Connect(UserInputService.InputBegan, function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if IsTM(Input.UserInputType) then
             if not Colorpicker.IsOpen then return end
             if Library:IsMouseOverFrame(Items["ColorpickerWindow"]) or Library:IsMouseOverFrame(Items["ColorpickerWindow2"]) then return end
             Colorpicker:SetOpen(false) Colorpicker:SetOpen2(false)
@@ -1667,6 +1725,29 @@ Library.Window = function(self, Data)
         end
     end)
 
+    -- Mobile: floating draggable toggle button (only on touch-only devices)
+    if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+        local MobileBtn = Instances:Create("TextButton", {
+            Parent = Library.Holder.Instance, Name = "\0",
+            Text = "=", FontFace = Library.Font,
+            TextColor3 = Library.Theme.Text, TextSize = 20,
+            AutoButtonColor = false,
+            Size = UDim2New(0, 48, 0, 48),
+            Position = UDim2New(1, -58, 1, -58),
+            AnchorPoint = Vector2New(0, 0),
+            BorderSizePixel = 0, ZIndex = 10,
+            BackgroundColor3 = Library.Theme.Accent
+        })
+        Corner(MobileBtn.Instance, 14)
+        MobileBtn:AddToTheme({ BackgroundColor3 = "Accent", TextColor3 = "Text" })
+        MobileBtn:MakeDraggable()
+        MobileBtn:Connect("InputBegan", function(i)
+            if i.UserInputType == Enum.UserInputType.Touch and not Debounce then
+                Window:SetOpen(not Window.IsOpen)
+            end
+        end)
+    end
+
     Window:SetCenter()
     task.wait()
 
@@ -2238,19 +2319,20 @@ Library.Sections.Slider = function(self, Data)
         if Slider.Callback then Library:SafeCall(Slider.Callback, Slider.Value) end
     end
 
+    local function IsSliderInput(t) return t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch end
     Items["Track"]:Connect("InputBegan", function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if IsSliderInput(Input.UserInputType) then
             Slider.Sliding = true
-            local sx = (Input.Position.X - Items["Track"].Instance.AbsolutePosition.X) / Items["Track"].Instance.AbsoluteSize.X
+            local sx = MathClamp((Input.Position.X - Items["Track"].Instance.AbsolutePosition.X) / Items["Track"].Instance.AbsoluteSize.X, 0, 1)
             Slider:Set(((Slider.Max - Slider.Min) * sx) + Slider.Min)
         end
     end)
     Items["Track"]:Connect("InputEnded", function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseButton1 then Slider.Sliding = false end
+        if IsSliderInput(Input.UserInputType) then Slider.Sliding = false end
     end)
     Library:Connect(UserInputService.InputChanged, function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseMovement and Slider.Sliding then
-            local sx = (Input.Position.X - Items["Track"].Instance.AbsolutePosition.X) / Items["Track"].Instance.AbsoluteSize.X
+        if (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) and Slider.Sliding then
+            local sx = MathClamp((Input.Position.X - Items["Track"].Instance.AbsolutePosition.X) / Items["Track"].Instance.AbsoluteSize.X, 0, 1)
             Slider:Set(((Slider.Max - Slider.Min) * sx) + Slider.Min)
         end
     end)
@@ -2327,7 +2409,7 @@ Library.Sections.Dropdown = function(self, Data)
     Items["Arrow"] = Instances:Create("TextLabel", {
         Parent = Items["Button"].Instance, Name = "\0",
         FontFace = Library.Font, TextColor3 = T.TextMuted,
-        Text = "▾", AnchorPoint = Vector2New(1,0.5),
+        Text = "v", AnchorPoint = Vector2New(1,0.5),
         Size = UDim2New(0,14,0,12),
         BackgroundTransparency = 1,
         Position = UDim2New(1,-4,0.5,0),
@@ -2446,11 +2528,11 @@ Library.Sections.Dropdown = function(self, Data)
                 if v ~= Dropdown then v:SetOpen(false) end
             end
             Library.OpenFrames[Dropdown] = Dropdown
-            Items["Arrow"].Instance.Text = "▴"
+            Items["Arrow"].Instance.Text = "^"
         else
             if DDRenderStepped then DDRenderStepped:Disconnect() DDRenderStepped = nil end
             Library.OpenFrames[Dropdown] = nil
-            Items["Arrow"].Instance.Text = "▾"
+            Items["Arrow"].Instance.Text = "v"
         end
 
         local all = Items["OptionHolder"].Instance:GetDescendants()
@@ -2568,10 +2650,14 @@ Library.Sections.Dropdown = function(self, Data)
 
     for _, v in Dropdown.Items do Dropdown:Add(v) end
 
-    Items["Button"]:Connect("MouseButton1Down", function() Dropdown:SetOpen(not Dropdown.IsOpen) end)
+    Items["Button"]:Connect("InputBegan", function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            Dropdown:SetOpen(not Dropdown.IsOpen)
+        end
+    end)
 
     Library:Connect(UserInputService.InputBegan, function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
             if not Dropdown.IsOpen then return end
             if Library:IsMouseOverFrame(Items["OptionHolder"]) then return end
             Dropdown:SetOpen(false)
@@ -2791,28 +2877,28 @@ Library.CreateSettingsPage = function(self, Window, KeybindList, Watermark, Mode
         local cDropdown = CS:Dropdown({ Name = "Profiles", Flag = "Profiles list", Multi = false, Items = {}, Callback = function(v) configSelected = v end })
         CS:Textbox({ Name = "Config name", Default = "", Flag = "ConfigName", Placeholder = "...", Callback = function(v) configName = v end })
         CS:Button({ Name = "Create", Callback = function()
-            if configName ~= "" and not isfile(Library.Folders.Configs .. "/" .. configName .. ".json") then
-                writefile(Library.Folders.Configs .. "/" .. configName .. ".json", Library:GetConfig())
+            if configName ~= "" and not SafeIsfile(Library.Folders.Configs .. "/" .. configName .. ".json") then
+                SafeWritefile(Library.Folders.Configs .. "/" .. configName .. ".json", Library:GetConfig())
                 Library:RefreshConfigsList(cDropdown)
                 Library:Notification("Created " .. configName, 4)
             end
         end })
         CS:Button({ Name = "Delete", Callback = function()
             if configSelected then
-                delfile(Library.Folders.Configs .. "/" .. configSelected .. ".json")
+                SafeDelfile(Library.Folders.Configs .. "/" .. configSelected .. ".json")
                 Library:RefreshConfigsList(cDropdown)
                 Library:Notification("Deleted " .. configSelected, 4)
             end
         end })
         CS:Button({ Name = "Load", Callback = function()
             if configSelected then
-                local ok = Library:LoadConfig(readfile(Library.Folders.Configs .. "/" .. configSelected .. ".json"))
+                local ok = Library:LoadConfig(SafeReadfile(Library.Folders.Configs .. "/" .. configSelected .. ".json"))
                 Library:Notification(ok and ("Loaded " .. configSelected) or "Load failed", 4)
             end
         end })
         CS:Button({ Name = "Save", Callback = function()
             if configSelected then
-                writefile(Library.Folders.Configs .. "/" .. configSelected .. ".json", Library:GetConfig())
+                SafeWritefile(Library.Folders.Configs .. "/" .. configSelected .. ".json", Library:GetConfig())
                 Library:Notification("Saved " .. configSelected, 4)
             end
         end })
@@ -3006,6 +3092,389 @@ Library.TargetHud = function(self)
     function TH:SetVisibility(Bool) Items["Frame"].Instance.Visible = Bool end
     function TH:SetPosition(pos) Items["Frame"].Instance.Position = pos end
     return TH
+end
+
+
+-- =============================================
+-- LoadSplash  -  load SplashReveal from external URL and attach to Library
+-- Usage:  Library:LoadSplash("https://raw.githubusercontent.com/.../SplashReveal.lua")
+-- After loading, call Library:Splash({ ... }) as normal
+-- =============================================
+Library.LoadSplash = function(self, url)
+    local ok, result = pcall(function()
+        return loadstring(game:HttpGet(url, true))()
+    end)
+    if not ok or type(result) ~= "table" then
+        warn("LoadSplash failed: " .. tostring(result))
+        return false
+    end
+    -- Attach Play as Library:Splash
+    Library.Splash = function(lib, cfg)
+        result:Play(cfg)
+    end
+    return true
+end
+
+-- =============================================
+-- Splash Art Reveal
+-- Usage:
+--   Library:Splash({
+--     Image       = "rbxassetid://ID",
+--     Name        = "Character Name",
+--     Title       = "Subtitle",
+--     BgColor     = Color3.fromRGB(139,0,0),
+--     AccentColor = Color3.fromRGB(200,169,110),
+--     Duration    = 4,
+--     OnDone      = function() end,
+--   })
+-- =============================================
+Library.Splash = function(self, cfg)
+    cfg = cfg or {}
+    local Image       = cfg.Image       or ""
+    local CharName    = cfg.Name        or "???"
+    local CharTitle   = cfg.Title       or ""
+    local BgColor     = cfg.BgColor     or FromRGB(139, 0, 0)
+    local AccentColor = cfg.AccentColor or FromRGB(200, 169, 110)
+    local Duration    = cfg.Duration    or 4
+    local OnDone      = cfg.OnDone      or function() end
+
+    -- root ScreenGui
+    local gui = InstanceNew("ScreenGui")
+    gui.Name               = "LibSplash"
+    gui.ZIndexBehavior     = Enum.ZIndexBehavior.Global
+    gui.DisplayOrder       = 999
+    gui.IgnoreGuiInset     = true
+    gui.ResetOnSpawn       = false
+    pcall(function() if syn and syn.protect_gui then syn.protect_gui(gui) end end)
+    local ok = pcall(function() gui.Parent = gethui and gethui() or Library.Holder.Instance.Parent end)
+    if not ok then pcall(function() gui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui") end) end
+
+    local function N(class, props, parent)
+        local i = InstanceNew(class)
+        for k,v in props do pcall(function() i[k] = v end) end
+        if parent then i.Parent = parent end
+        return i
+    end
+
+    local root = N("Frame", {
+        Size = UDim2New(1,0,1,0),
+        BackgroundColor3 = FromRGB(0,0,0),
+        BackgroundTransparency = 0,
+        BorderSizePixel = 0,
+        ClipsDescendants = true,
+    }, gui)
+
+    local barH = 0.075
+    local barTop = N("Frame", {
+        Size = UDim2New(1,0,barH,0), Position = UDim2New(0,0,0,0),
+        BackgroundColor3 = FromRGB(0,0,0), BorderSizePixel = 0, ZIndex = 20
+    }, root)
+    local barBot = N("Frame", {
+        Size = UDim2New(1,0,barH,0), Position = UDim2New(0,0,1-barH,0),
+        BackgroundColor3 = FromRGB(0,0,0), BorderSizePixel = 0, ZIndex = 20
+    }, root)
+
+    -- background
+    local bg = N("Frame", {
+        Size = UDim2New(0,0,1,0),
+        BackgroundColor3 = BgColor,
+        BorderSizePixel = 0, ZIndex = 1
+    }, root)
+
+    -- diagonal stripes
+    local stripes = N("Frame", {
+        Size = UDim2New(1,0,1,0), BackgroundTransparency = 1,
+        BorderSizePixel = 0, ZIndex = 2, ClipsDescendants = true
+    }, root)
+    for i = -3, 20 do
+        N("Frame", {
+            Size = UDim2New(0, 60, 1.5, 0),
+            Position = UDim2New(0, i * 80 - 40, -0.25, 0),
+            Rotation = -20,
+            BackgroundColor3 = FromRGB(0,0,0),
+            BackgroundTransparency = 0.82,
+            BorderSizePixel = 0, ZIndex = 2
+        }, stripes)
+    end
+    stripes.BackgroundTransparency = 1
+
+    -- big name background text
+    local bigText = N("TextLabel", {
+        Size = UDim2New(1,0,0,200), Position = UDim2New(0,0,0.5,-100),
+        BackgroundTransparency = 1,
+        Text = string.upper(CharName),
+        Font = Enum.Font.GothamBlack,
+        TextSize = 160,
+        TextColor3 = FromRGB(0,0,0),
+        TextTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        ZIndex = 3
+    }, root)
+
+    -- character frame
+    local charFrame = N("Frame", {
+        Size = UDim2New(0,580,1,0),
+        Position = UDim2New(0.5,-290,0,0),
+        BackgroundTransparency = 1, BorderSizePixel = 0,
+        ZIndex = 10, ClipsDescendants = false
+    }, root)
+
+    -- bloom glow behind char
+    local bloom = N("ImageLabel", {
+        Size = UDim2New(1.5,0,1.5,0),
+        Position = UDim2New(-0.25,0,-0.25,0),
+        BackgroundTransparency = 1,
+        Image = "rbxassetid://5028857472",
+        ImageColor3 = AccentColor,
+        ImageTransparency = 1, ZIndex = 9
+    }, charFrame)
+
+    -- character image
+    local charImg = N("ImageLabel", {
+        Size = UDim2New(1,0,1,0),
+        BackgroundTransparency = 1,
+        Image = Image,
+        ScaleType = Enum.ScaleType.Fit,
+        ImageTransparency = 1, ZIndex = 10
+    }, charFrame)
+
+    -- white flash overlay
+    local flash = N("Frame", {
+        Size = UDim2New(1,0,1,0),
+        BackgroundColor3 = FromRGB(255,255,255),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0, ZIndex = 11
+    }, charFrame)
+
+    -- name plate
+    local plate = N("Frame", {
+        Size = UDim2New(0,420,0,72),
+        Position = UDim2New(0,48,1,-130),
+        BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 15
+    }, root)
+
+    local accentLine = N("Frame", {
+        Size = UDim2New(0,0,0,3), Position = UDim2New(0,0,0,0),
+        BackgroundColor3 = AccentColor, BorderSizePixel = 0, ZIndex = 15
+    }, plate)
+
+    local nameLabel = N("TextLabel", {
+        Size = UDim2New(1,0,0,44), Position = UDim2New(-0.05,0,0,8),
+        BackgroundTransparency = 1,
+        Text = CharName, Font = Enum.Font.GothamBlack,
+        TextSize = 34, TextColor3 = FromRGB(240,230,210),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTransparency = 1, ZIndex = 15
+    }, plate)
+
+    local titleLabel = N("TextLabel", {
+        Size = UDim2New(1,0,0,20), Position = UDim2New(-0.05,0,0,54),
+        BackgroundTransparency = 1,
+        Text = CharTitle, Font = Enum.Font.Gotham,
+        TextSize = 13, TextColor3 = AccentColor,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTransparency = 1, ZIndex = 15
+    }, plate)
+
+    -- particle holder
+    local particles = N("Frame", {
+        Size = UDim2New(1,0,1,0),
+        BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 12
+    }, root)
+
+    local function spawnParticle()
+        if not gui or not gui.Parent then return end
+        local p = N("Frame", {
+            Size = UDim2New(0, math.random(2,5), 0, math.random(2,5)),
+            Position = UDim2New(math.random(25,75)/100, 0, math.random(30,75)/100, 0),
+            BackgroundColor3 = AccentColor,
+            BackgroundTransparency = 0.1,
+            BorderSizePixel = 0, ZIndex = 12
+        }, particles)
+        local c = InstanceNew("UICorner")
+        c.CornerRadius = UDim.new(1,0)
+        c.Parent = p
+        TweenService:Create(p, TweenInfo.new(math.random(5,12)/10,
+            Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Position = UDim2New(p.Position.X.Scale + math.random(-6,6)/100, 0,
+                                p.Position.Y.Scale - math.random(8,20)/100, 0),
+            BackgroundTransparency = 1,
+            Size = UDim2New(0,0,0,0)
+        }):Play()
+        game:GetService("Debris"):AddItem(p, 1.4)
+    end
+
+    -- hint
+    local hint = N("TextLabel", {
+        Size = UDim2New(0,220,0,24), Position = UDim2New(1,-230,1,-48),
+        BackgroundTransparency = 1,
+        Text = "[ Click to continue ]",
+        Font = Enum.Font.Gotham, TextSize = 12,
+        TextColor3 = FromRGB(180,165,145),
+        TextXAlignment = Enum.TextXAlignment.Right,
+        TextTransparency = 1, ZIndex = 20
+    }, root)
+
+    -- helpers --
+    local function tw(inst, t, s, d, props)
+        local ti = TweenInfo.new(t, s or Enum.EasingStyle.Quart, d or Enum.EasingDirection.Out)
+        local tw2 = TweenService:Create(inst, ti, props)
+        tw2:Play()
+        return tw2
+    end
+
+    -- destroy --
+    local alive = true
+    local pulseConn
+    local function destroy()
+        if not alive then return end
+        alive = false
+        if pulseConn then pulseConn:Disconnect() end
+        tw(root, 0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.In,
+            { BackgroundTransparency = 1 })
+        tw(bg,   0.3,  Enum.EasingStyle.Quart, Enum.EasingDirection.In,
+            { BackgroundTransparency = 1 })
+        tw(charImg, 0.25, nil, nil, { ImageTransparency = 1 })
+        tw(nameLabel, 0.2, nil, nil, { TextTransparency = 1 })
+        tw(titleLabel,0.2, nil, nil, { TextTransparency = 1 })
+        task.delay(0.4, function()
+            pcall(function() gui:Destroy() end)
+            Library:SafeCall(OnDone)
+        end)
+    end
+
+    root.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1
+        or i.UserInputType == Enum.UserInputType.Touch then
+            destroy()
+        end
+    end)
+
+    -- sequence --
+    Library:Thread(function()
+        task.wait(0.08)
+
+        -- bg wipe from left
+        tw(bg, 0.42, Enum.EasingStyle.Quint, Enum.EasingDirection.Out,
+            { Size = UDim2New(1,0,1,0) })
+        task.wait(0.18)
+
+        -- stripes appear
+        tw(stripes, 0.3, nil, nil, { BackgroundTransparency = 0 })
+
+        -- big name
+        task.wait(0.08)
+        tw(bigText, 0.55, nil, nil, { TextTransparency = 0.75 })
+
+        -- character slam in
+        task.wait(0.14)
+        charFrame.Position = UDim2New(0.5,-290,0.12,0)
+        charImg.ImageTransparency = 0
+
+        tw(bloom, 0.7, Enum.EasingStyle.Quart, nil, { ImageTransparency = 0.5 })
+        TweenService:Create(bloom, TweenInfo.new(0.7, Enum.EasingStyle.Quart), { ImageTransparency = 1 }):Play()
+
+        flash.BackgroundTransparency = 0.45
+        tw(flash, 0.38, nil, nil, { BackgroundTransparency = 1 })
+
+        tw(charFrame, 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out,
+            { Position = UDim2New(0.5,-290,0,0) })
+
+        -- screen flash
+        local sf = N("Frame", {
+            Size = UDim2New(1,0,1,0),
+            BackgroundColor3 = FromRGB(255,255,255),
+            BackgroundTransparency = 0.55,
+            BorderSizePixel = 0, ZIndex = 25
+        }, root)
+        tw(sf, 0.38, nil, nil, { BackgroundTransparency = 1 })
+        game:GetService("Debris"):AddItem(sf, 0.5)
+
+        -- bars open
+        tw(barTop, 0.48, Enum.EasingStyle.Quint, nil,
+            { Position = UDim2New(0,0,-barH,0) })
+        tw(barBot, 0.48, Enum.EasingStyle.Quint, nil,
+            { Position = UDim2New(0,0,1,0) })
+
+        -- name plate
+        task.wait(0.28)
+        tw(accentLine, 0.48, Enum.EasingStyle.Quint, nil,
+            { Size = UDim2New(1,0,0,3) })
+        task.wait(0.14)
+        tw(nameLabel, 0.42, nil, nil,
+            { TextTransparency = 0, Position = UDim2New(0,0,0,8) })
+        task.wait(0.09)
+        tw(titleLabel, 0.38, nil, nil,
+            { TextTransparency = 0, Position = UDim2New(0,0,0,54) })
+
+        -- particle burst
+        task.wait(0.08)
+        for i = 1, 20 do
+            task.delay(i * 0.035, spawnParticle)
+        end
+
+        -- hint
+        task.wait(0.28)
+        tw(hint, 0.4, nil, nil, { TextTransparency = 0.45 })
+
+        -- continuous animation loop
+        local t = 0
+        -- shimmer overlay on name
+        local shimmer = N("Frame", {
+            Size = UDim2New(0, 60, 1, 0),
+            Position = UDim2New(-0.2, 0, 0, 0),
+            BackgroundColor3 = FromRGB(255,255,255),
+            BackgroundTransparency = 0.7,
+            BorderSizePixel = 0, ZIndex = 16,
+            ClipsDescendants = false,
+            Rotation = -20
+        }, plate)
+        -- run shimmer sweep once
+        Library:Thread(function()
+            task.wait(0.1)
+            tw(shimmer, 0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut,
+                { Position = UDim2New(1.2, 0, 0, 0) })
+            task.wait(0.6)
+            shimmer:Destroy()
+        end)
+
+        pulseConn = RunService.Heartbeat:Connect(function(dt)
+            if not alive then return end
+            t = t + dt
+
+            -- 1. character gentle float (up/down sine wave)
+            local floatY  = math.sin(t * 0.9) * 6      -- 6px amplitude, slow
+            local floatX  = math.sin(t * 0.5) * 3      -- slight horizontal sway
+            charFrame.Position = UDim2New(0.5, -290 + floatX, 0, floatY)
+
+            -- 2. big background text slow drift left
+            bigText.Position = UDim2New(0, math.sin(t * 0.25) * 18, 0.5, -100)
+
+            -- 3. bg color subtle pulse (brightness oscillate)
+            local pulse = 0.06 + math.abs(math.sin(t * 0.7)) * 0.06
+            bg.BackgroundColor3 = Color3.new(
+                math.clamp(BgColor.R + math.sin(t * 1.1) * pulse * 0.4, 0, 1),
+                math.clamp(BgColor.G + math.sin(t * 1.1) * pulse * 0.1, 0, 1),
+                math.clamp(BgColor.B + math.sin(t * 1.1) * pulse * 0.1, 0, 1)
+            )
+
+            -- 4. accent line width breathe
+            local breathe = 0.88 + math.sin(t * 1.4) * 0.12
+            accentLine.Size = UDim2New(breathe, 0, 0, 3)
+
+            -- 5. random particle spawn
+            if math.random(1, 5) == 1 then spawnParticle() end
+
+            -- 6. hint text alpha pulse
+            hint.TextTransparency = 0.35 + math.abs(math.sin(t * 1.2)) * 0.35
+        end)
+
+        -- auto close
+        if Duration > 0 then
+            task.wait(Duration)
+            if alive then destroy() end
+        end
+    end)
 end
 
 return Library
