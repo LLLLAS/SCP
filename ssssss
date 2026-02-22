@@ -87,20 +87,20 @@ local RectNew = Rect.new
 -- LinoriaLib color palette
 local Themes = {
     ["Preset"] = {
-        ["Background"]      = FromRGB(15, 15, 23),
-        ["Surface"]         = FromRGB(20, 20, 30),
-        ["Surface2"]        = FromRGB(26, 26, 38),
-        ["Accent"]          = FromRGB(120, 100, 220),
-        ["AccentDark"]      = FromRGB(80, 65, 160),
-        ["Text"]            = FromRGB(220, 220, 230),
-        ["TextMuted"]       = FromRGB(130, 130, 150),
-        ["Border"]          = FromRGB(45, 45, 65),
-        ["Toggle On"]       = FromRGB(120, 100, 220),
-        ["Toggle Off"]      = FromRGB(40, 40, 58),
-        ["Element"]         = FromRGB(30, 30, 45),
-        ["ElementHover"]    = FromRGB(38, 38, 55),
-        ["TopBar"]          = FromRGB(18, 18, 28),
-        ["SlotBackground"]  = FromRGB(15, 15, 23),
+        ["Background"]      = FromRGB(245, 248, 255),
+        ["Surface"]         = FromRGB(235, 240, 252),
+        ["Surface2"]        = FromRGB(225, 232, 248),
+        ["Accent"]          = FromRGB(40, 120, 255),
+        ["AccentDark"]      = FromRGB(20, 90, 210),
+        ["Text"]            = FromRGB(15, 25, 60),
+        ["TextMuted"]       = FromRGB(100, 120, 170),
+        ["Border"]          = FromRGB(190, 210, 245),
+        ["Toggle On"]       = FromRGB(40, 120, 255),
+        ["Toggle Off"]      = FromRGB(200, 215, 240),
+        ["Element"]         = FromRGB(230, 238, 255),
+        ["ElementHover"]    = FromRGB(215, 228, 255),
+        ["TopBar"]          = FromRGB(220, 230, 250),
+        ["SlotBackground"]  = FromRGB(245, 248, 255),
     }
 }
 
@@ -1507,7 +1507,7 @@ Library.Window = function(self, Data)
         Name = Data.Name or Data.name or "Window",
         Logo = Data.Logo or Data.logo or nil,
         Pages = {}, Items = {}, IsOpen = false,
-        Transparency = Data.Transparency or Data.transparency or 0
+        Transparency = Data.Transparency or Data.transparency or 0.75
     }
 
     local Items = {}
@@ -2993,7 +2993,7 @@ Library.CreateSettingsPage = function(self, Window, KeybindList, Watermark, Mode
         SS:Toggle({ Name = "Keybind List", Flag = "Keybind list", Default = true, Callback = function(v) KeybindList:SetVisibility(v) end })
         SS:Toggle({ Name = "Moderator List", Flag = "Moderator list", Default = true, Callback = function(v) if ModeratorList then ModeratorList:SetVisibility(v) end end })
         SS:Label("Menu Keybind"):Keybind({ Name = "Menu Keybind", Flag = "MenuKeybind", Default = Library.MenuKeybind, Mode = "Toggle", Callback = function() Library.MenuKeybind = Library.Flags["MenuKeybind"].Key end })
-        SS:Slider({ Name = "UI Transparency", Default = 0, Flag = "UITransparency", Decimals = 0.05, Suffix = "", Max = 0.9, Min = 0, Callback = function(v) Window:SetTransparency(v) end })
+        SS:Slider({ Name = "UI Transparency", Default = 0.75, Flag = "UITransparency", Decimals = 0.05, Suffix = "", Max = 0.9, Min = 0, Callback = function(v) Window:SetTransparency(v) end })
         SS:Slider({ Name = "Tween Speed", Default = 0.18, Flag = "Tween Speed", Decimals = 0.01, Suffix = "s", Max = 2, Min = 0, Callback = function(v) Library.Tween.Time = v end })
         SS:Dropdown({ Name = "Tween Style", Flag = "Tween style", MaxSize = 200, Items = { "Linear", "Quad", "Quart", "Back", "Bounce", "Circular", "Cubic", "Elastic", "Exponential", "Sine", "Quint" }, Default = "Quart", Callback = function(v) if not v then v = "Quart" end Library.Tween.Style = Enum.EasingStyle[v] end })
         SS:Dropdown({ Name = "Tween Direction", Flag = "Tween direction", Items = { "In", "Out", "InOut" }, Default = "Out", Callback = function(v) if not v then v = "Out" end Library.Tween.Direction = Enum.EasingDirection[v] end })
