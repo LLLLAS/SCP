@@ -48,15 +48,6 @@ end
 -- Executor compatibility layer
 local function GetHUI()
     if gethui then return gethui() end
-    -- Delta / executors without gethui: parent to CoreGui directly
-    -- and use protect_gui if available
-    local sg = Instance.new("ScreenGui")
-    if syn and syn.protect_gui then syn.protect_gui(sg) end
-    if gethiddenproperty then -- some executors
-        pcall(function() gethiddenproperty(sg, "InternalTransparency") end)
-    end
-    sg.Parent = game:GetService("CoreGui")
-    sg:Destroy() -- destroy the test, return CoreGui
     return game:GetService("CoreGui")
 end
 
@@ -359,31 +350,24 @@ Library.Unload = function(self)
     for _, t in self.Threads do
         pcall(function() coroutine.close(t) end)
     end
-    -- destroy all ScreenGuis (Holder, UnusedHolder, any splash guis)
-    if self.Holder then
-        pcall(function() self.Holder.Instance:Destroy() end)
-    end
-    if self.UnusedHolder then
-        pcall(function() self.UnusedHolder.Instance:Destroy() end)
-    end
-    -- destroy any lingering splash/notif guis parented to gethui/CoreGui
+    -- destroy all ScreenGuis by direct ref AND by name scan (belt+suspenders)
+    local destroyNames = { LinoriaHolder=true, LinoriaUnused=true, LibSplash=true, SplashReveal=true }
+    -- direct refs
+    pcall(function() if self.Holder then self.Holder.Instance:Destroy() end end)
+    pcall(function() if self.UnusedHolder then self.UnusedHolder.Instance:Destroy() end end)
+    -- scan gethui
     pcall(function()
-        local hui = gethui and gethui() or game:GetService("CoreGui")
+        local hui = gethui()
         for _, v in hui:GetChildren() do
-            if v.Name == "LibSplash" or v.Name == "SplashReveal" then
-                v:Destroy()
-            end
+            if destroyNames[v.Name] then pcall(function() v:Destroy() end) end
         end
     end)
-    -- destroy any splash parented to PlayerGui
+    -- scan PlayerGui as fallback
     pcall(function()
         local pg = game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui")
-        if pg then
-            for _, v in pg:GetChildren() do
-                if v.Name == "LibSplash" or v.Name == "SplashReveal" then
-                    v:Destroy()
-                end
-            end
+        if not pg then return end
+        for _, v in pg:GetChildren() do
+            if destroyNames[v.Name] then pcall(function() v:Destroy() end) end
         end
     end)
     -- clear global reference
