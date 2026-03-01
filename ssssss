@@ -1721,61 +1721,56 @@ Library.Window = function(self, Data)
 
     -- MOBILE: Floating hamburger button to reopen menu
     do
-        local toggleBtn = Instances:Create("TextButton", {
-            Parent = Library.Holder.Instance, Name = "\0",
-            Text = "\xe2\x98\xb0",
-            FontFace = Library.Fonts["GothamBold"] or Library.Font,
-            TextColor3 = T.Text,
-            TextSize = 16,
-            AutoButtonColor = false,
-            AnchorPoint = Vector2New(0, 1),
-            Position = UDim2New(0, 8, 1, -8),
-            Size = UDim2New(0, 44, 0, 44),
-            BorderSizePixel = 0,
-            ZIndex = 10,
-            BackgroundColor3 = T.Surface
-        })
-        Corner(toggleBtn.Instance, 10)
-        Instances:Create("UIStroke", {
-            Parent = toggleBtn.Instance, Name = "\0",
-            Color = T.Accent, Thickness = 1.5
-        }):AddToTheme({ Color = "Accent" })
-        toggleBtn:AddToTheme({ BackgroundColor3 = "Surface", TextColor3 = "Text" })
+        local toggleBtn = InstanceNew("TextButton")
+        toggleBtn.Text = "Menu"
+        toggleBtn.FontFace = Library.Fonts["GothamBold"] or Library.Font
+        toggleBtn.TextColor3 = Library.Theme.Text
+        toggleBtn.TextSize = 12
+        toggleBtn.AutoButtonColor = false
+        toggleBtn.AnchorPoint = Vector2New(0, 1)
+        toggleBtn.Position = UDim2New(0, 8, 1, -8)
+        toggleBtn.Size = UDim2New(0, 52, 0, 28)
+        toggleBtn.BorderSizePixel = 0
+        toggleBtn.ZIndex = 20
+        toggleBtn.BackgroundColor3 = Library.Theme.Accent
+        toggleBtn.Visible = false
+        toggleBtn.Parent = Library.Holder.Instance
+        Corner(toggleBtn, 6)
 
-        local function ShowToggleBtn(show)
-            toggleBtn.Instance.Visible = show
+        -- Simple open: just make frame visible directly, skip animation entirely on mobile
+        local function OpenMenu()
+            if Window.IsOpen then return end
+            Window.IsOpen = true
+            Debounce = false
+            local frame = Items["MainFrame"].Instance
+            frame.Visible = true
+            frame.Size = UDim2New(0, WINDOW_W, 0, WINDOW_H)
+            frame.BackgroundTransparency = 0
+            toggleBtn.Visible = false
         end
 
-        -- Override SetOpen to track toggle button state
-        local origSetOpen = Window.SetOpen
-        Window.SetOpen = function(self, Bool)
-            origSetOpen(self, Bool)
+        -- Hook into SetOpen to show/hide toggle button
+        local _origSetOpen = Window.SetOpen
+        Window.SetOpen = function(self2, Bool)
+            _origSetOpen(self2, Bool)
             if Bool then
-                ShowToggleBtn(false)
+                toggleBtn.Visible = false
             else
-                task.delay(0.3, function()
-                    if not Window.IsOpen then ShowToggleBtn(true) end
+                -- Show button after close anim finishes (~0.4s total)
+                task.delay(0.5, function()
+                    if not Window.IsOpen then
+                        toggleBtn.Visible = true
+                    end
                 end)
             end
         end
 
-        -- Fire on finger LIFT (InputEnded/TouchEnded), not on press down
-        -- This prevents the TouchBegan from the same tap triggering other handlers
-        toggleBtn.Instance.MouseButton1Up:Connect(function()
-            if not Window.IsOpen and not Debounce then
-                Window:SetOpen(true)
+        toggleBtn.MouseButton1Up:Connect(OpenMenu)
+        toggleBtn.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then
+                OpenMenu()
             end
         end)
-        toggleBtn.Instance.InputEnded:Connect(function(Input)
-            if Input.UserInputType == Enum.UserInputType.Touch then
-                if not Window.IsOpen and not Debounce then
-                    Window:SetOpen(true)
-                end
-            end
-        end)
-
-        toggleBtn:MakeDraggable()
-        ShowToggleBtn(false)
     end
 
     Window:SetCenter()
