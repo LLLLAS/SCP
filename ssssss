@@ -5,7 +5,7 @@ local RunService      = game:GetService("RunService")
 local TweenService    = game:GetService("TweenService")
 local GuiService      = game:GetService("GuiService")
 
--- ─── Mobile detection ────────────────────────────────────────────────────────
+-- Mobile detection
 local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
 local Library do
@@ -49,10 +49,9 @@ end
 gethui = gethui or function() return game:GetService("CoreGui") end
 
 local LocalPlayer = Players.LocalPlayer
-local Camera      = workspace.CurrentCamera
 local Mouse       = LocalPlayer:GetMouse()
 
--- ─── Localised constructors ───────────────────────────────────────────────────
+-- Localised constructors
 local FromRGB              = Color3.fromRGB
 local FromHSV              = Color3.fromHSV
 local FromHex              = Color3.fromHex
@@ -80,7 +79,7 @@ local StringLen            = string.len
 local InstanceNew          = Instance.new
 local RectNew              = Rect.new
 
--- ─── Theme palette ───────────────────────────────────────────────────────────
+-- Theme palette
 local Themes = {
     ["Preset"] = {
         ["Background"]   = FromRGB(12, 12, 18),
@@ -106,7 +105,7 @@ for _, v in Library.Folders do
     if not isfolder(v) then makefolder(v) end
 end
 
--- ─── Tween system ────────────────────────────────────────────────────────────
+-- Tween system
 local Tween = {} do
     Tween.__index = Tween
 
@@ -147,7 +146,7 @@ local Tween = {} do
     Tween.Clean = function(self) if self.Tween then self:Pause() end self = nil end
 end
 
--- ─── Instances system ────────────────────────────────────────────────────────
+-- Instances system
 Instances = {} do
     Instances.__index = Instances
 
@@ -200,7 +199,7 @@ Instances = {} do
         self = nil
     end
 
-    -- ── Draggable: works for both mouse and touch ──────────────────────────
+    -- Draggable: works for both mouse and touch
     Instances.MakeDraggable = function(self)
         if not self.Instance then return end
         local Gui = self.Instance
@@ -254,14 +253,14 @@ Instances = {} do
     end
 end
 
--- ─── Font setup ──────────────────────────────────────────────────────────────
+-- Font setup
 Library.Font                  = Font.new("rbxasset://fonts/families/GothamSSm.json",  Enum.FontWeight.Regular)
 Library.Fonts["Gotham"]       = Font.new("rbxasset://fonts/families/GothamSSm.json",  Enum.FontWeight.Regular)
 Library.Fonts["GothamBold"]   = Font.new("rbxasset://fonts/families/GothamSSm.json",  Enum.FontWeight.Bold)
 Library.Fonts["Montserrat"]   = Font.new("rbxasset://fonts/families/Montserrat.json", Enum.FontWeight.Regular)
 Library.espfont               = Library.Fonts["Gotham"]
 
--- ─── Holders ─────────────────────────────────────────────────────────────────
+-- Holders
 Library.Holder = Instances:Create("ScreenGui", {
     Parent = gethui(), Name = "\0",
     ZIndexBehavior = Enum.ZIndexBehavior.Global,
@@ -290,22 +289,31 @@ Instances:Create("UIListLayout", {
     Padding = UDimNew(0, 6)
 })
 
--- ─── UIScale for small screens ────────────────────────────────────────────────
--- NOTE: Uses raw :Connect (not Library:Connect) because this runs before
--- Library methods are defined. The connection is stored so Unload can clean it.
-local _UIScaleConn do
-    local ScaleObj = InstanceNew("UIScale")
-    ScaleObj.Parent = Library.Holder.Instance
-    local function UpdateScale()
-        local vp = Camera.ViewportSize
-        local minDim = math.min(vp.X, vp.Y)
-        ScaleObj.Scale = MathClamp(minDim / 680, 0.55, 1)
-    end
-    UpdateScale()
-    _UIScaleConn = Camera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateScale)
+-- UIScale for small screens
+local _UIScaleConn
+local _UIScaleObj = InstanceNew("UIScale")
+_UIScaleObj.Parent = Library.Holder.Instance
+
+local function _UpdateScale()
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+    local vp = cam.ViewportSize
+    local minDim = math.min(vp.X, vp.Y)
+    _UIScaleObj.Scale = MathClamp(minDim / 680, 0.55, 1)
 end
 
--- ─── Library methods ─────────────────────────────────────────────────────────
+local function _InitUIScale()
+    local cam = workspace.CurrentCamera
+    if cam then
+        _UpdateScale()
+        _UIScaleConn = cam:GetPropertyChangedSignal("ViewportSize"):Connect(_UpdateScale)
+    else
+        workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(_InitUIScale)
+    end
+end
+_InitUIScale()
+
+-- Library methods
 Library.Unload = function(self)
     if _UIScaleConn then _UIScaleConn:Disconnect() _UIScaleConn = nil end
     for _, c in self.Connections do
@@ -456,7 +464,7 @@ Library.RefreshConfigsList = function(self, Element)
     Element:Refresh(ret)
 end
 
--- ─── Helpers ─────────────────────────────────────────────────────────────────
+-- Helpers
 local function Corner(parent, radius)
     local c = InstanceNew("UICorner")
     c.CornerRadius = UDimNew(0, radius or 4)
@@ -479,7 +487,7 @@ local function TrackPopupToAnchor(PopupInst, AnchorInst, OffsetY, OffsetX)
     return conn
 end
 
--- ─── Glow effect helper ───────────────────────────────────────────────────────
+-- Glow effect helper
 local function MakeGlow(parent, color, size)
     local g = InstanceNew("ImageLabel")
     g.Name             = "\0"
@@ -496,9 +504,9 @@ local function MakeGlow(parent, color, size)
     return g
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- COLORPICKER
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.CreateColorpicker = function(self, Data)
     local Colorpicker = {
         Hue = 0, Saturation = 0, Value = 0, Alpha = 0,
@@ -934,9 +942,9 @@ Library.CreateColorpicker = function(self, Data)
     return Colorpicker, Items
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- KEYBIND
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.CreateKeybind = function(self, Data)
     local Keybind = {
         IsOpen = false, Key = "", Toggled = false, Mode = "",
@@ -1198,9 +1206,9 @@ Library.CreateKeybind = function(self, Data)
     return Keybind, Items
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- WATERMARK
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.Watermark = function(self, Name)
     local Watermark = {}
     local T         = Library.Theme
@@ -1257,9 +1265,9 @@ Library.Watermark = function(self, Name)
     return Watermark
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- KEYBIND LIST
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.KeybindList = function(self)
     local KL    = {}
     self.KeyList = KL
@@ -1333,9 +1341,9 @@ Library.KeybindList = function(self)
     return KL
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- MODERATOR LIST
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.ModeratorList = function(self)
     local ML         = {}
     local Moderators = {}
@@ -1428,9 +1436,9 @@ Library.ModeratorList = function(self)
     return ML
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- NOTIFICATION
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.Notification = function(self, Name, Duration)
     local T     = Library.Theme
     local Items = {}
@@ -1492,9 +1500,9 @@ Library.Notification = function(self, Name, Duration)
     end)
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- WINDOW
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.Window = function(self, Data)
     Data = Data or {}
     local T      = Library.Theme
@@ -1684,9 +1692,9 @@ Library.Window = function(self, Data)
     return setmetatable(Window, Library)
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- PAGE
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.Page = function(self, Data)
     Data = Data or {}
     local T    = Library.Theme
@@ -1804,9 +1812,9 @@ Library.Page = function(self, Data)
     return setmetatable(Page, Library.Pages)
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- SECTION
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.Pages.Section = function(self, Data)
     Data = Data or {}
     local T       = Library.Theme
@@ -1897,9 +1905,9 @@ Library.Pages.Section = function(self, Data)
     return setmetatable(Section, Library.Sections)
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- TOGGLE
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.Sections.Toggle = function(self, Data)
     Data = Data or {}
     local T      = Library.Theme
@@ -2036,9 +2044,9 @@ Library.Sections.Toggle = function(self, Data)
     return Toggle
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- BUTTON
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.Sections.Button = function(self, Data)
     Data   = Data or {}
     local T      = Library.Theme
@@ -2083,9 +2091,9 @@ Library.Sections.Button = function(self, Data)
     return Button
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- SLIDER
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.Sections.Slider = function(self, Data)
     Data   = Data or {}
     local T      = Library.Theme
@@ -2222,9 +2230,9 @@ Library.Sections.Slider = function(self, Data)
     return Slider
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- DROPDOWN
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.Sections.Dropdown = function(self, Data)
     Data = Data or {}
     local T        = Library.Theme
@@ -2564,9 +2572,9 @@ Library.Sections.Dropdown = function(self, Data)
     return Dropdown
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- LABEL
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.Sections.Label = function(self, Name)
     local T     = Library.Theme
     local Label = { Window = self.Window, Page = self.Page, Section = self, Name = Name or "Label" }
@@ -2630,9 +2638,9 @@ Library.Sections.Label = function(self, Name)
     return Label
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- TEXTBOX
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.Sections.Textbox = function(self, Data)
     Data   = Data or {}
     local T       = Library.Theme
@@ -2723,12 +2731,12 @@ Library.Sections.Textbox = function(self, Data)
     return Textbox
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- NEW: VIEWPORT (3D character/model preview)
 -- Usage:  local vp = Section:Viewport({ Name = "Preview", Height = 120 })
 --         vp:SetModel(character)      -- show any model
 --         vp:RotateModel(dt)          -- call in RenderStepped for spin
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.Sections.Viewport = function(self, Data)
     Data = Data or {}
     local T        = Library.Theme
@@ -2840,9 +2848,9 @@ Library.Sections.Viewport = function(self, Data)
     return VP
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- SETTINGS PAGE
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.CreateSettingsPage = function(self, Window, KeybindList, Watermark, ModeratorList)
     local SP = Window:Page({ Name = "Settings", Columns = 2 })
 
@@ -2912,9 +2920,9 @@ Library.CreateSettingsPage = function(self, Window, KeybindList, Watermark, Mode
     end
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- ARMOR VIEWER  (unchanged API, minor style refresh)
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.ArmorViewer = function(self)
     local AV       = {}
     local T        = Library.Theme
@@ -2983,9 +2991,9 @@ Library.ArmorViewer = function(self)
     return AV
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 -- TARGET HUD  (unchanged API, minor style refresh)
--- ─────────────────────────────────────────────────────────────────────────────
+-- -----------------------------------------------------------------------------
 Library.TargetHud = function(self)
     local TH    = {}
     local T     = Library.Theme
