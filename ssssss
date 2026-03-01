@@ -266,24 +266,13 @@ Instances = {} do
 end
 
 -- Font setup
--- Font compatibility: Font.new() not supported on all executors
-local _useNewFont = pcall(function()
-    local _ = Font.new("rbxasset://fonts/families/GothamSSm.json")
-end)
-if _useNewFont then
-    Library.Font                = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
-    Library.Fonts["Gotham"]     = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
-    Library.Fonts["GothamBold"] = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
-    Library.Fonts["Montserrat"] = Font.new("rbxasset://fonts/families/Montserrat.json", Enum.FontWeight.Regular)
-else
-    Library.Font                = Enum.Font.Gotham
-    Library.Fonts["Gotham"]     = Enum.Font.Gotham
-    Library.Fonts["GothamBold"] = Enum.Font.GothamBold
-    Library.Fonts["Montserrat"] = Enum.Font.Gotham
-end
-Library.espfont = Library.Fonts["Gotham"]
--- espfont for Drawing API (always use string name, not Font object)
-Library.espfontName = "Gotham"
+-- Font: always use Enum.Font for maximum executor compatibility
+Library.Font                = Enum.Font.Gotham
+Library.Fonts["Gotham"]     = Enum.Font.Gotham
+Library.Fonts["GothamBold"] = Enum.Font.GothamBold
+Library.Fonts["Montserrat"] = Enum.Font.Gotham
+Library.espfont             = Enum.Font.Gotham
+Library.espfontName         = "Gotham"
 
 -- Holders
 Library.Holder = Instances:Create("ScreenGui", {
