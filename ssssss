@@ -165,15 +165,7 @@ Instances = {} do
     Instances.Create = function(self, Class, Properties)
         local obj = { Instance = InstanceNew(Class), Properties = Properties or {}, Class = Class }
         setmetatable(obj, Instances)
-        for k, v in obj.Properties do
-            local ok, err = pcall(function() obj.Instance[k] = v end)
-            if not ok then
-                -- Font property fallback: try Enum.Font string name
-                if k == "Font" and type(v) == "userdata" then
-                    pcall(function() obj.Instance[k] = tostring(v):match("Enum%.Font%.(.+)") or "Gotham" end)
-                end
-            end
-        end
+        for k, v in obj.Properties do obj.Instance[k] = v end
         return obj
     end
 
@@ -520,7 +512,8 @@ Library.CreateColorpicker = function(self, Data)
     local BTN_SIZE = IsMobile and 22 or 16  -- bigger tap target on mobile
 
     Items["ColorpickerButton"] = Instances:Create("TextButton", {
-        Parent = Data.Parent.Instance, Name = "\0", TextColor3 = FromRGB(0, 0, 0),
+        Parent = Data.Parent.Instance, Name = "\0",
+        Font = Library.Font, TextColor3 = FromRGB(0, 0, 0),
         Text = "", AutoButtonColor = false,
         Size = UDim2New(0, BTN_SIZE, 0, BTN_SIZE),
         BorderSizePixel = 0, TextSize = 13,
@@ -680,6 +673,7 @@ Library.CreateColorpicker = function(self, Data)
 
     Items["HexInput"] = Instances:Create("TextBox", {
         Parent = Items["ColorpickerWindow"].Instance, Name = "\0",
+        Font = Library.Font,
         ClearTextOnFocus = false,
         TextColor3 = T.Text,
         Text = "",
@@ -723,7 +717,8 @@ Library.CreateColorpicker = function(self, Data)
 
     local function AddCPButton(Name, Callback)
         local btn = Instances:Create("TextButton", {
-            Parent = Items["ColorpickerWindow2"].Instance, Name = "\0", TextColor3 = T.Text,
+            Parent = Items["ColorpickerWindow2"].Instance, Name = "\0",
+            Font = Library.Font, TextColor3 = T.Text,
             Text = Name, AutoButtonColor = false,
             BackgroundTransparency = 1,
             Size = UDim2New(1, 0, 0, 20),
@@ -956,7 +951,8 @@ Library.CreateKeybind = function(self, Data)
     local BTN_H = IsMobile and 22 or 16
 
     Items["KeyButton"] = Instances:Create("TextButton", {
-        Parent = Data.Parent.Instance, Name = "\0", TextColor3 = T.TextMuted,
+        Parent = Data.Parent.Instance, Name = "\0",
+        Font = Library.Font, TextColor3 = T.TextMuted,
         Text = "[ Unbound ]", AutoButtonColor = false,
         Size = UDim2New(0, 0, 0, BTN_H),
         BorderSizePixel = 0, TextSize = 11,
@@ -987,7 +983,8 @@ Library.CreateKeybind = function(self, Data)
 
     local function MakeMode(name)
         local btn = Instances:Create("TextButton", {
-            Parent = Items["KeybindWindow"].Instance, Name = "\0", TextColor3 = T.TextMuted,
+            Parent = Items["KeybindWindow"].Instance, Name = "\0",
+            Font = Library.Font, TextColor3 = T.TextMuted,
             Text = name, AutoButtonColor = false,
             BackgroundTransparency = 1,
             Size = UDim2New(1, 0, 0, 20),
@@ -1236,6 +1233,7 @@ Library.Watermark = function(self, Name)
 
     Items["Text"] = Instances:Create("TextLabel", {
         Parent = Items["Watermark"].Instance, Name = "\0",
+        Font = Library.Font,
         TextColor3 = T.Text,
         Text = Name,
         AnchorPoint = Vector2New(0, 0.5),
@@ -1290,6 +1288,7 @@ Library.KeybindList = function(self)
 
     Items["Title"] = Instances:Create("TextLabel", {
         Parent = Items["Frame"].Instance, Name = "\0",
+        Font = Library.Fonts["GothamBold"] or Library.Font,
         TextColor3 = T.Text, Text = "Keybinds",
         BackgroundTransparency = 1,
         TextXAlignment = Enum.TextXAlignment.Left,
@@ -1314,7 +1313,8 @@ Library.KeybindList = function(self)
     function KL:SetVisibility(Bool) Items["Frame"].Instance.Visible = Bool end
     function KL:Add(Name, Key)
         local lbl = Instances:Create("TextLabel", {
-            Parent = Items["Content"].Instance, Name = "\0", TextColor3 = Library.Theme.TextMuted,
+            Parent = Items["Content"].Instance, Name = "\0",
+            Font = Library.Font, TextColor3 = Library.Theme.TextMuted,
             Text = Name .. " [" .. Key .. "]",
             Size = UDim2New(0, 0, 0, 14),
             BackgroundTransparency = 1, BorderSizePixel = 0,
@@ -1364,6 +1364,7 @@ Library.ModeratorList = function(self)
     acLine:AddToTheme({ BackgroundColor3 = "Accent" })
 
     Items["Title"] = Instances:Create("TextLabel", { Parent = Items["Frame"].Instance, Name = "\0",
+        Font = Library.Fonts["GothamBold"] or Library.Font,
         TextColor3 = T.Text, Text = "Moderators",
         BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left,
         Size = UDim2New(0, 150, 0, 14), BorderSizePixel = 0, TextSize = 12,
@@ -1389,7 +1390,8 @@ Library.ModeratorList = function(self)
         local mf = Instances:Create("Frame", { Parent = Items["Content"].Instance, Name = "\0",
             BackgroundTransparency = 1, Size = UDim2New(1, 0, 0, 14),
             BorderSizePixel = 0, BackgroundColor3 = FromRGB(255, 255, 255) })
-        local line = Instances:Create("TextLabel", { Parent = mf.Instance, Name = "\0", RichText = true, TextColor3 = T.Text,
+        local line = Instances:Create("TextLabel", { Parent = mf.Instance, Name = "\0",
+            Font = Library.Font, RichText = true, TextColor3 = T.Text,
             BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left,
             BorderSizePixel = 0, TextSize = 12, Size = UDim2New(1, 0, 0, 14), Text = "" })
         line:AddToTheme({ TextColor3 = "Text" })
@@ -1455,7 +1457,8 @@ Library.Notification = function(self, Name, Duration)
         PaddingLeft = UDimNew(0, 20), PaddingRight = UDimNew(0, 12) })
 
     Items["Text"] = Instances:Create("TextLabel", {
-        Parent = Items["Frame"].Instance, Name = "\0", TextColor3 = T.Text, Text = Name,
+        Parent = Items["Frame"].Instance, Name = "\0",
+        Font = Library.Font, TextColor3 = T.Text, Text = Name,
         Size = UDim2New(0, 0, 0, 14),
         BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left,
         BorderSizePixel = 0, AutomaticSize = Enum.AutomaticSize.XY,
@@ -1566,6 +1569,7 @@ Library.Window = function(self, Data)
 
     Items["Title"] = Instances:Create("TextLabel", {
         Parent = Items["TopBar"].Instance, Name = "\0",
+        Font = Library.Fonts["GothamBold"] or Library.Font,
         TextColor3 = T.Text,
         Text = Window.Name,
         Size = UDim2New(0, 0, 0, 14),
@@ -1695,6 +1699,7 @@ Library.Page = function(self, Data)
 
     Items["Tab"] = Instances:Create("TextButton", {
         Parent = Page.Window.Items["Pages"].Instance, Name = "\0",
+        Font = Library.Font,
         TextColor3 = T.TextMuted,
         Text = Page.Name,
         AutoButtonColor = false,
@@ -1854,6 +1859,7 @@ Library.Pages.Section = function(self, Data)
 
     Items["Text"] = Instances:Create("TextLabel", {
         Parent = Items["Header"].Instance, Name = "\0",
+        Font = Library.Fonts["GothamBold"] or Library.Font,
         TextColor3 = T.Text, Text = Section.Name,
         AnchorPoint = Vector2New(0, 0.5),
         Size = UDim2New(1, -22, 0, 13),
@@ -1940,7 +1946,8 @@ Library.Sections.Toggle = function(self, Data)
     Items["Check"]:AddToTheme({ BackgroundColor3 = "AccentGlow" })
 
     Items["Text"] = Instances:Create("TextLabel", {
-        Parent = Items["Row"].Instance, Name = "\0", TextColor3 = T.TextMuted,
+        Parent = Items["Row"].Instance, Name = "\0",
+        Font = Library.Font, TextColor3 = T.TextMuted,
         Text = Toggle.Name,
         Size = UDim2New(0, 0, 0, 14),
         AnchorPoint = Vector2New(0, 0.5),
@@ -2040,7 +2047,8 @@ Library.Sections.Button = function(self, Data)
     local Items = {}
 
     Items["Button"] = Instances:Create("TextButton", {
-        Parent = Button.Section.Items["Content"].Instance, Name = "\0", TextColor3 = T.Text,
+        Parent = Button.Section.Items["Content"].Instance, Name = "\0",
+        Font = Library.Font, TextColor3 = T.Text,
         Text = Button.Name, AutoButtonColor = false,
         Size = UDim2New(1, 0, 0, IsMobile and 28 or 22),
         BorderSizePixel = 0, TextSize = 12,
@@ -2110,7 +2118,8 @@ Library.Sections.Slider = function(self, Data)
     })
 
     Items["Text"] = Instances:Create("TextLabel", {
-        Parent = topRow.Instance, Name = "\0", TextColor3 = T.TextMuted,
+        Parent = topRow.Instance, Name = "\0",
+        Font = Library.Font, TextColor3 = T.TextMuted,
         Text = Slider.Name, BackgroundTransparency = 1,
         Size = UDim2New(0, 0, 1, 0),
         AutomaticSize = Enum.AutomaticSize.X,
@@ -2120,7 +2129,8 @@ Library.Sections.Slider = function(self, Data)
     Items["Text"]:AddToTheme({ TextColor3 = "TextMuted" })
 
     Items["Value"] = Instances:Create("TextBox", {
-        Parent = topRow.Instance, Name = "\0", Active = false,
+        Parent = topRow.Instance, Name = "\0",
+        Font = Library.Font, Active = false,
         TextColor3 = T.TextMuted, TextSize = 11,
         Size = UDim2New(0, 0, 1, 0),
         AnchorPoint = Vector2New(1, 0),
@@ -2236,7 +2246,8 @@ Library.Sections.Dropdown = function(self, Data)
         BackgroundColor3 = FromRGB(255, 255, 255)
     })
     Items["Text"] = Instances:Create("TextLabel", {
-        Parent = Items["Container"].Instance, Name = "\0", TextColor3 = T.TextMuted,
+        Parent = Items["Container"].Instance, Name = "\0",
+        Font = Library.Font, TextColor3 = T.TextMuted,
         Text = Dropdown.Name, BackgroundTransparency = 1,
         Size = UDim2New(0, 0, 0, 14),
         AutomaticSize = Enum.AutomaticSize.X,
@@ -2260,7 +2271,8 @@ Library.Sections.Dropdown = function(self, Data)
         Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
 
     Items["Selected"] = Instances:Create("TextLabel", {
-        Parent = Items["Button"].Instance, Name = "\0", TextColor3 = T.TextMuted,
+        Parent = Items["Button"].Instance, Name = "\0",
+        Font = Library.Font, TextColor3 = T.TextMuted,
         Text = "-", AnchorPoint = Vector2New(0, 0.5),
         Size = UDim2New(1, -20, 0, 12),
         BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left,
@@ -2271,7 +2283,8 @@ Library.Sections.Dropdown = function(self, Data)
     Items["Selected"]:AddToTheme({ TextColor3 = "TextMuted" })
 
     Items["Arrow"] = Instances:Create("TextLabel", {
-        Parent = Items["Button"].Instance, Name = "\0", TextColor3 = T.TextMuted,
+        Parent = Items["Button"].Instance, Name = "\0",
+        Font = Library.Font, TextColor3 = T.TextMuted,
         Text = "▾", AnchorPoint = Vector2New(1, 0.5),
         Size = UDim2New(0, 14, 0, 12),
         BackgroundTransparency = 1,
@@ -2297,6 +2310,7 @@ Library.Sections.Dropdown = function(self, Data)
 
     Items["Search"] = Instances:Create("TextBox", {
         Parent = Items["OptionHolder"].Instance, Name = "\0",
+        Font = Library.Font,
         TextColor3 = T.Text, TextTransparency = 0.4,
         Text = "",
         Size = UDim2New(1, -8, 0, 14),
@@ -2425,7 +2439,8 @@ Library.Sections.Dropdown = function(self, Data)
     function Dropdown:Add(Option)
         local first = next(Dropdown.Options) == nil
         local btn = Instances:Create("TextButton", {
-            Parent = Items["Holder"].Instance, Name = "\0", Text = "", AutoButtonColor = false,
+            Parent = Items["Holder"].Instance, Name = "\0",
+            Font = Library.Font, Text = "", AutoButtonColor = false,
             BackgroundTransparency = 1,
             Size = UDim2New(1, 0, 0, IsMobile and 22 or 18),
             BorderSizePixel = 0, TextSize = 12,
@@ -2447,7 +2462,8 @@ Library.Sections.Dropdown = function(self, Data)
         liner:AddToTheme({ BackgroundColor3 = "Accent" })
 
         local txt = Instances:Create("TextLabel", {
-            Parent = btn.Instance, Name = "\0", TextColor3 = T.TextMuted,
+            Parent = btn.Instance, Name = "\0",
+            Font = Library.Font, TextColor3 = T.TextMuted,
             Text = Option,
             Size = UDim2New(1, -12, 0, 12),
             AnchorPoint = Vector2New(0, 0.5),
@@ -2559,7 +2575,8 @@ Library.Sections.Label = function(self, Name)
         BorderSizePixel = 0, BackgroundColor3 = FromRGB(255, 255, 255)
     })
     Items["Text"] = Instances:Create("TextLabel", {
-        Parent = Items["Row"].Instance, Name = "\0", TextColor3 = T.TextMuted, Text = Label.Name,
+        Parent = Items["Row"].Instance, Name = "\0",
+        Font = Library.Font, TextColor3 = T.TextMuted, Text = Label.Name,
         BackgroundTransparency = 1, Size = UDim2New(0, 0, 1, 0),
         AutomaticSize = Enum.AutomaticSize.X,
         BorderSizePixel = 0, TextSize = 12,
@@ -2637,7 +2654,8 @@ Library.Sections.Textbox = function(self, Data)
         BackgroundColor3 = FromRGB(255, 255, 255)
     })
     Items["Input"] = Instances:Create("TextBox", {
-        Parent = Items["Row"].Instance, Name = "\0", CursorPosition = -1,
+        Parent = Items["Row"].Instance, Name = "\0",
+        Font = Library.Font, CursorPosition = -1,
         TextColor3 = T.Text,
         Size = UDim2New(0.58, 0, 1, 0),
         BorderSizePixel = 0,
@@ -2655,7 +2673,8 @@ Library.Sections.Textbox = function(self, Data)
         Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
 
     Items["Label"] = Instances:Create("TextLabel", {
-        Parent = Items["Row"].Instance, Name = "\0", TextColor3 = T.TextMuted,
+        Parent = Items["Row"].Instance, Name = "\0",
+        Font = Library.Font, TextColor3 = T.TextMuted,
         Text = Textbox.Name,
         AnchorPoint = Vector2New(1, 0.5),
         Size = UDim2New(0, 0, 0, 14),
@@ -2728,7 +2747,8 @@ Library.Sections.Viewport = function(self, Data)
 
     if Data.Name and Data.Name ~= "" then
         Items["Label"] = Instances:Create("TextLabel", {
-            Parent = Items["Container"].Instance, Name = "\0", TextColor3 = T.TextMuted,
+            Parent = Items["Container"].Instance, Name = "\0",
+            Font = Library.Font, TextColor3 = T.TextMuted,
             Text = VP.Name,
             BackgroundTransparency = 1,
             Size = UDim2New(0, 0, 0, 14),
@@ -2917,7 +2937,8 @@ Library.ArmorViewer = function(self)
     Corner(acTop.Instance, 2)
     acTop:AddToTheme({ BackgroundColor3 = "Accent" })
 
-    Items["Title"] = Instances:Create("TextLabel", { Parent = Items["Frame"].Instance, Name = "\0", TextColor3 = T.TextMuted,
+    Items["Title"] = Instances:Create("TextLabel", { Parent = Items["Frame"].Instance, Name = "\0",
+        Font = Library.Fonts["GothamBold"] or Library.Font, TextColor3 = T.TextMuted,
         Text = "Armor Viewer", Size = UDim2New(1, -16, 0, 14),
         Position = UDim2New(0, 8, 0, 6), BackgroundTransparency = 1,
         TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6,
@@ -2948,7 +2969,8 @@ Library.ArmorViewer = function(self)
         Instances:Create("ImageLabel", { Parent = slot.Instance, Name = "\0",
             Image = image or "", Size = UDim2New(1, -4, 0, 44), Position = UDim2New(0, 2, 0, 2),
             BackgroundTransparency = 1, ZIndex = 6 })
-        local lbl = Instances:Create("TextLabel", { Parent = slot.Instance, Name = "\0", TextColor3 = T.TextMuted, Text = name or "",
+        local lbl = Instances:Create("TextLabel", { Parent = slot.Instance, Name = "\0",
+            Font = Library.Font, TextColor3 = T.TextMuted, Text = name or "",
             Size = UDim2New(1, 0, 0, 16), Position = UDim2New(0, 0, 0, 46),
             BackgroundTransparency = 1, TextSize = 9, ZIndex = 6, BackgroundColor3 = FromRGB(255, 255, 255) })
         lbl:AddToTheme({ TextColor3 = "TextMuted" })
@@ -2985,7 +3007,8 @@ Library.TargetHud = function(self)
     Corner(acTop.Instance, 2)
     acTop:AddToTheme({ BackgroundColor3 = "Accent" })
 
-    Items["Title"] = Instances:Create("TextLabel", { Parent = Items["Frame"].Instance, Name = "\0", TextColor3 = T.TextMuted,
+    Items["Title"] = Instances:Create("TextLabel", { Parent = Items["Frame"].Instance, Name = "\0",
+        Font = Library.Fonts["GothamBold"] or Library.Font, TextColor3 = T.TextMuted,
         Text = "Target HUD", Size = UDim2New(0, 0, 0, 12),
         Position = UDim2New(0, 10, 0, 6), BackgroundTransparency = 1,
         AutomaticSize = Enum.AutomaticSize.X, TextSize = 10,
@@ -3007,7 +3030,8 @@ Library.TargetHud = function(self)
         BackgroundColor3 = FromRGB(255, 255, 255) })
     Corner(Items["Avatar"].Instance, 4)
 
-    Items["Username"] = Instances:Create("TextLabel", { Parent = Items["Content"].Instance, Name = "\0", TextColor3 = T.Text,
+    Items["Username"] = Instances:Create("TextLabel", { Parent = Items["Content"].Instance, Name = "\0",
+        Font = Library.Font, TextColor3 = T.Text,
         Text = "-- (@--)", Size = UDim2New(1, -70, 0, 14),
         Position = UDim2New(0, 68, 0, 0), ZIndex = 6,
         BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left,
@@ -3036,7 +3060,8 @@ Library.TargetHud = function(self)
             Size = UDim2New(0.9, 0, 1, -2), Position = UDim2New(0, 1, 0, 1),
             ZIndex = 6, BorderSizePixel = 0, BackgroundColor3 = Color })
         Corner(fill.Instance, 99)
-        local val = Instances:Create("TextLabel", { Parent = bg.Instance, Name = "\0", TextColor3 = T.Text, ZIndex = 6,
+        local val = Instances:Create("TextLabel", { Parent = bg.Instance, Name = "\0",
+            Font = Library.Font, TextColor3 = T.Text, ZIndex = 6,
             Text = "90", Size = UDim2New(0, 0, 1, 0),
             BackgroundTransparency = 1, Position = UDim2New(0, 2, 0, -1),
             AutomaticSize = Enum.AutomaticSize.X, TextSize = 9,
