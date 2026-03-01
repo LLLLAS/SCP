@@ -91,6 +91,11 @@ local function IsPrimaryPress(Input)
         or Input.UserInputType == Enum.UserInputType.Touch
 end
 
+-- ONLY mouse click - used for "click outside to close" so touch never auto-closes
+local function IsMouseClick(Input)
+    return Input.UserInputType == Enum.UserInputType.MouseButton1
+end
+
 -- Check if an input is movement (mouse move or touch)
 local function IsMovement(Input)
     return Input.UserInputType == Enum.UserInputType.MouseMovement
@@ -917,8 +922,7 @@ Library.CreateColorpicker = function(self, Data)
     end)
 
     Library:Connect(UserInputService.InputBegan, function(Input)
-        if IsPrimaryPress(Input) then
-            if Library.JustOpenedWindow then return end
+        if IsMouseClick(Input) then
             if not Colorpicker.IsOpen then return end
             if Library:IsMouseOverFrame(Items["ColorpickerWindow"]) or Library:IsMouseOverFrame(Items["ColorpickerWindow2"]) then return end
             Colorpicker:SetOpen(false) Colorpicker:SetOpen2(false)
@@ -1177,8 +1181,7 @@ Library.CreateKeybind = function(self, Data)
             elseif Keybind.Mode == "Hold" then Keybind:Press(true)
             elseif Keybind.Mode == "Always" then Keybind:Press(true) end
         end
-        if IsPrimaryPress(Input) then
-            if Library.JustOpenedWindow then return end
+        if IsMouseClick(Input) then
             if not Keybind.IsOpen then return end
             if Library:IsMouseOverFrame(Items["KeybindWindow"]) then return end
             Keybind:SetOpen(false)
@@ -1603,9 +1606,12 @@ Library.Window = function(self, Data)
             BackgroundColor3 = FromRGB(255,255,255)
         })
         closeBtn:AddToTheme({ TextColor3 = "TextMuted" })
-        -- Use InputBegan not Activated/MouseButton1Down to avoid touch event lingering
-        closeBtn.Instance.InputBegan:Connect(function(Input)
-            if IsPrimaryPress(Input) then
+        closeBtn.Instance.MouseButton1Down:Connect(function()
+            Window:SetOpen(false)
+        end)
+        -- Touch: fire on TouchEnded (finger lift) not TouchBegan, prevents overlap with open
+        closeBtn.Instance.InputEnded:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.Touch then
                 Window:SetOpen(false)
             end
         end)
@@ -1753,11 +1759,16 @@ Library.Window = function(self, Data)
             end
         end
 
-        -- Use InputBegan on button directly (most reliable for touch, avoids Activated linger)
-        toggleBtn.Instance.InputBegan:Connect(function(Input)
-            if IsPrimaryPress(Input) then
+        -- Fire on finger LIFT (InputEnded/TouchEnded), not on press down
+        -- This prevents the TouchBegan from the same tap triggering other handlers
+        toggleBtn.Instance.MouseButton1Up:Connect(function()
+            if not Window.IsOpen and not Debounce then
+                Window:SetOpen(true)
+            end
+        end)
+        toggleBtn.Instance.InputEnded:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.Touch then
                 if not Window.IsOpen and not Debounce then
-                    task.wait() -- yield one frame so InputEnded from previous tap clears
                     Window:SetOpen(true)
                 end
             end
@@ -2654,8 +2665,7 @@ Library.Sections.Dropdown = function(self, Data)
     Items["Button"]:Connect("Activated", function() Dropdown:SetOpen(not Dropdown.IsOpen) end) -- Mobile
 
     Library:Connect(UserInputService.InputBegan, function(Input)
-        if IsPrimaryPress(Input) then
-            if Library.JustOpenedWindow then return end
+        if IsMouseClick(Input) then
             if not Dropdown.IsOpen then return end
             if Library:IsMouseOverFrame(Items["OptionHolder"]) then return end
             Dropdown:SetOpen(false)
