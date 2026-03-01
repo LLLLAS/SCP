@@ -1700,6 +1700,57 @@ Library.Window = function(self, Data)
         end
     end)
 
+    -- MOBILE: Always-visible floating toggle button so user can reopen menu after closing
+    -- Shown on ALL platforms (also useful on PC if keybind not working)
+    do
+        local toggleBtn = Instances:Create("TextButton", {
+            Parent = Library.Holder.Instance, Name = "\0",
+            Text = "☰",
+            FontFace = Library.Fonts["GothamBold"] or Library.Font,
+            TextColor3 = T.Text,
+            TextSize = 16,
+            AutoButtonColor = false,
+            AnchorPoint = Vector2New(0, 1),
+            Position = UDim2New(0, 8, 1, -8),
+            Size = UDim2New(0, 36, 0, 36),
+            BorderSizePixel = 0,
+            ZIndex = 10,
+            BackgroundColor3 = T.Surface
+        })
+        Corner(toggleBtn.Instance, 8)
+        Instances:Create("UIStroke", {
+            Parent = toggleBtn.Instance, Name = "\0",
+            Color = T.Accent, Thickness = 1.5
+        }):AddToTheme({ Color = "Accent" })
+        toggleBtn:AddToTheme({ BackgroundColor3 = "Surface", TextColor3 = "Text" })
+
+        -- Hide toggle btn when menu is open, show when closed
+        local function UpdateToggleBtnVisibility()
+            toggleBtn.Instance.Visible = not Window.IsOpen
+        end
+
+        -- Patch SetOpen to also update toggle button visibility
+        local origSetOpen = Window.SetOpen
+        Window.SetOpen = function(self, Bool)
+            origSetOpen(self, Bool)
+            -- Delay slightly so tween state is set
+            task.delay(0.35, UpdateToggleBtnVisibility)
+        end
+
+        toggleBtn:Connect("MouseButton1Down", function()
+            if not Debounce then Window:SetOpen(true) end
+        end)
+        toggleBtn:Connect("Activated", function()
+            if not Debounce then Window:SetOpen(true) end
+        end)
+
+        -- Make it draggable so user can move it out of the way
+        toggleBtn:MakeDraggable()
+
+        -- Initially hidden since menu starts open
+        toggleBtn.Instance.Visible = false
+    end
+
     Window:SetCenter()
     task.wait()
 
