@@ -293,22 +293,23 @@ Instances:Create("UIListLayout", {
 })
 
 -- ─── UIScale for small screens ────────────────────────────────────────────────
-do
+-- NOTE: Uses raw :Connect (not Library:Connect) because this runs before
+-- Library methods are defined. The connection is stored so Unload can clean it.
+local _UIScaleConn do
     local ScaleObj = InstanceNew("UIScale")
     ScaleObj.Parent = Library.Holder.Instance
     local function UpdateScale()
         local vp = Camera.ViewportSize
         local minDim = math.min(vp.X, vp.Y)
-        -- Reference design width = 580px; scale down on phones
         ScaleObj.Scale = MathClamp(minDim / 680, 0.55, 1)
     end
     UpdateScale()
-    Library:Connect and Library.Connections and nil -- forward ref guard
-    Camera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateScale)
+    _UIScaleConn = Camera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateScale)
 end
 
 -- ─── Library methods ─────────────────────────────────────────────────────────
 Library.Unload = function(self)
+    if _UIScaleConn then _UIScaleConn:Disconnect() _UIScaleConn = nil end
     for _, c in self.Connections do
         if c.Connection then c.Connection:Disconnect() end
     end
