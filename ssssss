@@ -918,6 +918,7 @@ Library.CreateColorpicker = function(self, Data)
 
     Library:Connect(UserInputService.InputBegan, function(Input)
         if IsPrimaryPress(Input) then
+            if Library.JustOpenedWindow then return end
             if not Colorpicker.IsOpen then return end
             if Library:IsMouseOverFrame(Items["ColorpickerWindow"]) or Library:IsMouseOverFrame(Items["ColorpickerWindow2"]) then return end
             Colorpicker:SetOpen(false) Colorpicker:SetOpen2(false)
@@ -1177,6 +1178,7 @@ Library.CreateKeybind = function(self, Data)
             elseif Keybind.Mode == "Always" then Keybind:Press(true) end
         end
         if IsPrimaryPress(Input) then
+            if Library.JustOpenedWindow then return end
             if not Keybind.IsOpen then return end
             if Library:IsMouseOverFrame(Items["KeybindWindow"]) then return end
             Keybind:SetOpen(false)
@@ -1595,17 +1597,17 @@ Library.Window = function(self, Data)
             Text = "✕", AutoButtonColor = false,
             AnchorPoint = Vector2New(1, 0.5),
             Position = UDim2New(1, -8, 0.5, 0),
-            Size = UDim2New(0, 30, 0, 28),
+            Size = UDim2New(0, 36, 0, 28),
             BorderSizePixel = 0, TextSize = 14,
             BackgroundTransparency = 1,
             BackgroundColor3 = FromRGB(255,255,255)
         })
         closeBtn:AddToTheme({ TextColor3 = "TextMuted" })
-        closeBtn:Connect("MouseButton1Down", function()
-            Window:SetOpen(false)
-        end)
-        closeBtn:Connect("Activated", function()
-            Window:SetOpen(false)
+        -- Use InputBegan not Activated/MouseButton1Down to avoid touch event lingering
+        closeBtn.Instance.InputBegan:Connect(function(Input)
+            if IsPrimaryPress(Input) then
+                Window:SetOpen(false)
+            end
         end)
     end
 
@@ -1650,6 +1652,11 @@ Library.Window = function(self, Data)
         Items["MainFrame"].Instance.Position = UDim2New(0, cp.X, 0, cp.Y)
     end
 
+    Library.JustOpenedWindow = false
+
+    -- JustOpened: blocks stale touch events from auto-closing the window
+    local JustOpened = false
+
     function Window:SetOpen(Bool)
         for _, v in Library.OpenFrames do v:SetOpen(false) end
 
@@ -1660,6 +1667,11 @@ Library.Window = function(self, Data)
         local frame = Items["MainFrame"].Instance
 
         if Bool then
+            -- Guard against stale touch-end events for 0.6s
+            JustOpened = true
+            Library.JustOpenedWindow = true
+            task.delay(0.6, function() JustOpened = false Library.JustOpenedWindow = false end)
+
             frame.Visible = true
             frame.Size = UDim2New(0, 0, 0, 0)
             frame.BackgroundTransparency = 1
@@ -1676,6 +1688,7 @@ Library.Window = function(self, Data)
                 Debounce = false
             end)
         else
+            JustOpened = false
             local t = TweenService:Create(
                 frame,
                 TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
@@ -1700,55 +1713,58 @@ Library.Window = function(self, Data)
         end
     end)
 
-    -- MOBILE: Always-visible floating toggle button so user can reopen menu after closing
-    -- Shown on ALL platforms (also useful on PC if keybind not working)
+    -- MOBILE: Floating hamburger button to reopen menu
     do
         local toggleBtn = Instances:Create("TextButton", {
             Parent = Library.Holder.Instance, Name = "\0",
-            Text = "☰",
+            Text = "\xe2\x98\xb0",
             FontFace = Library.Fonts["GothamBold"] or Library.Font,
             TextColor3 = T.Text,
             TextSize = 16,
             AutoButtonColor = false,
             AnchorPoint = Vector2New(0, 1),
             Position = UDim2New(0, 8, 1, -8),
-            Size = UDim2New(0, 36, 0, 36),
+            Size = UDim2New(0, 44, 0, 44),
             BorderSizePixel = 0,
             ZIndex = 10,
             BackgroundColor3 = T.Surface
         })
-        Corner(toggleBtn.Instance, 8)
+        Corner(toggleBtn.Instance, 10)
         Instances:Create("UIStroke", {
             Parent = toggleBtn.Instance, Name = "\0",
             Color = T.Accent, Thickness = 1.5
         }):AddToTheme({ Color = "Accent" })
         toggleBtn:AddToTheme({ BackgroundColor3 = "Surface", TextColor3 = "Text" })
 
-        -- Hide toggle btn when menu is open, show when closed
-        local function UpdateToggleBtnVisibility()
-            toggleBtn.Instance.Visible = not Window.IsOpen
+        local function ShowToggleBtn(show)
+            toggleBtn.Instance.Visible = show
         end
 
-        -- Patch SetOpen to also update toggle button visibility
+        -- Override SetOpen to track toggle button state
         local origSetOpen = Window.SetOpen
         Window.SetOpen = function(self, Bool)
             origSetOpen(self, Bool)
-            -- Delay slightly so tween state is set
-            task.delay(0.35, UpdateToggleBtnVisibility)
+            if Bool then
+                ShowToggleBtn(false)
+            else
+                task.delay(0.3, function()
+                    if not Window.IsOpen then ShowToggleBtn(true) end
+                end)
+            end
         end
 
-        toggleBtn:Connect("MouseButton1Down", function()
-            if not Debounce then Window:SetOpen(true) end
-        end)
-        toggleBtn:Connect("Activated", function()
-            if not Debounce then Window:SetOpen(true) end
+        -- Use InputBegan on button directly (most reliable for touch, avoids Activated linger)
+        toggleBtn.Instance.InputBegan:Connect(function(Input)
+            if IsPrimaryPress(Input) then
+                if not Window.IsOpen and not Debounce then
+                    task.wait() -- yield one frame so InputEnded from previous tap clears
+                    Window:SetOpen(true)
+                end
+            end
         end)
 
-        -- Make it draggable so user can move it out of the way
         toggleBtn:MakeDraggable()
-
-        -- Initially hidden since menu starts open
-        toggleBtn.Instance.Visible = false
+        ShowToggleBtn(false)
     end
 
     Window:SetCenter()
@@ -2639,6 +2655,7 @@ Library.Sections.Dropdown = function(self, Data)
 
     Library:Connect(UserInputService.InputBegan, function(Input)
         if IsPrimaryPress(Input) then
+            if Library.JustOpenedWindow then return end
             if not Dropdown.IsOpen then return end
             if Library:IsMouseOverFrame(Items["OptionHolder"]) then return end
             Dropdown:SetOpen(false)
