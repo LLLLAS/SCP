@@ -165,7 +165,15 @@ Instances = {} do
     Instances.Create = function(self, Class, Properties)
         local obj = { Instance = InstanceNew(Class), Properties = Properties or {}, Class = Class }
         setmetatable(obj, Instances)
-        for k, v in obj.Properties do obj.Instance[k] = v end
+        for k, v in obj.Properties do
+            local ok, err = pcall(function() obj.Instance[k] = v end)
+            if not ok then
+                -- Font property fallback: try Enum.Font string name
+                if k == "Font" and type(v) == "userdata" then
+                    pcall(function() obj.Instance[k] = tostring(v):match("Enum%.Font%.(.+)") or "Gotham" end)
+                end
+            end
+        end
         return obj
     end
 
