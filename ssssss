@@ -289,33 +289,10 @@ Instances:Create("UIListLayout", {
     Padding = UDimNew(0, 6)
 })
 
--- UIScale for small screens
-local _UIScaleConn
-local _UIScaleObj = InstanceNew("UIScale")
-_UIScaleObj.Parent = Library.Holder.Instance
-
-local function _UpdateScale()
-    local cam = workspace.CurrentCamera
-    if not cam then return end
-    local vp = cam.ViewportSize
-    local minDim = math.min(vp.X, vp.Y)
-    _UIScaleObj.Scale = MathClamp(minDim / 680, 0.55, 1)
-end
-
-local function _InitUIScale()
-    local cam = workspace.CurrentCamera
-    if cam then
-        _UpdateScale()
-        _UIScaleConn = cam:GetPropertyChangedSignal("ViewportSize"):Connect(_UpdateScale)
-    else
-        workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(_InitUIScale)
-    end
-end
-_InitUIScale()
+-- UIScale handled externally if needed
 
 -- Library methods
 Library.Unload = function(self)
-    if _UIScaleConn then _UIScaleConn:Disconnect() _UIScaleConn = nil end
     for _, c in self.Connections do
         if c.Connection then c.Connection:Disconnect() end
     end
