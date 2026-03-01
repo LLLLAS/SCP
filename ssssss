@@ -4,6 +4,43 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+-- =============================================
+-- MOBILE DETECTION & HELPERS
+-- =============================================
+local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+local IsConsole = UserInputService.GamepadEnabled and not UserInputService.KeyboardEnabled
+
+-- Touch tap threshold (pixels) for distinguishing tap vs drag
+local TOUCH_TAP_THRESHOLD = 10
+-- Long press duration (seconds) for simulating right-click on mobile
+local LONG_PRESS_DURATION = 0.45
+
+-- Helper: fire a callback after a long press (used for right-click simulation)
+local function MakeLongPress(instance, callback)
+    local holdStart, holdConn, movedTooFar
+    instance.InputBegan:Connect(function(input)
+        if input.UserInputType ~= Enum.UserInputType.Touch then return end
+        movedTooFar = false
+        holdStart = tick()
+        holdConn = RunService.RenderStepped:Connect(function()
+            if tick() - holdStart >= LONG_PRESS_DURATION and not movedTooFar then
+                if holdConn then holdConn:Disconnect() holdConn = nil end
+                callback()
+            end
+        end)
+    end)
+    instance.InputEnded:Connect(function(input)
+        if input.UserInputType ~= Enum.UserInputType.Touch then return end
+        if holdConn then holdConn:Disconnect() holdConn = nil end
+    end)
+    instance.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            movedTooFar = true
+            if holdConn then holdConn:Disconnect() holdConn = nil end
+        end
+    end)
+end
+
 local Library do
     Library = {
         Theme = {},
@@ -39,7 +76,7 @@ local Library do
         Font = nil,
         CopiedColor = nil,
         Fonts = {},
-        IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled,
+        IsMobile = IsMobile,
     }
     Library.__index = Library
     Library.Sections.__index = Library.Sections
@@ -50,7 +87,6 @@ gethui = gethui or function() return CoreGui end
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
--- Mobile-safe mouse: use a dummy on mobile
 local Mouse = LocalPlayer:GetMouse()
 
 local FromRGB = Color3.fromRGB
@@ -80,26 +116,32 @@ local StringLen = string.len
 local InstanceNew = Instance.new
 local RectNew = Rect.new
 
--- Mobile helper: get current cursor/touch position
-local function GetInputPosition(Input)
-    return Input and Input.Position or Vector2New(0, 0)
+-- =============================================
+-- SCREEN SIZE HELPERS
+-- =============================================
+local function GetScreenSize()
+    return Camera.ViewportSize
 end
 
--- Check if an input is a primary press (mouse1 or touch)
-local function IsPrimaryPress(Input)
-    return Input.UserInputType == Enum.UserInputType.MouseButton1
-        or Input.UserInputType == Enum.UserInputType.Touch
+-- Scale UI size based on screen (mobile gets larger touch targets)
+local function ScaleForDevice(baseSize)
+    if not IsMobile then return baseSize end
+    local screen = GetScreenSize()
+    local minDim = math.min(screen.X, screen.Y)
+    -- On small screens (phone), scale up touch targets
+    local scale = math.clamp(minDim / 667, 0.85, 1.6)
+    return math.round(baseSize * scale)
 end
 
--- ONLY mouse click - used for "click outside to close" so touch never auto-closes
-local function IsMouseClick(Input)
-    return Input.UserInputType == Enum.UserInputType.MouseButton1
-end
-
--- Check if an input is movement (mouse move or touch)
-local function IsMovement(Input)
-    return Input.UserInputType == Enum.UserInputType.MouseMovement
-        or Input.UserInputType == Enum.UserInputType.Touch
+-- Mobile-aware window size
+local function GetWindowSize()
+    if not IsMobile then
+        return 580, 440
+    end
+    local screen = GetScreenSize()
+    local w = math.clamp(screen.X - 20, 300, 560)
+    local h = math.clamp(screen.Y - 60, 320, 520)
+    return math.round(w), math.round(h)
 end
 
 -- LinoriaLib color palette
@@ -223,14 +265,16 @@ Instances = {} do
         self = nil
     end
 
-    -- MOBILE-PATCHED: MakeDraggable with full touch support
+    -- =============================================
+    -- MOBILE-AWARE DRAGGABLE
+    -- Handles both Mouse and Touch input
+    -- =============================================
     Instances.MakeDraggable = function(self)
         if not self.Instance then return end
         local Gui = self.Instance
         local Dragging, DragStart, StartPos = false, nil, nil
 
-        local function UpdateDrag(InputPos)
-            if not Dragging or not DragStart or not StartPos then return end
+        local function Set(InputPos)
             local d = InputPos - DragStart
             local nx = MathClamp(StartPos.X.Offset + d.X, 0, Gui.Parent.AbsoluteSize.X - Gui.AbsoluteSize.X)
             local ny = MathClamp(StartPos.Y.Offset + d.Y, 0, Gui.Parent.AbsoluteSize.Y - Gui.AbsoluteSize.Y)
@@ -239,7 +283,9 @@ Instances = {} do
 
         local ic
         self:Connect("InputBegan", function(Input)
-            if IsPrimaryPress(Input) then
+            local isMouse = Input.UserInputType == Enum.UserInputType.MouseButton1
+            local isTouch = Input.UserInputType == Enum.UserInputType.Touch
+            if isMouse or isTouch then
                 Dragging = true
                 DragStart = Input.Position
                 StartPos = Gui.Position
@@ -255,30 +301,24 @@ Instances = {} do
         end)
 
         Library:Connect(UserInputService.InputChanged, function(Input)
-            if IsMovement(Input) and Dragging then
-                UpdateDrag(Input.Position)
+            local isMouse = Input.UserInputType == Enum.UserInputType.MouseMovement
+            local isTouch = Input.UserInputType == Enum.UserInputType.Touch
+            if (isMouse or isTouch) and Dragging then
+                Set(Input.Position)
             end
-        end)
-
-        -- Touch-specific: handle touch move from global
-        Library:Connect(UserInputService.TouchMoved, function(touch)
-            if Dragging then
-                UpdateDrag(touch.Position)
-            end
-        end)
-
-        Library:Connect(UserInputService.TouchEnded, function(touch)
-            Dragging = false
         end)
     end
 
+    -- OnHover: on mobile, no-op (or use TouchEnter if available)
     Instances.OnHover = function(self, fn)
         if not self.Instance then return end
+        if IsMobile then return end -- Skip hover on mobile (no cursor)
         return Library:Connect(self.Instance.MouseEnter, fn)
     end
 
     Instances.OnHoverLeave = function(self, fn)
         if not self.Instance then return end
+        if IsMobile then return end
         return Library:Connect(self.Instance.MouseLeave, fn)
     end
 end
@@ -407,17 +447,22 @@ Library.GetLighterColor = function(self, Color, Inc)
     return FromHSV(h, s, MathClamp(v * Inc, 0, 1))
 end
 
--- MOBILE-PATCHED: IsMouseOverFrame also works with last touch position
-Library.IsMouseOverFrame = function(self, Frame)
-    Frame = Frame.Instance or Frame
-    local mp
-    -- Try touch location first on mobile
-    local touchLocations = UserInputService:GetTouchLocations()
-    if touchLocations and #touchLocations > 0 then
-        mp = Vector2New(touchLocations[1].Position.X, touchLocations[1].Position.Y)
-    else
-        mp = Vector2New(Mouse.X, Mouse.Y)
+-- =============================================
+-- MOBILE: Get touch/mouse position unified
+-- =============================================
+Library.GetCursorPos = function(self)
+    if IsMobile then
+        -- Use last touch position from UserInputService
+        local touches = UserInputService:GetTouchingParts()
+        -- Fallback to Mouse position
+        return Vector2New(Mouse.X, Mouse.Y)
     end
+    return Vector2New(Mouse.X, Mouse.Y)
+end
+
+Library.IsMouseOverFrame = function(self, Frame)
+    Frame = Frame.Instance
+    local mp = Library:GetCursorPos()
     return mp.X >= Frame.AbsolutePosition.X and mp.X <= Frame.AbsolutePosition.X + Frame.AbsoluteSize.X
         and mp.Y >= Frame.AbsolutePosition.Y and mp.Y <= Frame.AbsolutePosition.Y + Frame.AbsoluteSize.Y
 end
@@ -485,7 +530,49 @@ local function Corner(parent, radius)
 end
 
 -- =============================================
--- Colorpicker (MOBILE-PATCHED)
+-- MOBILE TOGGLE BUTTON (hamburger on mobile)
+-- Shows a persistent small button to open/close the menu when closed
+-- =============================================
+Library.CreateMobileToggle = function(self, Window)
+    if not IsMobile then return end
+
+    local T = Library.Theme
+    local btn = Instances:Create("TextButton", {
+        Parent = Library.Holder.Instance, Name = "\0",
+        Text = "☰",
+        FontFace = Library.Fonts["GothamBold"] or Library.Font,
+        TextColor3 = T.Text,
+        TextSize = 18,
+        Size = UDim2New(0, 44, 0, 44),
+        Position = UDim2New(0, 10, 0, 10),
+        BackgroundColor3 = T.Surface,
+        AutoButtonColor = false,
+        BorderSizePixel = 0,
+        ZIndex = 20,
+        Visible = true,
+    })
+    Corner(btn.Instance, 8)
+    Instances:Create("UIStroke", {
+        Parent = btn.Instance, Name = "\0",
+        Color = T.Border, Thickness = 1
+    }):AddToTheme({ Color = "Border" })
+    btn:AddToTheme({ TextColor3 = "Text", BackgroundColor3 = "Surface" })
+    btn:MakeDraggable()
+
+    -- Show toggle button only when menu is closed
+    btn:Connect("MouseButton1Down", function()
+        Window:SetOpen(not Window.IsOpen)
+    end)
+
+    -- Update toggle button visibility based on menu state
+    Library.MobileToggleButton = btn
+
+    return btn
+end
+
+-- =============================================
+-- Colorpicker (Mobile-enhanced)
+-- =============================================
 Library.CreateColorpicker = function(self, Data)
     local Colorpicker = {
         Hue = 0, Saturation = 0, Value = 0, Alpha = 0,
@@ -497,11 +584,14 @@ Library.CreateColorpicker = function(self, Data)
     local T = Library.Theme
     local Items = {}
 
+    -- Mobile: slightly larger color button for easier tapping
+    local btnSize = IsMobile and 22 or 16
+
     Items["ColorpickerButton"] = Instances:Create("TextButton", {
         Parent = Data.Parent.Instance, Name = "\0",
         FontFace = Library.Font, TextColor3 = FromRGB(0,0,0),
         Text = "", AutoButtonColor = false,
-        Size = UDim2New(0, 16, 0, 16),
+        Size = UDim2New(0, btnSize, 0, btnSize),
         BorderSizePixel = 0, TextSize = 13,
         BackgroundColor3 = FromRGB(140,255,213)
     })
@@ -514,11 +604,15 @@ Library.CreateColorpicker = function(self, Data)
         ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     }):AddToTheme({ Color = "Border" })
 
+    -- Mobile: colorpicker window fills more of the screen
+    local cpW = IsMobile and math.min(GetScreenSize().X - 20, 290) or 238
+    local cpH = IsMobile and 300 or 260
+
     Items["ColorpickerWindow"] = Instances:Create("Frame", {
         Parent = Library.UnusedHolder.Instance, Name = "\0",
         Visible = false,
         Position = UDim2New(0, 0, 0, 0),
-        Size = UDim2New(0, 238, 0, 260),
+        Size = UDim2New(0, cpW, 0, cpH),
         BorderSizePixel = 0,
         BackgroundColor3 = T.Surface
     })
@@ -563,9 +657,12 @@ Library.CreateColorpicker = function(self, Data)
         Transparency = NumSequence{ NumSequenceKeypoint(0,1), NumSequenceKeypoint(1,0) }
     })
 
+    -- Mobile: bigger dragger for touch
+    local draggerSize = IsMobile and 14 or 10
+
     Items["PaletteDragger"] = Instances:Create("Frame", {
         Parent = Items["Palette"].Instance, Name = "\0",
-        Size = UDim2New(0,10,0,10), AnchorPoint = Vector2New(0.5,0.5),
+        Size = UDim2New(0, draggerSize, 0, draggerSize), AnchorPoint = Vector2New(0.5,0.5),
         Position = UDim2New(0,8,0,8), BorderSizePixel = 0, ZIndex = 4,
         BackgroundColor3 = FromRGB(255,255,255)
     })
@@ -575,12 +672,15 @@ Library.CreateColorpicker = function(self, Data)
         Color = FromRGB(0,0,0), Thickness = 1.5
     })
 
+    -- Mobile: wider hue bar for easier touch
+    local hueW = IsMobile and 18 or 12
+
     Items["Hue"] = Instances:Create("TextButton", {
         Parent = Items["ColorpickerWindow"].Instance, Name = "\0",
         Text = "", AutoButtonColor = false,
         AnchorPoint = Vector2New(1,0),
         Position = UDim2New(1, -8, 0, 8),
-        Size = UDim2New(0, 12, 1, -56), ZIndex = 2,
+        Size = UDim2New(0, hueW, 1, -56), ZIndex = 2,
         BorderSizePixel = 0, BackgroundColor3 = FromRGB(255,255,255)
     })
     Corner(Items["Hue"].Instance, 3)
@@ -608,7 +708,7 @@ Library.CreateColorpicker = function(self, Data)
 
     Items["HueDragger"] = Instances:Create("Frame", {
         Parent = Items["Hue"].Instance, Name = "\0",
-        Size = UDim2New(1,0,0,3), AnchorPoint = Vector2New(0,0.5),
+        Size = UDim2New(1,0,0, IsMobile and 5 or 3), AnchorPoint = Vector2New(0,0.5),
         Position = UDim2New(0,0,0,0), ZIndex = 3,
         BorderSizePixel = 0, BackgroundColor3 = FromRGB(255,255,255)
     })
@@ -623,7 +723,7 @@ Library.CreateColorpicker = function(self, Data)
         Text = "", AutoButtonColor = false,
         AnchorPoint = Vector2New(0,1),
         Position = UDim2New(0, 8, 1, -28),
-        Size = UDim2New(1, -28, 0, 10), ZIndex = 2,
+        Size = UDim2New(1, -28, 0, IsMobile and 14 or 10), ZIndex = 2,
         BorderSizePixel = 0, BackgroundColor3 = FromRGB(140,255,213)
     })
     Corner(Items["Alpha"].Instance, 3)
@@ -644,7 +744,7 @@ Library.CreateColorpicker = function(self, Data)
 
     Items["AlphaDragger"] = Instances:Create("Frame", {
         Parent = Items["Alpha"].Instance, Name = "\0",
-        Size = UDim2New(0,3,1,0), AnchorPoint = Vector2New(0.5,0),
+        Size = UDim2New(0, IsMobile and 5 or 3, 1, 0), AnchorPoint = Vector2New(0.5,0),
         Position = UDim2New(0,8,0,0), ZIndex = 3,
         BorderSizePixel = 0, BackgroundColor3 = FromRGB(255,255,255)
     })
@@ -661,10 +761,10 @@ Library.CreateColorpicker = function(self, Data)
         TextColor3 = T.Text,
         Text = "",
         AnchorPoint = Vector2New(0,1),
-        Size = UDim2New(1, -16, 0, 20),
+        Size = UDim2New(1, -16, 0, IsMobile and 26 or 20),
         PlaceholderColor3 = T.TextMuted,
         Position = UDim2New(0, 8, 1, -4),
-        BorderSizePixel = 0, TextSize = 12,
+        BorderSizePixel = 0, TextSize = IsMobile and 14 or 12,
         BackgroundColor3 = T.Element
     })
     Corner(Items["HexInput"].Instance, 3)
@@ -678,7 +778,7 @@ Library.CreateColorpicker = function(self, Data)
     Items["ColorpickerWindow2"] = Instances:Create("Frame", {
         Parent = Library.UnusedHolder.Instance, Name = "\0",
         Position = UDim2New(0,0,0,0),
-        Size = UDim2New(0,80,0,0),
+        Size = UDim2New(0, IsMobile and 110 or 80, 0, 0),
         BorderSizePixel = 0,
         BackgroundColor3 = T.Surface,
         AutomaticSize = Enum.AutomaticSize.Y
@@ -699,22 +799,18 @@ Library.CreateColorpicker = function(self, Data)
     })
 
     local function AddCPButton(Name, Callback)
+        local btnH = IsMobile and 28 or 20
         local btn = Instances:Create("TextButton", {
             Parent = Items["ColorpickerWindow2"].Instance, Name = "\0",
             FontFace = Library.Font, TextColor3 = T.Text,
             Text = Name, AutoButtonColor = false,
             BackgroundTransparency = 1,
-            Size = UDim2New(1,0,0,20),
-            BorderSizePixel = 0, TextSize = 12,
+            Size = UDim2New(1,0,0,btnH),
+            BorderSizePixel = 0, TextSize = IsMobile and 14 or 12,
             BackgroundColor3 = T.ElementHover
         })
         btn:AddToTheme({ TextColor3 = "Text" })
         btn:Connect("MouseButton1Down", function()
-            Callback()
-            Colorpicker:SetOpen2(false)
-        end)
-        -- Mobile: TouchTap on button
-        btn:Connect("Activated", function()
             Callback()
             Colorpicker:SetOpen2(false)
         end)
@@ -733,6 +829,9 @@ Library.CreateColorpicker = function(self, Data)
         end
     end)
 
+    -- =============================================
+    -- SLIDING STATE: unified Mouse + Touch
+    -- =============================================
     local SlidingPalette, SlidingHue, SlidingAlpha = false, false, false
     local Debounce = false
     local RenderStepped, RenderStepped2
@@ -747,10 +846,21 @@ Library.CreateColorpicker = function(self, Data)
             Items["ColorpickerWindow"].Instance.Visible = true
             Items["ColorpickerWindow"].Instance.Parent = Library.Holder.Instance
             RenderStepped = RunService.RenderStepped:Connect(function()
-                Items["ColorpickerWindow"].Instance.Position = UDim2New(0,
-                    Items["ColorpickerButton"].Instance.AbsolutePosition.X,
-                    0,
-                    Items["ColorpickerButton"].Instance.AbsolutePosition.Y + Items["ColorpickerButton"].Instance.AbsoluteSize.Y + 65)
+                -- On mobile: center the colorpicker on screen
+                if IsMobile then
+                    local screen = GetScreenSize()
+                    local cw = Items["ColorpickerWindow"].Instance.AbsoluteSize.X
+                    local ch = Items["ColorpickerWindow"].Instance.AbsoluteSize.Y
+                    Items["ColorpickerWindow"].Instance.Position = UDim2New(0,
+                        math.clamp(Items["ColorpickerButton"].Instance.AbsolutePosition.X, 10, screen.X - cw - 10),
+                        0,
+                        math.clamp(Items["ColorpickerButton"].Instance.AbsolutePosition.Y + Items["ColorpickerButton"].Instance.AbsoluteSize.Y + 8, 10, screen.Y - ch - 10))
+                else
+                    Items["ColorpickerWindow"].Instance.Position = UDim2New(0,
+                        Items["ColorpickerButton"].Instance.AbsolutePosition.X,
+                        0,
+                        Items["ColorpickerButton"].Instance.AbsolutePosition.Y + Items["ColorpickerButton"].Instance.AbsoluteSize.Y + 65)
+                end
             end)
             for _, v in Library.OpenFrames do
                 if v ~= Colorpicker then v:SetOpen(false) end
@@ -786,10 +896,19 @@ Library.CreateColorpicker = function(self, Data)
             Items["ColorpickerWindow2"].Instance.Visible = true
             Items["ColorpickerWindow2"].Instance.Parent = Library.Holder.Instance
             RenderStepped2 = RunService.RenderStepped:Connect(function()
-                Items["ColorpickerWindow2"].Instance.Position = UDim2New(0,
-                    Items["ColorpickerButton"].Instance.AbsolutePosition.X + Items["ColorpickerButton"].Instance.AbsoluteSize.X,
-                    0,
-                    Items["ColorpickerButton"].Instance.AbsolutePosition.Y + Items["ColorpickerButton"].Instance.AbsoluteSize.Y + 65)
+                if IsMobile then
+                    local screen = GetScreenSize()
+                    local cw = Items["ColorpickerWindow2"].Instance.AbsoluteSize.X
+                    Items["ColorpickerWindow2"].Instance.Position = UDim2New(0,
+                        math.clamp(Items["ColorpickerButton"].Instance.AbsolutePosition.X + Items["ColorpickerButton"].Instance.AbsoluteSize.X + 4, 10, screen.X - cw - 10),
+                        0,
+                        Items["ColorpickerButton"].Instance.AbsolutePosition.Y + Items["ColorpickerButton"].Instance.AbsoluteSize.Y + 8)
+                else
+                    Items["ColorpickerWindow2"].Instance.Position = UDim2New(0,
+                        Items["ColorpickerButton"].Instance.AbsolutePosition.X + Items["ColorpickerButton"].Instance.AbsoluteSize.X,
+                        0,
+                        Items["ColorpickerButton"].Instance.AbsolutePosition.Y + Items["ColorpickerButton"].Instance.AbsoluteSize.Y + 65)
+                end
             end)
         else
             if RenderStepped2 then RenderStepped2:Disconnect() RenderStepped2 = nil end
@@ -798,51 +917,33 @@ Library.CreateColorpicker = function(self, Data)
         end
     end
 
-    -- MOBILE: unified slide helpers that accept a raw Vector3 position
-    local function CalcPaletteSlide(pos)
-        local px = Items["Palette"].Instance.AbsolutePosition
-        local ps = Items["Palette"].Instance.AbsoluteSize
-        local sx = MathClamp(1 - (pos.X - px.X) / ps.X, 0, 1)
-        local sy = MathClamp(1 - (pos.Y - px.Y) / ps.Y, 0, 1)
-        local dx = MathClamp((pos.X - px.X) / ps.X, 0, 0.99)
-        local dy = MathClamp((pos.Y - px.Y) / ps.Y, 0, 0.99)
+    -- Unified slide helpers that work for both Mouse and Touch
+    function Colorpicker:SlidePalette(Input)
+        if not Input or not SlidingPalette then return end
+        local sx = MathClamp(1 - (Input.Position.X - Items["Palette"].Instance.AbsolutePosition.X) / Items["Palette"].Instance.AbsoluteSize.X, 0, 1)
+        local sy = MathClamp(1 - (Input.Position.Y - Items["Palette"].Instance.AbsolutePosition.Y) / Items["Palette"].Instance.AbsoluteSize.Y, 0, 1)
         Colorpicker.Saturation = sx
         Colorpicker.Value = sy
+        local dx = MathClamp((Input.Position.X - Items["Palette"].Instance.AbsolutePosition.X) / Items["Palette"].Instance.AbsoluteSize.X, 0, 0.99)
+        local dy = MathClamp((Input.Position.Y - Items["Palette"].Instance.AbsolutePosition.Y) / Items["Palette"].Instance.AbsoluteSize.Y, 0, 0.99)
         Items["PaletteDragger"]:Tween(TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2New(dx, 0, dy, 0) })
         Colorpicker:Update()
     end
 
-    local function CalcHueSlide(pos)
-        local hy = Items["Hue"].Instance.AbsolutePosition.Y
-        local hs = Items["Hue"].Instance.AbsoluteSize.Y
-        Colorpicker.Hue = MathClamp((pos.Y - hy) / hs, 0, 1)
-        local dy = MathClamp((pos.Y - hy) / hs, 0, 0.99)
+    function Colorpicker:SlideHue(Input)
+        if not Input or not SlidingHue then return end
+        Colorpicker.Hue = MathClamp((Input.Position.Y - Items["Hue"].Instance.AbsolutePosition.Y) / Items["Hue"].Instance.AbsoluteSize.Y, 0, 1)
+        local dy = MathClamp((Input.Position.Y - Items["Hue"].Instance.AbsolutePosition.Y) / Items["Hue"].Instance.AbsoluteSize.Y, 0, 0.99)
         Items["HueDragger"]:Tween(TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2New(0,0,dy,0) })
         Colorpicker:Update()
     end
 
-    local function CalcAlphaSlide(pos)
-        local ax = Items["Alpha"].Instance.AbsolutePosition.X
-        local as = Items["Alpha"].Instance.AbsoluteSize.X
-        Colorpicker.Alpha = MathClamp((pos.X - ax) / as, 0, 1)
-        local dx = MathClamp((pos.X - ax) / as, 0, 0.99)
-        Items["AlphaDragger"]:Tween(TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2New(dx,0,0,0) })
-        Colorpicker:Update(true)
-    end
-
-    function Colorpicker:SlidePalette(Input)
-        if not Input or not SlidingPalette then return end
-        CalcPaletteSlide(Input.Position)
-    end
-
-    function Colorpicker:SlideHue(Input)
-        if not Input or not SlidingHue then return end
-        CalcHueSlide(Input.Position)
-    end
-
     function Colorpicker:SlideAlpha(Input)
         if not Input or not SlidingAlpha then return end
-        CalcAlphaSlide(Input.Position)
+        Colorpicker.Alpha = MathClamp((Input.Position.X - Items["Alpha"].Instance.AbsolutePosition.X) / Items["Alpha"].Instance.AbsoluteSize.X, 0, 1)
+        local dx = MathClamp((Input.Position.X - Items["Alpha"].Instance.AbsolutePosition.X) / Items["Alpha"].Instance.AbsoluteSize.X, 0, 0.99)
+        Items["AlphaDragger"]:Tween(TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2New(dx,0,0,0) })
+        Colorpicker:Update(true)
     end
 
     function Colorpicker:Update(IsFromAlpha)
@@ -867,65 +968,57 @@ Library.CreateColorpicker = function(self, Data)
         Colorpicker:Update(false)
     end
 
-    -- Mouse + Touch InputBegan/Ended for palette
-    Items["Palette"]:Connect("InputBegan", function(i)
-        if IsPrimaryPress(i) then SlidingPalette = true Colorpicker:SlidePalette(i) end
-    end)
-    Items["Palette"]:Connect("InputEnded", function(i)
-        if IsPrimaryPress(i) then SlidingPalette = false end
-    end)
+    -- =============================================
+    -- TOUCH + MOUSE INPUT FOR COLORPICKER SLIDERS
+    -- =============================================
+    local function IsSliderInput(input)
+        return input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch
+    end
+    local function IsMovementInput(input)
+        return input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch
+    end
 
-    -- Mouse + Touch for hue
-    Items["HueInline"]:Connect("InputBegan", function(i)
-        if IsPrimaryPress(i) then SlidingHue = true Colorpicker:SlideHue(i) end
-    end)
-    Items["HueInline"]:Connect("InputEnded", function(i)
-        if IsPrimaryPress(i) then SlidingHue = false end
-    end)
-
-    -- Mouse + Touch for alpha
-    Items["Alpha"]:Connect("InputBegan", function(i)
-        if IsPrimaryPress(i) then SlidingAlpha = true Colorpicker:SlideAlpha(i) end
-    end)
-    Items["Alpha"]:Connect("InputEnded", function(i)
-        if IsPrimaryPress(i) then SlidingAlpha = false end
-    end)
-
+    Items["Palette"]:Connect("InputBegan", function(i) if IsSliderInput(i) then SlidingPalette = true Colorpicker:SlidePalette(i) end end)
+    Items["Palette"]:Connect("InputEnded", function(i) if IsSliderInput(i) then SlidingPalette = false end end)
+    Items["HueInline"]:Connect("InputBegan", function(i) if IsSliderInput(i) then SlidingHue = true Colorpicker:SlideHue(i) end end)
+    Items["HueInline"]:Connect("InputEnded", function(i) if IsSliderInput(i) then SlidingHue = false end end)
+    Items["Alpha"]:Connect("InputBegan", function(i) if IsSliderInput(i) then SlidingAlpha = true Colorpicker:SlideAlpha(i) end end)
+    Items["Alpha"]:Connect("InputEnded", function(i) if IsSliderInput(i) then SlidingAlpha = false end end)
     Items["HexInput"]:Connect("FocusLost", function() Colorpicker:Set(tostring(Items["HexInput"].Instance.Text), Colorpicker.Alpha) end)
-    Items["ColorpickerButton"]:Connect("MouseButton1Down", function() Colorpicker:SetOpen(not Colorpicker.IsOpen) end)
-    Items["ColorpickerButton"]:Connect("MouseButton2Down", function() Colorpicker:SetOpen2(not Colorpicker.IsOpen2) end)
-    -- Mobile: long-press button to open context menu (Window2) via Activated
-    Items["ColorpickerButton"]:Connect("Activated", function()
+
+    Items["ColorpickerButton"]:Connect("MouseButton1Down", function()
         Colorpicker:SetOpen(not Colorpicker.IsOpen)
     end)
 
-    -- Global input moved: handles both mouse and touch drag for sliders
+    -- Right-click / long-press for context menu
+    if IsMobile then
+        MakeLongPress(Items["ColorpickerButton"].Instance, function()
+            Colorpicker:SetOpen2(not Colorpicker.IsOpen2)
+        end)
+    else
+        Items["ColorpickerButton"]:Connect("MouseButton2Down", function()
+            Colorpicker:SetOpen2(not Colorpicker.IsOpen2)
+        end)
+    end
+
     Library:Connect(UserInputService.InputChanged, function(Input)
-        if IsMovement(Input) then
-            if SlidingPalette then CalcPaletteSlide(Input.Position)
-            elseif SlidingHue then CalcHueSlide(Input.Position)
-            elseif SlidingAlpha then CalcAlphaSlide(Input.Position) end
+        if IsMovementInput(Input) then
+            if SlidingPalette then Colorpicker:SlidePalette(Input)
+            elseif SlidingHue then Colorpicker:SlideHue(Input)
+            elseif SlidingAlpha then Colorpicker:SlideAlpha(Input) end
         end
     end)
 
-    -- TouchMoved for mobile precision
-    Library:Connect(UserInputService.TouchMoved, function(touch)
-        if SlidingPalette then CalcPaletteSlide(touch.Position)
-        elseif SlidingHue then CalcHueSlide(touch.Position)
-        elseif SlidingAlpha then CalcAlphaSlide(touch.Position) end
-    end)
-
-    Library:Connect(UserInputService.TouchEnded, function()
-        SlidingPalette = false
-        SlidingHue = false
-        SlidingAlpha = false
-    end)
-
     Library:Connect(UserInputService.InputBegan, function(Input)
-        if IsMouseClick(Input) then
+        local isClose = Input.UserInputType == Enum.UserInputType.MouseButton1
+            or Input.UserInputType == Enum.UserInputType.Touch
+        if isClose then
             if not Colorpicker.IsOpen then return end
             if Library:IsMouseOverFrame(Items["ColorpickerWindow"]) or Library:IsMouseOverFrame(Items["ColorpickerWindow2"]) then return end
-            Colorpicker:SetOpen(false) Colorpicker:SetOpen2(false)
+            Colorpicker:SetOpen(false)
+            Colorpicker:SetOpen2(false)
         end
     end)
 
@@ -935,7 +1028,8 @@ Library.CreateColorpicker = function(self, Data)
 end
 
 -- =============================================
--- Keybind (MOBILE-PATCHED)
+-- Keybind (Mobile-enhanced)
+-- =============================================
 Library.CreateKeybind = function(self, Data)
     local Keybind = {
         IsOpen = false, Key = "", Toggled = false, Mode = "",
@@ -948,12 +1042,15 @@ Library.CreateKeybind = function(self, Data)
     local Items = {}
     local T = Library.Theme
 
+    local kbTextSize = IsMobile and 13 or 11
+    local kbHeight = IsMobile and 22 or 16
+
     Items["KeyButton"] = Instances:Create("TextButton", {
         Parent = Data.Parent.Instance, Name = "\0",
         FontFace = Library.Font, TextColor3 = T.TextMuted,
         Text = "[ Unbound ]", AutoButtonColor = false,
-        Size = UDim2New(0,0,0,16),
-        BorderSizePixel = 0, TextSize = 11,
+        Size = UDim2New(0,0,0, kbHeight),
+        BorderSizePixel = 0, TextSize = kbTextSize,
         AutomaticSize = Enum.AutomaticSize.X,
         BackgroundColor3 = T.Element
     })
@@ -962,10 +1059,13 @@ Library.CreateKeybind = function(self, Data)
         PaddingLeft = UDimNew(0,6), PaddingRight = UDimNew(0,6) })
     Items["KeyButton"]:AddToTheme({ TextColor3 = "TextMuted", BackgroundColor3 = "Element" })
 
+    local kbWinH = IsMobile and 90 or 72
+    local kbWinW = IsMobile and 120 or 90
+
     Items["KeybindWindow"] = Instances:Create("Frame", {
         Parent = Library.UnusedHolder.Instance, Name = "\0",
         Visible = false, ZIndex = 5,
-        Size = UDim2New(0,90,0,72),
+        Size = UDim2New(0, kbWinW, 0, kbWinH),
         BorderSizePixel = 0,
         BackgroundColor3 = T.Surface
     })
@@ -978,14 +1078,17 @@ Library.CreateKeybind = function(self, Data)
     Instances:Create("UIListLayout", { Parent = Items["KeybindWindow"].Instance, Name = "\0",
         Padding = UDimNew(0,2), SortOrder = Enum.SortOrder.LayoutOrder })
 
+    local modeH = IsMobile and 26 or 20
+    local modeFSize = IsMobile and 13 or 12
+
     local function MakeMode(name)
         local btn = Instances:Create("TextButton", {
             Parent = Items["KeybindWindow"].Instance, Name = "\0",
             FontFace = Library.Font, TextColor3 = T.TextMuted,
             Text = name, AutoButtonColor = false,
             BackgroundTransparency = 1,
-            Size = UDim2New(1,0,0,20),
-            BorderSizePixel = 0, TextSize = 12,
+            Size = UDim2New(1,0,0,modeH),
+            BorderSizePixel = 0, TextSize = modeFSize,
             BackgroundColor3 = T.ElementHover
         })
         Corner(btn.Instance, 3)
@@ -1048,10 +1151,19 @@ Library.CreateKeybind = function(self, Data)
             Items["KeybindWindow"].Instance.Visible = true
             Items["KeybindWindow"].Instance.Parent = Library.Holder.Instance
             KbRenderStepped = RunService.RenderStepped:Connect(function()
-                Items["KeybindWindow"].Instance.Position = UDim2New(0,
-                    Items["KeyButton"].Instance.AbsolutePosition.X,
-                    0,
-                    Items["KeyButton"].Instance.AbsolutePosition.Y + Items["KeyButton"].Instance.AbsoluteSize.Y + 65)
+                if IsMobile then
+                    local screen = GetScreenSize()
+                    local ww = Items["KeybindWindow"].Instance.AbsoluteSize.X
+                    Items["KeybindWindow"].Instance.Position = UDim2New(0,
+                        math.clamp(Items["KeyButton"].Instance.AbsolutePosition.X, 10, screen.X - ww - 10),
+                        0,
+                        Items["KeyButton"].Instance.AbsolutePosition.Y + Items["KeyButton"].Instance.AbsoluteSize.Y + 8)
+                else
+                    Items["KeybindWindow"].Instance.Position = UDim2New(0,
+                        Items["KeyButton"].Instance.AbsolutePosition.X,
+                        0,
+                        Items["KeyButton"].Instance.AbsolutePosition.Y + Items["KeyButton"].Instance.AbsoluteSize.Y + 65)
+                end
             end)
         else
             if KbRenderStepped then KbRenderStepped:Disconnect() KbRenderStepped = nil end
@@ -1140,8 +1252,8 @@ Library.CreateKeybind = function(self, Data)
         Update()
     end
 
-    -- MOBILE-PATCHED: Picking also accepts Touch as a valid keybind
-    local function StartPicking()
+    -- Left click / tap = pick key
+    Items["KeyButton"]:Connect("MouseButton1Click", function()
         Keybind.Picking = true
         Items["KeyButton"].Instance.Text = "[ ... ]"
         Library:Thread(function()
@@ -1157,22 +1269,29 @@ Library.CreateKeybind = function(self, Data)
             if Input.UserInputType == Enum.UserInputType.Keyboard then
                 Keybind:Set(Input.KeyCode)
             elseif Input.UserInputType == Enum.UserInputType.Touch then
-                -- On mobile, set Touch as the trigger key
-                Keybind:Set(Input.UserInputType)
+                -- On mobile: tap to cancel picking (no keys to bind to)
+                Keybind.Picking = false
+                Items["KeyButton"].Instance.Text = "[ Touch ]"
+                Keybind.Key = "Touch"
+                Keybind.Value = "Touch"
+                Library.Flags[Keybind.Flag] = { Mode = Keybind.Mode, Key = "Touch", Toggled = Keybind.Toggled, active = Keybind.Toggled }
             else
                 Keybind:Set(Input.UserInputType)
             end
-            ib:Disconnect() ib = nil
+            if ib then ib:Disconnect() ib = nil end
+        end)
+    end)
+
+    -- Right-click / long-press = mode menu
+    if IsMobile then
+        MakeLongPress(Items["KeyButton"].Instance, function()
+            Keybind:SetOpen(not Keybind.IsOpen)
+        end)
+    else
+        Items["KeyButton"]:Connect("MouseButton2Down", function()
+            Keybind:SetOpen(not Keybind.IsOpen)
         end)
     end
-
-    Items["KeyButton"]:Connect("MouseButton1Click", StartPicking)
-    -- Mobile: Activated fires on both tap and click
-    Items["KeyButton"]:Connect("Activated", StartPicking)
-
-    Items["KeyButton"]:Connect("MouseButton2Down", function()
-        Keybind:SetOpen(not Keybind.IsOpen)
-    end)
 
     Library:Connect(UserInputService.InputBegan, function(Input)
         if Keybind.Value == "None" then return end
@@ -1181,7 +1300,9 @@ Library.CreateKeybind = function(self, Data)
             elseif Keybind.Mode == "Hold" then Keybind:Press(true)
             elseif Keybind.Mode == "Always" then Keybind:Press(true) end
         end
-        if IsMouseClick(Input) then
+        local isClose = Input.UserInputType == Enum.UserInputType.MouseButton1
+            or Input.UserInputType == Enum.UserInputType.Touch
+        if isClose then
             if not Keybind.IsOpen then return end
             if Library:IsMouseOverFrame(Items["KeybindWindow"]) then return end
             Keybind:SetOpen(false)
@@ -1197,11 +1318,8 @@ Library.CreateKeybind = function(self, Data)
     end)
 
     ToggleBtn:Connect("MouseButton1Down", function() Keybind.Mode = "Toggle" Keybind:SetMode("Toggle") end)
-    ToggleBtn:Connect("Activated", function() Keybind.Mode = "Toggle" Keybind:SetMode("Toggle") end)
     HoldBtn:Connect("MouseButton1Down", function() Keybind.Mode = "Hold" Keybind:SetMode("Hold") end)
-    HoldBtn:Connect("Activated", function() Keybind.Mode = "Hold" Keybind:SetMode("Hold") end)
     AlwaysBtn:Connect("MouseButton1Down", function() Keybind.Mode = "Always" Keybind:SetMode("Always On") end)
-    AlwaysBtn:Connect("Activated", function() Keybind.Mode = "Always" Keybind:SetMode("Always On") end)
 
     if Data.Default then Keybind:Set({ Key = Data.Default, Mode = Data.Mode or "Toggle", Toggled = Data.Toggled }) end
     Library.SetFlags[Keybind.Flag] = function(v) Keybind:Set(v) end
@@ -1210,15 +1328,20 @@ end
 
 -- =============================================
 -- Watermark
+-- =============================================
 Library.Watermark = function(self, Name)
     local Watermark = {}
     local T = Library.Theme
     local Items = {}
 
+    local wPos = IsMobile
+        and UDim2New(0.5, 0, 0, 60)  -- below mobile toggle button
+        or  UDim2New(0.5, 0, 0, 12)
+
     Items["Watermark"] = Instances:Create("Frame", {
         Parent = Library.Holder.Instance, Name = "\0",
         AnchorPoint = Vector2New(0.5, 0),
-        Position = UDim2New(0.5, 0, 0, 12),
+        Position = wPos,
         Size = UDim2New(0, 180, 0, 26),
         BorderSizePixel = 0, ZIndex = 5,
         BackgroundColor3 = T.Surface
@@ -1267,16 +1390,25 @@ end
 
 -- =============================================
 -- KeybindList
+-- =============================================
 Library.KeybindList = function(self)
     local KL = {}
     self.KeyList = KL
     local T = Library.Theme
     local Items = {}
 
+    -- On mobile, position on right side below mid-screen
+    local klPos = IsMobile
+        and UDim2New(1, -12, 0.7, 0)
+        or UDim2New(0, 12, 0.5, 0)
+    local klAnchor = IsMobile
+        and Vector2New(1, 0)
+        or Vector2New(0, 0.5)
+
     Items["Frame"] = Instances:Create("Frame", {
         Parent = Library.Holder.Instance, Name = "\0",
-        AnchorPoint = Vector2New(0, 0.5),
-        Position = UDim2New(0, 12, 0.5, 0),
+        AnchorPoint = klAnchor,
+        Position = klPos,
         BorderSizePixel = 0,
         AutomaticSize = Enum.AutomaticSize.XY,
         BackgroundColor3 = T.Surface
@@ -1362,6 +1494,7 @@ end
 
 -- =============================================
 -- ModeratorList
+-- =============================================
 Library.ModeratorList = function(self)
     local ML = {}
     local Moderators = {}
@@ -1448,6 +1581,7 @@ end
 
 -- =============================================
 -- Notification
+-- =============================================
 Library.Notification = function(self, Name, Duration)
     local T = Library.Theme
     local Items = {}
@@ -1480,7 +1614,7 @@ Library.Notification = function(self, Name, Duration)
         Size = UDim2New(0,0,0,14),
         BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left,
         BorderSizePixel = 0, AutomaticSize = Enum.AutomaticSize.XY,
-        TextSize = 12, BackgroundColor3 = FromRGB(255,255,255)
+        TextSize = IsMobile and 14 or 12, BackgroundColor3 = FromRGB(255,255,255)
     })
     Items["Text"]:AddToTheme({ TextColor3 = "Text" })
 
@@ -1510,7 +1644,8 @@ Library.Notification = function(self, Name, Duration)
 end
 
 -- =============================================
--- Window (MOBILE-PATCHED: larger touch-friendly scale on mobile)
+-- Window (Mobile-aware sizing & toggle)
+-- =============================================
 Library.Window = function(self, Data)
     Data = Data or {}
     local T = Library.Theme
@@ -1521,10 +1656,7 @@ Library.Window = function(self, Data)
     }
 
     local Items = {}
-
-    -- Scale window for mobile screens
-    local WINDOW_W = Library.IsMobile and math.min(580, Camera.ViewportSize.X - 20) or 580
-    local WINDOW_H = Library.IsMobile and math.min(440, Camera.ViewportSize.Y - 60) or 440
+    local WINDOW_W, WINDOW_H = GetWindowSize()
 
     -- Main container
     Items["MainFrame"] = Instances:Create("Frame", {
@@ -1543,9 +1675,10 @@ Library.Window = function(self, Data)
     Items["MainFrame"]:MakeDraggable()
 
     -- Top bar
+    local topBarH = IsMobile and 44 or 36
     Items["TopBar"] = Instances:Create("Frame", {
         Parent = Items["MainFrame"].Instance, Name = "\0",
-        Size = UDim2New(1, 0, 0, 36),
+        Size = UDim2New(1, 0, 0, topBarH),
         BorderSizePixel = 0,
         BackgroundColor3 = T.TopBar
     })
@@ -1588,41 +1721,16 @@ Library.Window = function(self, Data)
         BackgroundTransparency = 1,
         Position = UDim2New(0, 24, 0.5, 0),
         BorderSizePixel = 0, AutomaticSize = Enum.AutomaticSize.X,
-        TextSize = 13, BackgroundColor3 = FromRGB(255,255,255)
+        TextSize = IsMobile and 15 or 13, BackgroundColor3 = FromRGB(255,255,255)
     })
     Items["Title"]:AddToTheme({ TextColor3 = "Text" })
-
-    -- Mobile: close button in top-right corner (touch-friendly)
-    if Library.IsMobile then
-        local closeBtn = Instances:Create("TextButton", {
-            Parent = Items["TopBar"].Instance, Name = "\0",
-            FontFace = Library.Font, TextColor3 = T.TextMuted,
-            Text = "✕", AutoButtonColor = false,
-            AnchorPoint = Vector2New(1, 0.5),
-            Position = UDim2New(1, -8, 0.5, 0),
-            Size = UDim2New(0, 36, 0, 28),
-            BorderSizePixel = 0, TextSize = 14,
-            BackgroundTransparency = 1,
-            BackgroundColor3 = FromRGB(255,255,255)
-        })
-        closeBtn:AddToTheme({ TextColor3 = "TextMuted" })
-        closeBtn.Instance.MouseButton1Down:Connect(function()
-            Window:SetOpen(false)
-        end)
-        -- Touch: fire on TouchEnded (finger lift) not TouchBegan, prevents overlap with open
-        closeBtn.Instance.InputEnded:Connect(function(Input)
-            if Input.UserInputType == Enum.UserInputType.Touch then
-                Window:SetOpen(false)
-            end
-        end)
-    end
 
     Items["Pages"] = Instances:Create("Frame", {
         Parent = Items["TopBar"].Instance, Name = "\0",
         AnchorPoint = Vector2New(0.5, 0.5),
         Position = UDim2New(0.5, 0, 0.5, 0),
         BackgroundTransparency = 1,
-        Size = UDim2New(0, 0, 0, 24),
+        Size = UDim2New(0, 0, 0, IsMobile and 32 or 24),
         AutomaticSize = Enum.AutomaticSize.X,
         BorderSizePixel = 0,
         BackgroundColor3 = FromRGB(255,255,255)
@@ -1632,17 +1740,39 @@ Library.Window = function(self, Data)
         FillDirection = Enum.FillDirection.Horizontal,
         HorizontalAlignment = Enum.HorizontalAlignment.Center,
         VerticalAlignment = Enum.VerticalAlignment.Center,
-        Padding = UDimNew(0, 2),
+        Padding = UDimNew(0, IsMobile and 4 or 2),
         SortOrder = Enum.SortOrder.LayoutOrder
     })
+
+    -- Mobile: close button in top-right of window for easy dismissal
+    if IsMobile then
+        local closeBtn = Instances:Create("TextButton", {
+            Parent = Items["TopBar"].Instance, Name = "\0",
+            Text = "✕",
+            FontFace = Library.Fonts["GothamBold"] or Library.Font,
+            TextColor3 = T.TextMuted,
+            TextSize = 14,
+            Size = UDim2New(0, 36, 0, 36),
+            AnchorPoint = Vector2New(1, 0.5),
+            Position = UDim2New(1, -4, 0.5, 0),
+            BackgroundTransparency = 1,
+            AutoButtonColor = false,
+            BorderSizePixel = 0,
+            BackgroundColor3 = FromRGB(255,255,255),
+        })
+        closeBtn:AddToTheme({ TextColor3 = "TextMuted" })
+        closeBtn:Connect("MouseButton1Down", function()
+            Window:SetOpen(false)
+        end)
+    end
 
     Items["Content"] = Instances:Create("Frame", {
         Parent = Items["MainFrame"].Instance, Name = "\0",
         BorderSizePixel = 0,
         BackgroundTransparency = 1,
-        Position = UDim2New(0, 8, 0, 44),
+        Position = UDim2New(0, 8, 0, topBarH + 8),
         ClipsDescendants = true,
-        Size = UDim2New(1, -16, 1, -52),
+        Size = UDim2New(1, -16, 1, -(topBarH + 16)),
         ZIndex = 2,
         BackgroundColor3 = FromRGB(255,255,255)
     })
@@ -1658,11 +1788,6 @@ Library.Window = function(self, Data)
         Items["MainFrame"].Instance.Position = UDim2New(0, cp.X, 0, cp.Y)
     end
 
-    Library.JustOpenedWindow = false
-
-    -- JustOpened: blocks stale touch events from auto-closing the window
-    local JustOpened = false
-
     function Window:SetOpen(Bool)
         for _, v in Library.OpenFrames do v:SetOpen(false) end
 
@@ -1672,12 +1797,12 @@ Library.Window = function(self, Data)
 
         local frame = Items["MainFrame"].Instance
 
-        if Bool then
-            -- Guard against stale touch-end events for 0.6s
-            JustOpened = true
-            Library.JustOpenedWindow = true
-            task.delay(0.6, function() JustOpened = false Library.JustOpenedWindow = false end)
+        -- Update mobile toggle button visibility
+        if Library.MobileToggleButton then
+            Library.MobileToggleButton.Instance.Visible = not Bool
+        end
 
+        if Bool then
             frame.Visible = true
             frame.Size = UDim2New(0, 0, 0, 0)
             frame.BackgroundTransparency = 1
@@ -1694,7 +1819,6 @@ Library.Window = function(self, Data)
                 Debounce = false
             end)
         else
-            JustOpened = false
             local t = TweenService:Create(
                 frame,
                 TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
@@ -1710,65 +1834,13 @@ Library.Window = function(self, Data)
         end
     end
 
-    -- Toggle on keyboard (PC) or MenuKeybind
-    Library:Connect(UserInputService.InputBegan, function(Input)
-        if tostring(Input.KeyCode) == Library.MenuKeybind or tostring(Input.UserInputType) == Library.MenuKeybind then
-            if not Debounce then
-                Window:SetOpen(not Window.IsOpen)
-            end
-        end
-    end)
-
-    -- MOBILE: Floating hamburger button to reopen menu
-    do
-        local toggleBtn = InstanceNew("TextButton")
-        toggleBtn.Text = "Menu"
-        toggleBtn.FontFace = Library.Fonts["GothamBold"] or Library.Font
-        toggleBtn.TextColor3 = Library.Theme.Text
-        toggleBtn.TextSize = 12
-        toggleBtn.AutoButtonColor = false
-        toggleBtn.AnchorPoint = Vector2New(0, 1)
-        toggleBtn.Position = UDim2New(0, 8, 1, -8)
-        toggleBtn.Size = UDim2New(0, 52, 0, 28)
-        toggleBtn.BorderSizePixel = 0
-        toggleBtn.ZIndex = 20
-        toggleBtn.BackgroundColor3 = Library.Theme.Accent
-        toggleBtn.Visible = false
-        toggleBtn.Parent = Library.Holder.Instance
-        Corner(toggleBtn, 6)
-
-        -- Simple open: just make frame visible directly, skip animation entirely on mobile
-        local function OpenMenu()
-            if Window.IsOpen then return end
-            Window.IsOpen = true
-            Debounce = false
-            local frame = Items["MainFrame"].Instance
-            frame.Visible = true
-            frame.Size = UDim2New(0, WINDOW_W, 0, WINDOW_H)
-            frame.BackgroundTransparency = 0
-            toggleBtn.Visible = false
-        end
-
-        -- Hook into SetOpen to show/hide toggle button
-        local _origSetOpen = Window.SetOpen
-        Window.SetOpen = function(self2, Bool)
-            _origSetOpen(self2, Bool)
-            if Bool then
-                toggleBtn.Visible = false
-            else
-                -- Show button after close anim finishes (~0.4s total)
-                task.delay(0.5, function()
-                    if not Window.IsOpen then
-                        toggleBtn.Visible = true
-                    end
-                end)
-            end
-        end
-
-        toggleBtn.MouseButton1Up:Connect(OpenMenu)
-        toggleBtn.InputEnded:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.Touch then
-                OpenMenu()
+    -- Keyboard toggle (PC only)
+    if not IsMobile then
+        Library:Connect(UserInputService.InputBegan, function(Input)
+            if tostring(Input.KeyCode) == Library.MenuKeybind or tostring(Input.UserInputType) == Library.MenuKeybind then
+                if not Debounce then
+                    Window:SetOpen(not Window.IsOpen)
+                end
             end
         end)
     end
@@ -1781,18 +1853,22 @@ Library.Window = function(self, Data)
     Items["MainFrame"].Instance.Size = UDim2New(0, WINDOW_W, 0, WINDOW_H)
     Items["MainFrame"].Instance.BackgroundTransparency = 0
 
+    -- Create mobile hamburger toggle button
+    Library:CreateMobileToggle(Window)
+
     return setmetatable(Window, Library)
 end
 
 -- =============================================
--- Page (MOBILE-PATCHED: Activated for tab clicks)
+-- Page (Mobile: larger tab targets)
+-- =============================================
 Library.Page = function(self, Data)
     Data = Data or {}
     local T = Library.Theme
     local Page = {
         Window = self,
         Name = Data.Name or Data.name or "Page",
-        Columns = Data.Columns or Data.columns or 2,
+        Columns = Data.Columns or Data.columns or (IsMobile and 1 or 2),
         Items = {}, ColumnsData = {}, Active = false
     }
 
@@ -1807,13 +1883,14 @@ Library.Page = function(self, Data)
         BackgroundTransparency = 1,
         Size = UDim2New(0, 0, 1, 0),
         AutomaticSize = Enum.AutomaticSize.X,
-        BorderSizePixel = 0, TextSize = 12,
+        BorderSizePixel = 0, TextSize = IsMobile and 14 or 12,
         BackgroundColor3 = T.Element
     })
     Corner(Items["Tab"].Instance, 4)
+    local tabPad = IsMobile and 16 or 12
     Instances:Create("UIPadding", {
         Parent = Items["Tab"].Instance, Name = "\0",
-        PaddingLeft = UDimNew(0,12), PaddingRight = UDimNew(0,12)
+        PaddingLeft = UDimNew(0, tabPad), PaddingRight = UDimNew(0, tabPad)
     })
     Items["Tab"]:AddToTheme({ TextColor3 = "TextMuted" })
 
@@ -1845,33 +1922,31 @@ Library.Page = function(self, Data)
         VerticalFlex = Enum.UIFlexAlignment.Fill
     })
 
-    -- On mobile, use 1 column if not enough width
-    local cols = Page.Columns
-    if Library.IsMobile and Camera.ViewportSize.X < 480 then
-        cols = 1
-    end
-
-    for i = 1, cols do
+    for i = 1, Page.Columns do
+        local scrollBarThick = IsMobile and 3 or 2
         local col = Instances:Create("ScrollingFrame", {
             Parent = Items["Page"].Instance, Name = "\0",
             ScrollBarImageColor3 = T.Border,
             Active = true,
             AutomaticCanvasSize = Enum.AutomaticSize.Y,
             BorderSizePixel = 0,
-            ScrollBarThickness = 2,
+            ScrollBarThickness = scrollBarThick,
             BackgroundTransparency = 1,
             Size = UDim2New(0,100,0,100),
             CanvasSize = UDim2New(0,0,0,0),
+            -- Enable elastic scrolling on mobile
+            ElasticBehavior = IsMobile and Enum.ElasticBehavior.Always or Enum.ElasticBehavior.WhenScrollable,
         })
         col:AddToTheme({ ScrollBarImageColor3 = "Border" })
+        local padV = IsMobile and 8 or 6
         Instances:Create("UIPadding", {
             Parent = col.Instance, Name = "\0",
-            PaddingTop = UDimNew(0,6), PaddingBottom = UDimNew(0,8),
-            PaddingLeft = UDimNew(0,6), PaddingRight = UDimNew(0,6)
+            PaddingTop = UDimNew(0, padV), PaddingBottom = UDimNew(0, padV + 2),
+            PaddingLeft = UDimNew(0, padV), PaddingRight = UDimNew(0, padV)
         })
         Instances:Create("UIListLayout", {
             Parent = col.Instance, Name = "\0",
-            Padding = UDimNew(0,8), SortOrder = Enum.SortOrder.LayoutOrder
+            Padding = UDimNew(0, IsMobile and 10 or 8), SortOrder = Enum.SortOrder.LayoutOrder
         })
         Page.ColumnsData[i] = col
     end
@@ -1898,15 +1973,12 @@ Library.Page = function(self, Data)
         Debounce = false
     end
 
-    local function OnTabPress()
+    Items["Tab"]:Connect("MouseButton1Down", function()
         for _, v in Page.Window.Pages do
             if v == Page and Page.Active then return end
             v:Turn(v == Page)
         end
-    end
-
-    Items["Tab"]:Connect("MouseButton1Down", OnTabPress)
-    Items["Tab"]:Connect("Activated", OnTabPress) -- Mobile touch
+    end)
 
     if #Page.Window.Pages == 0 then Page:Turn(true) end
     TableInsert(Page.Window.Pages, Page)
@@ -1914,7 +1986,8 @@ Library.Page = function(self, Data)
 end
 
 -- =============================================
--- Section
+-- Section (Mobile: slightly bigger touch elements)
+-- =============================================
 Library.Pages.Section = function(self, Data)
     Data = Data or {}
     local T = Library.Theme
@@ -1941,12 +2014,13 @@ Library.Pages.Section = function(self, Data)
     }):AddToTheme({ Color = "Border" })
     Instances:Create("UIPadding", {
         Parent = Items["Section"].Instance, Name = "\0",
-        PaddingBottom = UDimNew(0, 10)
+        PaddingBottom = UDimNew(0, IsMobile and 14 or 10)
     })
 
+    local hdrH = IsMobile and 34 or 28
     Items["Header"] = Instances:Create("Frame", {
         Parent = Items["Section"].Instance, Name = "\0",
-        Size = UDim2New(1, 0, 0, 28),
+        Size = UDim2New(1, 0, 0, hdrH),
         BorderSizePixel = 0,
         BackgroundColor3 = T.Surface2
     })
@@ -1982,7 +2056,7 @@ Library.Pages.Section = function(self, Data)
         Position = UDim2New(0, 17, 0.5, 0),
         BorderSizePixel = 0,
         AutomaticSize = Enum.AutomaticSize.X,
-        TextSize = 11,
+        TextSize = IsMobile and 13 or 11,
         TextXAlignment = Enum.TextXAlignment.Left,
         BackgroundColor3 = FromRGB(255,255,255)
     })
@@ -1990,7 +2064,7 @@ Library.Pages.Section = function(self, Data)
 
     Instances:Create("Frame", {
         Parent = Items["Section"].Instance, Name = "\0",
-        Position = UDim2New(0, 8, 0, 29),
+        Position = UDim2New(0, 8, 0, hdrH + 1),
         Size = UDim2New(1, -16, 0, 1),
         BorderSizePixel = 0,
         BackgroundColor3 = T.Border
@@ -2000,14 +2074,14 @@ Library.Pages.Section = function(self, Data)
         Parent = Items["Section"].Instance, Name = "\0",
         BorderSizePixel = 0,
         BackgroundTransparency = 1,
-        Position = UDim2New(0, 10, 0, 38),
+        Position = UDim2New(0, 10, 0, hdrH + 10),
         Size = UDim2New(1, -20, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundColor3 = FromRGB(255,255,255)
     })
     Instances:Create("UIListLayout", {
         Parent = Items["Content"].Instance, Name = "\0",
-        Padding = UDimNew(0, 7), SortOrder = Enum.SortOrder.LayoutOrder
+        Padding = UDimNew(0, IsMobile and 10 or 7), SortOrder = Enum.SortOrder.LayoutOrder
     })
 
     Section.Items = Items
@@ -2015,7 +2089,8 @@ Library.Pages.Section = function(self, Data)
 end
 
 -- =============================================
--- Toggle (MOBILE-PATCHED)
+-- Toggle (Mobile: bigger hit area)
+-- =============================================
 Library.Sections.Toggle = function(self, Data)
     Data = Data or {}
     local T = Library.Theme
@@ -2028,13 +2103,19 @@ Library.Sections.Toggle = function(self, Data)
         Value = false
     }
 
+    local rowH = IsMobile and 26 or 18
+    local boxSz = IsMobile and 20 or 14
+    local txtSz = IsMobile and 14 or 12
+    local txtOff = IsMobile and 28 or 22
+    local checkSz = IsMobile and 12 or 8
+
     local Items = {}
 
     Items["Row"] = Instances:Create("TextButton", {
         Parent = Toggle.Section.Items["Content"].Instance, Name = "\0",
         Text = "", AutoButtonColor = false,
         BackgroundTransparency = 1,
-        Size = UDim2New(1, 0, 0, 18),
+        Size = UDim2New(1, 0, 0, rowH),
         BorderSizePixel = 0,
         BackgroundColor3 = FromRGB(255,255,255)
     })
@@ -2043,7 +2124,7 @@ Library.Sections.Toggle = function(self, Data)
         Parent = Items["Row"].Instance, Name = "\0",
         AnchorPoint = Vector2New(0, 0.5),
         Position = UDim2New(0, 0, 0.5, 0),
-        Size = UDim2New(0, 14, 0, 14),
+        Size = UDim2New(0, boxSz, 0, boxSz),
         BorderSizePixel = 0,
         BackgroundColor3 = T.Element
     })
@@ -2074,9 +2155,9 @@ Library.Sections.Toggle = function(self, Data)
         Size = UDim2New(0, 0, 0, 14),
         AnchorPoint = Vector2New(0, 0.5),
         BorderSizePixel = 0, BackgroundTransparency = 1,
-        Position = UDim2New(0, 22, 0.5, 0),
+        Position = UDim2New(0, txtOff, 0.5, 0),
         AutomaticSize = Enum.AutomaticSize.X,
-        TextSize = 12,
+        TextSize = txtSz,
         BackgroundColor3 = FromRGB(255,255,255)
     })
     Items["Text"]:AddToTheme({ TextColor3 = "TextMuted" })
@@ -2095,7 +2176,7 @@ Library.Sections.Toggle = function(self, Data)
         VerticalAlignment = Enum.VerticalAlignment.Center,
         FillDirection = Enum.FillDirection.Horizontal,
         HorizontalAlignment = Enum.HorizontalAlignment.Right,
-        Padding = UDimNew(0, 6), SortOrder = Enum.SortOrder.LayoutOrder
+        Padding = UDimNew(0, IsMobile and 10 or 6), SortOrder = Enum.SortOrder.LayoutOrder
     })
 
     Items["Row"]:OnHover(function()
@@ -2114,7 +2195,7 @@ Library.Sections.Toggle = function(self, Data)
         Library.Flags[Toggle.Flag] = Value
         if Toggle.Value then
             Items["Box"]:Tween(nil, { BackgroundColor3 = Library.Theme.Accent })
-            Items["Check"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2New(0,8,0,8), BackgroundTransparency = 0 })
+            Items["Check"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2New(0, checkSz, 0, checkSz), BackgroundTransparency = 0 })
             Items["Text"].Instance.TextColor3 = Library.Theme.Text
         else
             Items["Box"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
@@ -2151,14 +2232,14 @@ Library.Sections.Toggle = function(self, Data)
     function Toggle:SetVisibility(Bool) Items["Row"].Instance.Visible = Bool end
 
     Items["Row"]:Connect("MouseButton1Down", function() Toggle:Set(not Toggle.Value) end)
-    Items["Row"]:Connect("Activated", function() Toggle:Set(not Toggle.Value) end) -- Mobile
     Toggle:Set(Toggle.Default)
     Library.SetFlags[Toggle.Flag] = function(v) Toggle:Set(v) end
     return Toggle
 end
 
 -- =============================================
--- Button (MOBILE-PATCHED)
+-- Button (Mobile: taller touch target)
+-- =============================================
 Library.Sections.Button = function(self, Data)
     Data = Data or {}
     local T = Library.Theme
@@ -2169,14 +2250,16 @@ Library.Sections.Button = function(self, Data)
     }
     local Items = {}
 
+    local btnH = IsMobile and 32 or 22
+
     Items["Button"] = Instances:Create("TextButton", {
         Parent = Button.Section.Items["Content"].Instance, Name = "\0",
         FontFace = Library.Font,
         TextColor3 = T.Text,
         Text = Button.Name,
         AutoButtonColor = false,
-        Size = UDim2New(1, 0, 0, 22),
-        BorderSizePixel = 0, TextSize = 12,
+        Size = UDim2New(1, 0, 0, btnH),
+        BorderSizePixel = 0, TextSize = IsMobile and 14 or 12,
         BackgroundColor3 = T.Element
     })
     Corner(Items["Button"].Instance, 4)
@@ -2200,12 +2283,12 @@ Library.Sections.Button = function(self, Data)
     end
 
     Items["Button"]:Connect("MouseButton1Down", function() Button:Press() end)
-    Items["Button"]:Connect("Activated", function() Button:Press() end) -- Mobile
     return Button
 end
 
 -- =============================================
--- Slider (MOBILE-PATCHED: full touch support)
+-- Slider (Mobile: taller track for easier touch)
+-- =============================================
 Library.Sections.Slider = function(self, Data)
     Data = Data or {}
     local T = Library.Theme
@@ -2223,10 +2306,13 @@ Library.Sections.Slider = function(self, Data)
     }
     local Items = {}
 
+    local containerH = IsMobile and 42 or 34
+    local trackH = IsMobile and 16 or 10
+
     Items["Container"] = Instances:Create("Frame", {
         Parent = Slider.Section.Items["Content"].Instance, Name = "\0",
         BackgroundTransparency = 1,
-        Size = UDim2New(1, 0, 0, 34),
+        Size = UDim2New(1, 0, 0, containerH),
         BorderSizePixel = 0,
         BackgroundColor3 = FromRGB(255,255,255)
     })
@@ -2246,7 +2332,7 @@ Library.Sections.Slider = function(self, Data)
         BackgroundTransparency = 1,
         Size = UDim2New(0,0,1,0),
         AutomaticSize = Enum.AutomaticSize.X,
-        BorderSizePixel = 0, TextSize = 12,
+        BorderSizePixel = 0, TextSize = IsMobile and 13 or 12,
         BackgroundColor3 = FromRGB(255,255,255)
     })
     Items["Text"]:AddToTheme({ TextColor3 = "TextMuted" })
@@ -2254,7 +2340,7 @@ Library.Sections.Slider = function(self, Data)
     Items["Value"] = Instances:Create("TextBox", {
         Parent = topRow.Instance, Name = "\0",
         FontFace = Library.Font, Active = false,
-        TextColor3 = T.TextMuted, TextSize = 11,
+        TextColor3 = T.TextMuted, TextSize = IsMobile and 13 or 11,
         Size = UDim2New(0,0,1,0),
         AnchorPoint = Vector2New(1,0),
         Position = UDim2New(1,0,0,0),
@@ -2271,7 +2357,7 @@ Library.Sections.Slider = function(self, Data)
         Text = "", AutoButtonColor = false,
         AnchorPoint = Vector2New(0,1),
         Position = UDim2New(0,0,1,0),
-        Size = UDim2New(1,0,0,10),
+        Size = UDim2New(1,0,0,trackH),
         BorderSizePixel = 0,
         BackgroundColor3 = T.Element
     })
@@ -2297,11 +2383,6 @@ Library.Sections.Slider = function(self, Data)
         Items["Track"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
     end)
 
-    local function SlideFromPos(posX)
-        local sx = (posX - Items["Track"].Instance.AbsolutePosition.X) / Items["Track"].Instance.AbsoluteSize.X
-        Slider:Set(((Slider.Max - Slider.Min) * sx) + Slider.Min)
-    end
-
     function Slider:Get() return Slider.Value end
     function Slider:Set(Value)
         Slider.Value = MathClamp(Library:Round(Value, Slider.Decimals), Slider.Min, Slider.Max)
@@ -2315,33 +2396,32 @@ Library.Sections.Slider = function(self, Data)
         if Slider.Callback then Library:SafeCall(Slider.Callback, Slider.Value) end
     end
 
-    -- Mouse InputBegan on track
+    -- =============================================
+    -- SLIDER TOUCH + MOUSE INPUT
+    -- =============================================
+    local function GetSlideX(Input)
+        return (Input.Position.X - Items["Track"].Instance.AbsolutePosition.X) / Items["Track"].Instance.AbsoluteSize.X
+    end
+
     Items["Track"]:Connect("InputBegan", function(Input)
-        if IsPrimaryPress(Input) then
+        local isDown = Input.UserInputType == Enum.UserInputType.MouseButton1
+            or Input.UserInputType == Enum.UserInputType.Touch
+        if isDown then
             Slider.Sliding = true
-            SlideFromPos(Input.Position.X)
+            Slider:Set(((Slider.Max - Slider.Min) * GetSlideX(Input)) + Slider.Min)
         end
     end)
     Items["Track"]:Connect("InputEnded", function(Input)
-        if IsPrimaryPress(Input) then Slider.Sliding = false end
+        local isUp = Input.UserInputType == Enum.UserInputType.MouseButton1
+            or Input.UserInputType == Enum.UserInputType.Touch
+        if isUp then Slider.Sliding = false end
     end)
-
-    -- Global move (mouse + touch)
     Library:Connect(UserInputService.InputChanged, function(Input)
-        if IsMovement(Input) and Slider.Sliding then
-            SlideFromPos(Input.Position.X)
+        local isMov = Input.UserInputType == Enum.UserInputType.MouseMovement
+            or Input.UserInputType == Enum.UserInputType.Touch
+        if isMov and Slider.Sliding then
+            Slider:Set(((Slider.Max - Slider.Min) * GetSlideX(Input)) + Slider.Min)
         end
-    end)
-
-    -- TouchMoved for mobile precision
-    Library:Connect(UserInputService.TouchMoved, function(touch)
-        if Slider.Sliding then
-            SlideFromPos(touch.Position.X)
-        end
-    end)
-
-    Library:Connect(UserInputService.TouchEnded, function()
-        Slider.Sliding = false
     end)
 
     if Slider.Default then Slider:Set(Slider.Default) end
@@ -2350,7 +2430,8 @@ Library.Sections.Slider = function(self, Data)
 end
 
 -- =============================================
--- Dropdown (MOBILE-PATCHED)
+-- Dropdown (Mobile: larger options, larger hit areas)
+-- =============================================
 Library.Sections.Dropdown = function(self, Data)
     Data = Data or {}
     local T = Library.Theme
@@ -2360,17 +2441,22 @@ Library.Sections.Dropdown = function(self, Data)
         Flag = Data.Flag or Data.flag or Library:NextFlag(),
         Items = Data.Items or Data.items or Data.Options or Data.options or {},
         Default = Data.Default or Data.default or nil,
-        MaxSize = Data.MaxSize or Data.maxsize or 80,
+        MaxSize = Data.MaxSize or Data.maxsize or (IsMobile and 120 or 80),
         Callback = Data.Callback or Data.callback or function() end,
         Multi = Data.Multi or Data.multi or false,
         Options = {}, Value = {}, IsOpen = false
     }
     local Items = {}
 
+    local containerH = IsMobile and 42 or 34
+    local btnH = IsMobile and 26 or 18
+    local txtSz = IsMobile and 13 or 12
+    local selTxtSz = IsMobile and 13 or 11
+
     Items["Container"] = Instances:Create("Frame", {
         Parent = Dropdown.Section.Items["Content"].Instance, Name = "\0",
         BackgroundTransparency = 1,
-        Size = UDim2New(1,0,0,34),
+        Size = UDim2New(1,0,0,containerH),
         ZIndex = 2, BorderSizePixel = 0,
         BackgroundColor3 = FromRGB(255,255,255)
     })
@@ -2382,7 +2468,7 @@ Library.Sections.Dropdown = function(self, Data)
         BackgroundTransparency = 1,
         Size = UDim2New(0,0,0,14),
         AutomaticSize = Enum.AutomaticSize.X,
-        BorderSizePixel = 0, TextSize = 12,
+        BorderSizePixel = 0, TextSize = txtSz,
         BackgroundColor3 = FromRGB(255,255,255)
     })
     Items["Text"]:AddToTheme({ TextColor3 = "TextMuted" })
@@ -2392,8 +2478,8 @@ Library.Sections.Dropdown = function(self, Data)
         Text = "", AutoButtonColor = false,
         AnchorPoint = Vector2New(0,1),
         Position = UDim2New(0,0,1,0),
-        Size = UDim2New(1,0,0,18),
-        BorderSizePixel = 0, TextSize = 12,
+        Size = UDim2New(1,0,0,btnH),
+        BorderSizePixel = 0, TextSize = txtSz,
         BackgroundColor3 = T.Element
     })
     Corner(Items["Button"].Instance, 4)
@@ -2408,7 +2494,7 @@ Library.Sections.Dropdown = function(self, Data)
         Size = UDim2New(1,-20,0,12),
         BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left,
         Position = UDim2New(0,8,0.5,0),
-        BorderSizePixel = 0, TextSize = 11,
+        BorderSizePixel = 0, TextSize = selTxtSz,
         BackgroundColor3 = FromRGB(255,255,255)
     })
     Items["Selected"]:AddToTheme({ TextColor3 = "TextMuted" })
@@ -2439,47 +2525,51 @@ Library.Sections.Dropdown = function(self, Data)
     Instances:Create("UIStroke", { Parent = Items["OptionHolder"].Instance, Name = "\0",
         Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
 
+    local searchH = IsMobile and 20 or 14
     Items["Search"] = Instances:Create("TextBox", {
         Parent = Items["OptionHolder"].Instance, Name = "\0",
         FontFace = Library.Font,
         TextColor3 = T.Text, TextTransparency = 0.4,
         Text = "",
-        Size = UDim2New(1,-8,0,14),
+        Size = UDim2New(1,-8,0,searchH),
         Position = UDim2New(0,4,0,5),
         BackgroundTransparency = 1, BorderSizePixel = 0,
         PlaceholderColor3 = T.TextMuted,
         PlaceholderText = "Search...",
         TextXAlignment = Enum.TextXAlignment.Left,
-        TextSize = 11,
+        TextSize = IsMobile and 13 or 11,
         BackgroundColor3 = FromRGB(255,255,255)
     })
     Items["Search"]:AddToTheme({ TextColor3 = "Text" })
 
+    local sepY = IsMobile and 28 or 22
     Instances:Create("Frame", {
         Parent = Items["OptionHolder"].Instance, Name = "\0",
-        Position = UDim2New(0,4,0,22),
+        Position = UDim2New(0,4,0, sepY),
         Size = UDim2New(1,-8,0,1),
         BorderSizePixel = 0,
         BackgroundColor3 = T.Border
     }):AddToTheme({ BackgroundColor3 = "Border" })
 
+    local holderY = IsMobile and 34 or 26
     Items["Holder"] = Instances:Create("ScrollingFrame", {
         Parent = Items["OptionHolder"].Instance, Name = "\0",
         Active = true,
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         BorderSizePixel = 0, CanvasSize = UDim2New(0,0,0,0),
         ScrollBarImageColor3 = T.Border,
-        ScrollBarThickness = 2,
-        Size = UDim2New(1,-4,1,-28),
+        ScrollBarThickness = IsMobile and 3 or 2,
+        Size = UDim2New(1,-4,1,-holderY),
         BackgroundTransparency = 1,
-        Position = UDim2New(0,0,0,26),
+        Position = UDim2New(0,0,0,holderY),
+        ElasticBehavior = IsMobile and Enum.ElasticBehavior.Always or Enum.ElasticBehavior.WhenScrollable,
     })
     Items["Holder"]:AddToTheme({ ScrollBarImageColor3 = "Border" })
     Instances:Create("UIPadding", { Parent = Items["Holder"].Instance, Name = "\0",
         PaddingTop = UDimNew(0,4), PaddingBottom = UDimNew(0,4),
         PaddingLeft = UDimNew(0,6), PaddingRight = UDimNew(0,8) })
     Instances:Create("UIListLayout", { Parent = Items["Holder"].Instance, Name = "\0",
-        Padding = UDimNew(0,3), SortOrder = Enum.SortOrder.LayoutOrder })
+        Padding = UDimNew(0, IsMobile and 5 or 3), SortOrder = Enum.SortOrder.LayoutOrder })
 
     Items["Button"]:OnHover(function()
         Items["Button"]:Tween(nil, { BackgroundColor3 = Library:GetLighterColor(Library.Theme.Element, 1.4) })
@@ -2524,10 +2614,25 @@ Library.Sections.Dropdown = function(self, Data)
             Items["OptionHolder"].Instance.Visible = true
             Items["OptionHolder"].Instance.Parent = Library.Holder.Instance
             DDRenderStepped = RunService.RenderStepped:Connect(function()
-                Items["OptionHolder"].Instance.Position = UDim2New(0,
-                    Items["Button"].Instance.AbsolutePosition.X, 0,
-                    Items["Button"].Instance.AbsolutePosition.Y + Items["Button"].Instance.AbsoluteSize.Y + 65)
-                Items["OptionHolder"].Instance.Size = UDim2New(0, Items["Button"].Instance.AbsoluteSize.X, 0, Dropdown.MaxSize)
+                local screen = GetScreenSize()
+                local bx = Items["Button"].Instance.AbsolutePosition.X
+                local by = Items["Button"].Instance.AbsolutePosition.Y + Items["Button"].Instance.AbsoluteSize.Y
+                local holderW = Items["Button"].Instance.AbsoluteSize.X
+                local holderH = Dropdown.MaxSize
+
+                if IsMobile then
+                    -- Ensure dropdown doesn't go off screen bottom
+                    local offY = IsMobile and 8 or 65
+                    local posY = by + offY
+                    if posY + holderH > screen.Y - 10 then
+                        posY = Items["Button"].Instance.AbsolutePosition.Y - holderH - 4
+                    end
+                    Items["OptionHolder"].Instance.Position = UDim2New(0, bx, 0, posY)
+                    Items["OptionHolder"].Instance.Size = UDim2New(0, holderW, 0, holderH)
+                else
+                    Items["OptionHolder"].Instance.Position = UDim2New(0, bx, 0, by + 65)
+                    Items["OptionHolder"].Instance.Size = UDim2New(0, holderW, 0, holderH)
+                end
             end)
             for _, v in Library.OpenFrames do
                 if v ~= Dropdown then v:SetOpen(false) end
@@ -2561,12 +2666,13 @@ Library.Sections.Dropdown = function(self, Data)
 
     function Dropdown:Add(Option)
         local first = #Dropdown.Options == 0
+        local optionH = IsMobile and 26 or 18
         local btn = Instances:Create("TextButton", {
             Parent = Items["Holder"].Instance, Name = "\0",
             FontFace = Library.Font, Text = "", AutoButtonColor = false,
             BackgroundTransparency = 1,
-            Size = UDim2New(1,0,0,18),
-            BorderSizePixel = 0, TextSize = 12,
+            Size = UDim2New(1,0,0,optionH),
+            BorderSizePixel = 0, TextSize = IsMobile and 13 or 12,
             BackgroundColor3 = T.ElementHover
         })
         Corner(btn.Instance, 3)
@@ -2593,7 +2699,7 @@ Library.Sections.Dropdown = function(self, Data)
             BackgroundTransparency = 1,
             Position = UDim2New(0,10,0.5,0),
             AutomaticSize = Enum.AutomaticSize.X,
-            BorderSizePixel = 0, TextSize = 11,
+            BorderSizePixel = 0, TextSize = IsMobile and 13 or 11,
             BackgroundColor3 = FromRGB(255,255,255)
         })
         txt:AddToTheme({ TextColor3 = "TextMuted" })
@@ -2639,7 +2745,6 @@ Library.Sections.Dropdown = function(self, Data)
         end
 
         btn:Connect("MouseButton1Down", function() od:Set() end)
-        btn:Connect("Activated", function() od:Set() end) -- Mobile
         Dropdown.Options[od.Name] = od
         return od
     end
@@ -2657,10 +2762,11 @@ Library.Sections.Dropdown = function(self, Data)
     for _, v in Dropdown.Items do Dropdown:Add(v) end
 
     Items["Button"]:Connect("MouseButton1Down", function() Dropdown:SetOpen(not Dropdown.IsOpen) end)
-    Items["Button"]:Connect("Activated", function() Dropdown:SetOpen(not Dropdown.IsOpen) end) -- Mobile
 
     Library:Connect(UserInputService.InputBegan, function(Input)
-        if IsMouseClick(Input) then
+        local isClose = Input.UserInputType == Enum.UserInputType.MouseButton1
+            or Input.UserInputType == Enum.UserInputType.Touch
+        if isClose then
             if not Dropdown.IsOpen then return end
             if Library:IsMouseOverFrame(Items["OptionHolder"]) then return end
             Dropdown:SetOpen(false)
@@ -2692,7 +2798,8 @@ Library.Sections.Dropdown = function(self, Data)
 end
 
 -- =============================================
--- Label (MOBILE-PATCHED)
+-- Label
+-- =============================================
 Library.Sections.Label = function(self, Name)
     local T = Library.Theme
     local Label = { Window = self.Window, Page = self.Page, Section = self, Name = Name or "Label" }
@@ -2701,7 +2808,7 @@ Library.Sections.Label = function(self, Name)
     Items["Row"] = Instances:Create("Frame", {
         Parent = Label.Section.Items["Content"].Instance, Name = "\0",
         BackgroundTransparency = 1,
-        Size = UDim2New(1,0,0,16),
+        Size = UDim2New(1,0,0, IsMobile and 22 or 16),
         BorderSizePixel = 0,
         BackgroundColor3 = FromRGB(255,255,255)
     })
@@ -2712,7 +2819,7 @@ Library.Sections.Label = function(self, Name)
         BackgroundTransparency = 1,
         Size = UDim2New(0,0,1,0),
         AutomaticSize = Enum.AutomaticSize.X,
-        BorderSizePixel = 0, TextSize = 12,
+        BorderSizePixel = 0, TextSize = IsMobile and 13 or 12,
         BackgroundColor3 = FromRGB(255,255,255)
     })
     Items["Text"]:AddToTheme({ TextColor3 = "TextMuted" })
@@ -2730,7 +2837,7 @@ Library.Sections.Label = function(self, Name)
         VerticalAlignment = Enum.VerticalAlignment.Center,
         FillDirection = Enum.FillDirection.Horizontal,
         HorizontalAlignment = Enum.HorizontalAlignment.Right,
-        Padding = UDimNew(0,6), SortOrder = Enum.SortOrder.LayoutOrder })
+        Padding = UDimNew(0, IsMobile and 10 or 6), SortOrder = Enum.SortOrder.LayoutOrder })
 
     function Label:SetText(Text) Items["Text"].Instance.Text = tostring(Text) end
     function Label:SetVisibility(Bool) Items["Row"].Instance.Visible = Bool end
@@ -2764,7 +2871,8 @@ Library.Sections.Label = function(self, Name)
 end
 
 -- =============================================
--- Textbox (MOBILE-PATCHED)
+-- Textbox (Mobile: taller input)
+-- =============================================
 Library.Sections.Textbox = function(self, Data)
     Data = Data or {}
     local T = Library.Theme
@@ -2781,10 +2889,12 @@ Library.Sections.Textbox = function(self, Data)
     }
     local Items = {}
 
+    local rowH = IsMobile and 28 or 20
+
     Items["Row"] = Instances:Create("Frame", {
         Parent = Textbox.Section.Items["Content"].Instance, Name = "\0",
         BackgroundTransparency = 1,
-        Size = UDim2New(1,0,0,20),
+        Size = UDim2New(1,0,0,rowH),
         BorderSizePixel = 0,
         BackgroundColor3 = FromRGB(255,255,255)
     })
@@ -2799,7 +2909,7 @@ Library.Sections.Textbox = function(self, Data)
         PlaceholderColor3 = T.TextMuted,
         TextXAlignment = Enum.TextXAlignment.Left,
         PlaceholderText = Textbox.Placeholder,
-        TextSize = 11,
+        TextSize = IsMobile and 13 or 11,
         BackgroundColor3 = T.Element
     })
     Corner(Items["Input"].Instance, 4)
@@ -2818,7 +2928,7 @@ Library.Sections.Textbox = function(self, Data)
         BackgroundTransparency = 1,
         Position = UDim2New(1,0,0.5,0),
         AutomaticSize = Enum.AutomaticSize.X,
-        BorderSizePixel = 0, TextSize = 12,
+        BorderSizePixel = 0, TextSize = IsMobile and 13 or 12,
         BackgroundColor3 = FromRGB(255,255,255)
     })
     Items["Label"]:AddToTheme({ TextColor3 = "TextMuted" })
@@ -2859,20 +2969,27 @@ end
 
 -- =============================================
 -- Settings page builder
+-- =============================================
 Library.CreateSettingsPage = function(self, Window, KeybindList, Watermark, ModeratorList)
-    local SP = Window:Page({ Name = "Settings", Columns = 2 })
-    local SS = SP:Section({ Name = "Settings", Side = 1 }) do
+    local cols = IsMobile and 1 or 2
+    local SP = Window:Page({ Name = "Settings", Columns = cols })
+    local side1 = 1
+    local side2 = IsMobile and 1 or 2
+
+    local SS = SP:Section({ Name = "Settings", Side = side1 }) do
         SS:Button({ Name = "Unload", Callback = function() Library:Unload() end })
         SS:Toggle({ Name = "Watermark", Flag = "Watermark", Default = true, Callback = function(v) Watermark:SetVisibility(v) end })
         SS:Toggle({ Name = "Keybind List", Flag = "Keybind list", Default = true, Callback = function(v) KeybindList:SetVisibility(v) end })
         SS:Toggle({ Name = "Moderator List", Flag = "Moderator list", Default = true, Callback = function(v) if ModeratorList then ModeratorList:SetVisibility(v) end end })
-        SS:Label("Menu Keybind"):Keybind({ Name = "Menu Keybind", Flag = "MenuKeybind", Default = Library.MenuKeybind, Mode = "Toggle", Callback = function() Library.MenuKeybind = Library.Flags["MenuKeybind"].Key end })
+        if not IsMobile then
+            SS:Label("Menu Keybind"):Keybind({ Name = "Menu Keybind", Flag = "MenuKeybind", Default = Library.MenuKeybind, Mode = "Toggle", Callback = function() Library.MenuKeybind = Library.Flags["MenuKeybind"].Key end })
+        end
         SS:Slider({ Name = "Tween Speed", Default = 0.18, Flag = "Tween Speed", Decimals = 0.01, Suffix = "s", Max = 2, Min = 0, Callback = function(v) Library.Tween.Time = v end })
         SS:Dropdown({ Name = "Tween Style", Flag = "Tween style", MaxSize = 200, Items = { "Linear", "Quad", "Quart", "Back", "Bounce", "Circular", "Cubic", "Elastic", "Exponential", "Sine", "Quint" }, Default = "Quart", Callback = function(v) if not v then v = "Quart" end Library.Tween.Style = Enum.EasingStyle[v] end })
         SS:Dropdown({ Name = "Tween Direction", Flag = "Tween direction", Items = { "In", "Out", "InOut" }, Default = "Out", Callback = function(v) if not v then v = "Out" end Library.Tween.Direction = Enum.EasingDirection[v] end })
     end
 
-    local CS = SP:Section({ Name = "Configs", Side = 2 }) do
+    local CS = SP:Section({ Name = "Configs", Side = side2 }) do
         local configName, configSelected
         local cDropdown = CS:Dropdown({ Name = "Profiles", Flag = "Profiles list", Multi = false, Items = {}, Callback = function(v) configSelected = v end })
         CS:Textbox({ Name = "Config name", Default = "", Flag = "ConfigName", Placeholder = "...", Callback = function(v) configName = v end })
@@ -2906,7 +3023,7 @@ Library.CreateSettingsPage = function(self, Window, KeybindList, Watermark, Mode
         Library:RefreshConfigsList(cDropdown)
     end
 
-    local TS = SP:Section({ Name = "Theming", Side = 2 }) do
+    local TS = SP:Section({ Name = "Theming", Side = side2 }) do
         for k, v in Library.Theme do
             TS:Label(k):Colorpicker({ Flag = "Theme_" .. k, Default = v, Callback = function(col) Library:ChangeTheme(k, col) end })
         end
@@ -2915,6 +3032,7 @@ end
 
 -- =============================================
 -- ArmorViewer
+-- =============================================
 Library.ArmorViewer = function(self)
     local AV = {}
     local T = Library.Theme
@@ -2923,8 +3041,8 @@ Library.ArmorViewer = function(self)
 
     Items["Frame"] = Instances:Create("Frame", {
         Parent = Library.Holder.Instance, Name = "\0",
-        Size = UDim2New(0, 280, 0, 0),
-        Position = UDim2New(0, 10, 0.6, 0),
+        Size = UDim2New(0, IsMobile and 240 or 280, 0, 0),
+        Position = IsMobile and UDim2New(0, 10, 0.55, 0) or UDim2New(0, 10, 0.6, 0),
         BorderSizePixel = 0, ZIndex = 6,
         AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundColor3 = T.Surface,
@@ -2969,17 +3087,21 @@ Library.ArmorViewer = function(self)
         ItemSlots = {}
     end
 
+    local slotW = IsMobile and 48 or 54
+    local slotH = IsMobile and 58 or 64
+    local imgH = IsMobile and 38 or 44
+
     function AV:Add(name, image)
         local slot = Instances:Create("Frame", { Parent = Items["Content"].Instance, Name = "\0",
-            Size = UDim2New(0,54,0,64), BackgroundColor3 = T.Background, BorderSizePixel = 0, ZIndex = 6 })
+            Size = UDim2New(0, slotW, 0, slotH), BackgroundColor3 = T.Background, BorderSizePixel = 0, ZIndex = 6 })
         Corner(slot.Instance, 4)
         Instances:Create("UIStroke", { Parent = slot.Instance, Name = "\0", Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
         local img = Instances:Create("ImageLabel", { Parent = slot.Instance, Name = "\0",
-            Image = image or "", Size = UDim2New(1,-4,0,44), Position = UDim2New(0,2,0,2),
+            Image = image or "", Size = UDim2New(1,-4,0,imgH), Position = UDim2New(0,2,0,2),
             BackgroundTransparency = 1, ZIndex = 6 })
         local lbl = Instances:Create("TextLabel", { Parent = slot.Instance, Name = "\0",
             FontFace = Library.Font, TextColor3 = T.TextMuted, Text = name or "",
-            Size = UDim2New(1,0,0,16), Position = UDim2New(0,0,0,46),
+            Size = UDim2New(1,0,0,16), Position = UDim2New(0,0,0,imgH+4),
             BackgroundTransparency = 1, TextSize = 9, ZIndex = 6, BackgroundColor3 = FromRGB(255,255,255) })
         lbl:AddToTheme({ TextColor3 = "TextMuted" })
         table.insert(ItemSlots, slot.Instance)
@@ -2994,6 +3116,7 @@ end
 
 -- =============================================
 -- TargetHud
+-- =============================================
 Library.TargetHud = function(self)
     local TH = {}
     local T = Library.Theme
@@ -3001,7 +3124,7 @@ Library.TargetHud = function(self)
 
     Items["Frame"] = Instances:Create("Frame", {
         Parent = Library.Holder.Instance, Name = "\0",
-        Size = UDim2New(0, 270, 0, 18),
+        Size = UDim2New(0, IsMobile and 240 or 270, 0, 18),
         Position = UDim2New(0, 0, 0.8, 0),
         BorderSizePixel = 0, ZIndex = 6,
         AutomaticSize = Enum.AutomaticSize.Y,
@@ -3045,7 +3168,7 @@ Library.TargetHud = function(self)
         Text = "-- (@--)", Size = UDim2New(1,-70,0,14),
         Position = UDim2New(0,68,0,0), ZIndex = 6,
         BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left,
-        BorderSizePixel = 0, TextSize = 12,
+        BorderSizePixel = 0, TextSize = IsMobile and 13 or 12,
         BackgroundColor3 = FromRGB(255,255,255) })
     Items["Username"]:AddToTheme({ TextColor3 = "Text" })
 
@@ -3059,9 +3182,10 @@ Library.TargetHud = function(self)
 
     function TH:AddBar(Color)
         local nb = {}
+        local barH = IsMobile and 12 or 10
         local bg = Instances:Create("Frame", { Parent = Items["Bars"].Instance, Name = "\0",
             AnchorPoint = Vector2New(0,1), ZIndex = 6,
-            BackgroundTransparency = 1, Size = UDim2New(1,0,0,10),
+            BackgroundTransparency = 1, Size = UDim2New(1,0,0,barH),
             BorderSizePixel = 0, BackgroundColor3 = T.Element })
         Corner(bg.Instance, 99)
         Instances:Create("UIStroke", { Parent = bg.Instance, Name = "\0",
