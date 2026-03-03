@@ -423,105 +423,135 @@ workspace.DescendantAdded:Connect(function(inst) if inst:IsA('Seat') then inst.D
 -- CORE LOOPS
 -- ══════════════════════════════════════════════════════════════════════════════
 local t = 0
-local circlepos = function(t, r) return math.cos(t * 20) * r, math.sin(t * 20) * r end
-local autoground = { i = tick(), o = tick(), pos = { x = seed:NextInteger(-300, 300), y = seed:NextInteger(-6, -1), z = seed:NextInteger(-300, 300) } }
+-- ══════════════════════════════════════════════════════════════════════════════
+-- CORE LOOPS (TP-on-top style)
+-- ══════════════════════════════════════════════════════════════════════════════
+local t = 0
 
--- KO check
+-- KO check + auto-void
 task.spawn(function()
     repeat task.wait()
         if target and killing then
             if bodyeffects.get(target, 'K.O') or not players:FindFirstChild(target.Name) then
-                killing = false; pcall(function() camera.CameraSubject = lplr.Character.Humanoid end)
-                utils.update(CFrame.new(x(), yy(), x())); info.Text = ''; target = nil
+                local tname = target and target.Name or '?'
+                killing = false
+                pcall(function() camera.CameraSubject = lplr.Character.Humanoid end)
+                utils.update(CFrame.new(x(), yy(), x()))
+                info.Text = 'killed ' .. tname .. ' - voiding'
+                pcall(function() wsSend({type='log', msg='Killed ' .. tname .. ' - back to void'}) end)
+                target = nil
+                task.delay(2, function() if not killing and not stomping then info.Text = '' end end)
+            end
+        end
+        if target and stomping then
+            if not bodyeffects.get(target, 'K.O') or bodyeffects.get(target, 'SDeath') or not players:FindFirstChild(target.Name) then
+                local tname = target and target.Name or '?'
+                stomping = false
+                pcall(function() camera.CameraSubject = lplr.Character.Humanoid end)
+                utils.update(CFrame.new(x(), yy(), x()))
+                info.Text = 'stomped ' .. tname .. ' - voiding'
+                pcall(function() wsSend({type='log', msg='Stomped ' .. tname .. ' - back to void'}) end)
+                target = nil
+                task.delay(2, function() if not killing and not stomping then info.Text = '' end end)
             end
         end
     until not game
 end)
 
--- Main combat
+-- Main combat loop — TP on top of player, shoot, void when done
 task.spawn(function()
     repeat task.wait()
         pcall(function()
             if localent.Alive and target and killing then
                 if bodyeffects.get(lplr, 'Reload') then utils.update(CFrame.new(x(), yy(), x())); return end
-                if bodyeffects.get(target, 'K.O') or not players:FindFirstChild(target.Name) then
-                    killing = false; camera.CameraSubject = lplr.Character.Humanoid
-                    utils.update(CFrame.new(x(), yy(), x())); info.Text = ''; target = nil; return
-                end
+                if bodyeffects.get(target, 'K.O') or not players:FindFirstChild(target.Name) then return end
+
                 local target_position = utils:getposition(target)
-                if killing and target_position and target.Character and not stomping and not buyinammo then
-                    if #guns == 0 then
-                        local dg = altcontrol.default_guns or {'rifle', 'flintlock'}
-                        local done = false
-                        repeat task.wait()
-                            if #guns == 0 then
-                                for i, v in dg do
-                                    if pguns[v] then
-                                        local status = pguns[v]
-                                        if not status or not localent.Alive then continue end
-                                        local weapon = status.name:gsub('%s*%- %$%d+', '')
-                                        if lplr.Backpack and lplr.Character and lplr.Character:FindFirstChild('Humanoid') and not lplr.Backpack:FindFirstChild(weapon) and not lplr.Character:FindFirstChild(weapon) then
-                                            utils.purchase('weapon', status.name)
-                                            info.Text = 'purchasing ('.. status.name:lower() .. ')'
-                                        end
-                                    end
-                                end
-                                done = (#guns >= #dg)
+                if not target_position or not target.Character then return end
+
+                -- Buy guns if we have none
+                if #guns == 0 then
+                    local dg = altcontrol.default_guns or {'rifle', 'flintlock'}
+                    for i, v in dg do
+                        if pguns[v] then
+                            local status = pguns[v]
+                            if not status or not localent.Alive then continue end
+                            local weapon = status.name:gsub('%s*%- %$%d+', '')
+                            if lplr.Backpack and lplr.Character and not lplr.Backpack:FindFirstChild(weapon) and not lplr.Character:FindFirstChild(weapon) then
+                                info.Text = 'buying ' .. v
+                                utils.purchase('weapon', status.name)
                             end
-                        until #guns >= #dg or done or not killing or stop or not localent.Alive
-                    end
-                    if target and target.Character then
-                        camera.CameraSubject = target.Character.Humanoid
-                        if target.Character:FindFirstChildOfClass('ForceField') then
-                            info.Text = 'target has forcefield'; utils.update(CFrame.new(x(), yy(), x()))
                         end
                     end
-                    for _, v in guns do
-                        if not lplr or not lplr.Character or not target or not target.Character then continue end
-                        v.Parent = lplr.Character
-                        if v and v:FindFirstChild('Ammo') and not buyinammo then
-                            if v.Ammo.Value == 0 and utils.getfullammo(v) ~= 0 then
-                                info.Text = 'reloading'; utils.reload(v); utils.update(CFrame.new(x(), yy(), x())); continue
-                            end
-                            if target.Character:FindFirstChild('Head') and target.Character:FindFirstChild('Humanoid') then
-                                if target.Character:FindFirstChild('GRABBING_CONSTRAINT') then
-                                    local a = target.Character:FindFirstChild('GRABBING_CONSTRAINT')
-                                    if a:GetAttribute('PLAYER_HOLD') then
-                                        local nt = utils.getname(a:GetAttribute('PLAYER_HOLD'))
-                                        if nt then target = nt end
-                                    end
-                                end
-                                local hum = target.Character.Humanoid
-                                info.Text = 'shooting (' .. target.Name .. ') | hp: ' .. math.floor((hum.Health / hum.MaxHealth) * 100) .. '%'
-                                local cx, cy
-                                if not badstrafe then t += 0.0001; cx, cy = circlepos(t, 23) end
-                                local now = tick()
-                                local h = now - autoground.i > 0.3
-                                utils.update((h and CFrame.new(autoground.pos.x, autoground.pos.y, autoground.pos.z) or (CFrame.new(target_position.p) + (badstrafe and Vector3.new(0, 5, 0) or Vector3.new(cx, cy, -18))))
-                                    * CFrame.Angles(math.rad(seed:NextInteger(0, 360)), math.rad(seed:NextInteger(0, 360)), math.rad(seed:NextInteger(0, 360))))
-                                utils.shoot({ startposition = target_position.p + Vector3.new(0, seed:NextInteger(1, 12), 0), position = target_position.p, part = target.Character.Head, tool = v })
-                            end
+                    return
+                end
+
+                -- Check forcefield
+                if target.Character:FindFirstChildOfClass('ForceField') then
+                    info.Text = 'target has forcefield - waiting'
+                    utils.update(CFrame.new(x(), yy(), x()))
+                    return
+                end
+
+                -- Camera follow target
+                if target.Character:FindFirstChild('Humanoid') then
+                    camera.CameraSubject = target.Character.Humanoid
+                end
+
+                -- Handle GRABBING_CONSTRAINT redirect
+                if target.Character:FindFirstChild('GRABBING_CONSTRAINT') then
+                    local a = target.Character:FindFirstChild('GRABBING_CONSTRAINT')
+                    if a:GetAttribute('PLAYER_HOLD') then
+                        local nt = utils.getname(a:GetAttribute('PLAYER_HOLD'))
+                        if nt then target = nt end
+                    end
+                end
+
+                -- TP on top of player and shoot
+                local hum = target.Character.Humanoid
+                info.Text = 'shooting (' .. target.Name .. ') | hp: ' .. math.floor((hum.Health / hum.MaxHealth) * 100) .. '%'
+
+                for _, v in guns do
+                    if not lplr or not lplr.Character or not target or not target.Character then continue end
+                    v.Parent = lplr.Character
+                    if v and v:FindFirstChild('Ammo') and not buyinammo then
+                        if v.Ammo.Value == 0 and utils.getfullammo(v) ~= 0 then
+                            info.Text = 'reloading'
+                            utils.reload(v)
+                            utils.update(CFrame.new(x(), yy(), x()))
+                            continue
+                        end
+                        if target.Character:FindFirstChild('Head') then
+                            -- TP directly on top of target
+                            utils.update(CFrame.new(target_position.p + Vector3.new(0, 5, 0)))
+                            utils.shoot({
+                                startposition = target_position.p + Vector3.new(0, seed:NextInteger(1, 8), 0),
+                                position = target_position.p,
+                                part = target.Character.Head,
+                                tool = v
+                            })
                         end
                     end
                 end
             end
+
+            -- Stomping — TP on top and stomp
             if stomping and target and target.Character then
-                if not bodyeffects.get(target, 'K.O') or bodyeffects.get(target, 'SDeath') or not players:FindFirstChild(target.Name) then
-                    utils.update(CFrame.new(x(), yy(), x())); stomping = false; camera.CameraSubject = lplr.Character.Humanoid; info.Text = ''; target = nil; return
-                end
                 if bodyeffects.get(lplr, 'Reload') then utils.update(CFrame.new(x(), yy(), x())); return end
                 for i, v in lplr.Character:GetChildren() do if v:IsA('Tool') then v.Parent = lplr.Backpack end end
                 info.Text = 'stomping (' .. target.Name .. ')'
-                utils.update((CFrame.new(target.Character.LowerTorso.Position) * CFrame.Angles(0, math.rad(6), 0)) + Vector3.new(0, stomp_offset or 4, 0))
+                utils.update(CFrame.new(target.Character.LowerTorso.Position + Vector3.new(0, stomp_offset or 4, 0)))
                 lplr.Character.HumanoidRootPart.Velocity = Vector3.zero
                 replicated.MainEvent:FireServer('Stomp')
             end
+
+            -- Idle — void or follow
             if not (killing or stomping) then
                 if showtarget then
                     local showpos = show and utils:getposition(players:FindFirstChild(showtarget)) or nil
                     utils.update(showpos and showpos + Vector3.new(0, 4, 4) or CFrame.new(x(), yy(), x()))
                 end
-                if void and not showtarget then utils.update(CFrame.new(x(), yy(), x())); return end
+                if void and not showtarget then utils.update(CFrame.new(x(), yy(), x())) end
             end
         end)
     until not game
@@ -547,7 +577,7 @@ task.spawn(function()
     until not game
 end)
 
--- Ammo loop
+-- Ammo buy loop
 task.spawn(function()
     repeat task.wait()
         pcall(function()
@@ -607,7 +637,7 @@ end)
 
 -- Sentry
 replicated.MainEvent.OnClientEvent:Connect(function(name, plr, handle, forced, aimpos, part, _)
-    if name ~= 'ClientBullet' or not sentry or killing or stomping then return end
+    if name ~= 'ClientBullet' or killing or stomping then return end
     if part then
         local victim
         for i, v in players:GetPlayers() do
@@ -628,11 +658,6 @@ replicated.MainEvent.OnClientEvent:Connect(function(name, plr, handle, forced, a
                     killing = true; target = shooter
                     repeat task.wait() until not killing or stop or not sentry
                     target = nil
-                    if mode == 'stomp' then
-                        stomping = true; target = shooter
-                        repeat task.wait() until not stomping or stop or not sentry
-                        target = nil
-                    end
                     utils.update(CFrame.new(x(), yy(), x()))
                 end
             end
@@ -666,9 +691,6 @@ task.spawn(function()
     until not game
 end)
 
--- ══════════════════════════════════════════════════════════════════════════════
--- WEBSOCKET CLIENT
--- ══════════════════════════════════════════════════════════════════════════════
 local WS_URL = altcontrol.ws_url or 'ws://localhost:8000/ws'
 local WS_TOKEN = altcontrol.ws_token or ''
 local wsConnected = false
