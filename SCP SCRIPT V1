@@ -1,7 +1,23 @@
+--[[
+    Alt Control v4 — WebSocket Edition (No Entity Module)
+    Works on any executor (Volt, Solara, Wave, etc.)
+    
+    Usage:
+        getgenv().altcontrol = {
+            owners = {'YourUsername'},
+            default_guns = {'rifle', 'flintlock'},
+            ws_url = 'wss://cat-service.com/ws',
+            ws_token = 'bot_xxxxxxxxxxxxxxxxxxxx',
+            whitelist = {},
+            bots = {},
+            emotes = {},
+        }
+        loadstring(game:HttpGet("YOUR_URL"))()
+]]
+
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local cloneref = cloneref or function(serv) return serv end
-local entity = require('@src/entity')
 
 print('[AltControl WS] Loading...')
 
@@ -22,6 +38,48 @@ local utils = {}
 local pguns, ammos = {}, {}
 local shop = workspace:FindFirstChild('Ignored')
 local getconnections = getconnections or function() return {} end
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- ENTITY REPLACEMENT (no require needed)
+-- ══════════════════════════════════════════════════════════════════════════════
+local entity = { Entities = {} }
+
+-- LocalPlayer entity
+entity.Entities.LocalPlayer = setmetatable({}, {
+    __index = function(self, key)
+        if key == 'Alive' then
+            return lplr and lplr.Character and lplr.Character:FindFirstChild('Humanoid') and lplr.Character.Humanoid.Health > 0 and lplr.Character:FindFirstChild('HumanoidRootPart') ~= nil
+        elseif key == 'Character' then
+            return lplr and lplr.Character
+        elseif key == 'RootPart' then
+            return lplr and lplr.Character and lplr.Character:FindFirstChild('HumanoidRootPart')
+        end
+        return nil
+    end
+})
+
+-- Player entities via metatable
+setmetatable(entity.Entities, {
+    __index = function(self, playerName)
+        if playerName == 'LocalPlayer' then return rawget(self, 'LocalPlayer') end
+        local plr = players:FindFirstChild(playerName)
+        if not plr then return nil end
+        return setmetatable({}, {
+            __index = function(_, key)
+                if key == 'Alive' then
+                    return plr.Character and plr.Character:FindFirstChild('Humanoid') and plr.Character.Humanoid.Health > 0 and plr.Character:FindFirstChild('HumanoidRootPart') ~= nil
+                elseif key == 'Character' then
+                    return plr.Character
+                elseif key == 'RootPart' then
+                    return plr.Character and plr.Character:FindFirstChild('HumanoidRootPart')
+                end
+                return nil
+            end
+        })
+    end
+})
+
+local localent = entity.Entities.LocalPlayer
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- POSITIONS
@@ -57,9 +115,10 @@ end
 
 workspace.FallenPartsDestroyHeight = 0/0
 
-if getthreadidentity() ~= 8 or not fireclickdetector then
+if not fireclickdetector then
     getgenv().fireclickdetector = function(target)
         local cd = target:IsA('ClickDetector') and target or target:FindFirstChild('ClickDetector')
+        if not cd then return end
         local originalParent = cd.Parent
         local holder = Instance.new('Part')
         holder.Transparency = 1
@@ -76,8 +135,8 @@ if getthreadidentity() ~= 8 or not fireclickdetector then
         end)
         local restore = function()
             pcall(function() if heart then heart:Disconnect() end end)
-            cd.Parent = originalParent
-            holder:Destroy()
+            pcall(function() cd.Parent = originalParent end)
+            pcall(function() holder:Destroy() end)
         end
         cd.MouseClick:Once(function() restore() end)
         task.delay(3, restore)
@@ -105,7 +164,7 @@ if shop then
 end
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- UTILS (same as original)
+-- UTILS
 -- ══════════════════════════════════════════════════════════════════════════════
 local seed = Random.new()
 local x = function() return seed:NextNumber(-3000, 3000) end
@@ -127,32 +186,41 @@ utils.update = function(position)
 end
 
 utils.getposition = function(self, player)
-    local ent = player and typeof(player) == 'Instance' and entity.Entities[player.Name]
-    if ent and ent.Alive and ent.RootPart then return ent.RootPart.CFrame end
+    if player and typeof(player) == 'Instance' and player.Character and player.Character:FindFirstChild('HumanoidRootPart') then
+        local hum = player.Character:FindFirstChild('Humanoid')
+        if hum and hum.Health > 0 then
+            return player.Character.HumanoidRootPart.CFrame
+        end
+    end
     return nil
 end
 
 utils.needarmor = function(player)
     player = player or lplr
-    return tonumber(player.Character.BodyEffects.Armor.Value) < 30
+    local ok, val = pcall(function() return tonumber(player.Character.BodyEffects.Armor.Value) end)
+    return ok and val < 30
 end
 
 utils.hasarmor = function(player)
     player = player or lplr
-    return tonumber(player.Character.BodyEffects.Armor.Value) > 0
+    local ok, val = pcall(function() return tonumber(player.Character.BodyEffects.Armor.Value) end)
+    return ok and val > 0
 end
 
 utils.getmoney = function(player)
     local plr = player or lplr
     if not plr then return 0 end
-    repeat task.wait() until plr:FindFirstChild('DataFolder')
-    local text = plr.DataFolder:WaitForChild('Currency')
-    return text.Value
+    local ok, val = pcall(function()
+        return plr:FindFirstChild('DataFolder') and plr.DataFolder:FindFirstChild('Currency') and plr.DataFolder.Currency.Value or 0
+    end)
+    return ok and val or 0
 end
 
 utils.getitem = function(name)
-    for _, v in lplr.Character:GetChildren() do
-        if v.Name:lower():find(name) and v:IsA('Tool') then return v end
+    if lplr.Character then
+        for _, v in lplr.Character:GetChildren() do
+            if v.Name:lower():find(name) and v:IsA('Tool') then return v end
+        end
     end
     for _, v in lplr.Backpack:GetChildren() do
         if v.Name:lower():find(name) and v:IsA('Tool') then return v end
@@ -183,7 +251,7 @@ utils.purchase = function(type, itemname, last)
         if not click then return 'nosuch' end
         local name = itemname:gsub('%[', ''):gsub('%]', ''):gsub('%s*%- %$%d+', '')
         local head = shopItem:FindFirstChildOfClass('Part') or shopItem:FindFirstChildOfClass('BasePart') or shopItem:FindFirstChild('Head')
-        if not head or not shopItem then return 'nosuch' end
+        if not head then return 'nosuch' end
         local startingmoney = utils.getmoney()
         local saved = {}
         for i, v in lplr.Character:GetChildren() do
@@ -211,8 +279,8 @@ utils.purchase = function(type, itemname, last)
         utils.update(CFrame.new(x(), yy(), x()))
         for i, v in saved do if v then v.Parent = lplr.Character end end
         local tool = lplr.Backpack:FindFirstChild(weapon) or lplr.Character:FindFirstChild(weapon)
-        if tool then tool.Parent = lplr.Character end
-        if tool then table.insert(guns, tool); return 'success' else return 'failed' end
+        if tool then tool.Parent = lplr.Character; table.insert(guns, tool); return 'success' end
+        return 'failed'
     elseif type == 'ammo' then
         local match = string.match(itemname, '%[([A-Za-z]+)%]')
         if not match then return 'nosuch' end
@@ -241,21 +309,25 @@ end
 
 utils.getfullammo = function(tool)
     if not tool then return 0 end
-    local ammo = lplr.DataFolder.Inventory:FindFirstChild(tool.Name) and lplr.DataFolder.Inventory[tool.Name].Value or 0
-    return tonumber(ammo)
+    local ok, val = pcall(function()
+        return lplr.DataFolder.Inventory:FindFirstChild(tool.Name) and lplr.DataFolder.Inventory[tool.Name].Value or 0
+    end)
+    return ok and tonumber(val) or 0
 end
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- BODY EFFECTS
+-- BODY EFFECTS (direct check, no entity module)
 -- ══════════════════════════════════════════════════════════════════════════════
 local bodyeffects = {}
 bodyeffects.get = function(player, beffect)
-    local ent = player and typeof(player) == 'Instance' and entity.Entities[player.Name]
-    if ent and ent.Alive and ent.Character:FindFirstChild('BodyEffects') then
-        local be = ent.Character.BodyEffects:FindFirstChild(beffect)
-        if be then return be.Value end
-    end
-    return nil
+    local ok, val = pcall(function()
+        if player and player.Character and player.Character:FindFirstChild('BodyEffects') then
+            local be = player.Character.BodyEffects:FindFirstChild(beffect)
+            if be then return be.Value end
+        end
+        return nil
+    end)
+    return ok and val or nil
 end
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -323,8 +395,6 @@ local loadanimation = function(animation, speed)
     return track
 end
 
-local localent = entity.Entities.LocalPlayer
-
 -- ══════════════════════════════════════════════════════════════════════════════
 -- GUI
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -346,55 +416,40 @@ info.RichText = true
 info.Parent = screen
 info.Text = ''
 
--- Seat disable
 for i, v in workspace:GetDescendants() do if v:IsA('Seat') then v.Disabled = true end end
 workspace.DescendantAdded:Connect(function(inst) if inst:IsA('Seat') then inst.Disabled = true end end)
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- CORE LOOPS (kill/stomp/ammo/reload — same logic as original)
+-- CORE LOOPS
 -- ══════════════════════════════════════════════════════════════════════════════
 local t = 0
-local circlepos = function(t, r)
-    return math.cos(t * 20) * r, math.sin(t * 20) * r
-end
+local circlepos = function(t, r) return math.cos(t * 20) * r, math.sin(t * 20) * r end
+local autoground = { i = tick(), o = tick(), pos = { x = seed:NextInteger(-300, 300), y = seed:NextInteger(-6, -1), z = seed:NextInteger(-300, 300) } }
 
-local autoground = {
-    i = tick(), o = tick(),
-    pos = { x = seed:NextInteger(-300, 300), y = seed:NextInteger(-6, -1), z = seed:NextInteger(-300, 300) }
-}
-
--- KO check loop
+-- KO check
 task.spawn(function()
     repeat task.wait()
         if target and killing then
-            if bodyeffects.get(target, 'K.O') then
-                killing = false; camera.CameraSubject = lplr.Character.Humanoid
-                utils.update(CFrame.new(x(), yy(), x())); info.Text = ''; target = nil
-            end
-            if target and not players:FindFirstChild(target.Name) then
-                killing = false; camera.CameraSubject = lplr.Character.Humanoid
+            if bodyeffects.get(target, 'K.O') or not players:FindFirstChild(target.Name) then
+                killing = false; pcall(function() camera.CameraSubject = lplr.Character.Humanoid end)
                 utils.update(CFrame.new(x(), yy(), x())); info.Text = ''; target = nil
             end
         end
     until not game
 end)
 
--- Main combat loop
+-- Main combat
 task.spawn(function()
     repeat task.wait()
-        local success, _ = pcall(function()
+        pcall(function()
             if localent.Alive and target and killing then
                 if bodyeffects.get(lplr, 'Reload') then utils.update(CFrame.new(x(), yy(), x())); return end
-                if bodyeffects.get(target, 'K.O') then
-                    killing = false; camera.CameraSubject = lplr.Character.Humanoid
-                    utils.update(CFrame.new(x(), yy(), x())); info.Text = ''; target = nil; return
-                end
-                if not players:FindFirstChild(target.Name) then
+                if bodyeffects.get(target, 'K.O') or not players:FindFirstChild(target.Name) then
                     killing = false; camera.CameraSubject = lplr.Character.Humanoid
                     utils.update(CFrame.new(x(), yy(), x())); info.Text = ''; target = nil; return
                 end
                 local target_position = utils:getposition(target)
-                if killing and target_position and target and target.Character and not stomping and not buyinammo and not flamethrower and not punch then
+                if killing and target_position and target.Character and not stomping and not buyinammo then
                     if #guns == 0 then
                         local dg = altcontrol.default_guns or {'rifle', 'flintlock'}
                         local done = false
@@ -405,10 +460,9 @@ task.spawn(function()
                                         local status = pguns[v]
                                         if not status or not localent.Alive then continue end
                                         local weapon = status.name:gsub('%s*%- %$%d+', '')
-                                        if lplr and lplr.Backpack and lplr.Character and lplr.Character:FindFirstChild('Humanoid') and (not lplr.Backpack:FindFirstChild(weapon) and not lplr.Character:FindFirstChild(weapon)) then
-                                            local r = utils.purchase('weapon', status.name)
+                                        if lplr.Backpack and lplr.Character and lplr.Character:FindFirstChild('Humanoid') and not lplr.Backpack:FindFirstChild(weapon) and not lplr.Character:FindFirstChild(weapon) then
+                                            utils.purchase('weapon', status.name)
                                             info.Text = 'purchasing ('.. status.name:lower() .. ')'
-                                            repeat task.wait() until r == 'success' or r == 'owned' or not killing or stop or not localent.Alive
                                         end
                                     end
                                 end
@@ -419,18 +473,17 @@ task.spawn(function()
                     if target and target.Character then
                         camera.CameraSubject = target.Character.Humanoid
                         if target.Character:FindFirstChildOfClass('ForceField') then
-                            info.Text = 'target has forcefield (void)'
-                            utils.update(CFrame.new(x(), yy(), x()))
+                            info.Text = 'target has forcefield'; utils.update(CFrame.new(x(), yy(), x()))
                         end
                     end
                     for _, v in guns do
                         if not lplr or not lplr.Character or not target or not target.Character then continue end
                         v.Parent = lplr.Character
-                        if v and v.Ammo and not buyinammo then
+                        if v and v:FindFirstChild('Ammo') and not buyinammo then
                             if v.Ammo.Value == 0 and utils.getfullammo(v) ~= 0 then
-                                info.Text = 'reloading (voiding)'; utils.reload(v); utils.update(CFrame.new(x(), yy(), x())); continue
+                                info.Text = 'reloading'; utils.reload(v); utils.update(CFrame.new(x(), yy(), x())); continue
                             end
-                            if target and target.Character and target.Character:FindFirstChild('Head') and target.Character:FindFirstChild('Humanoid') then
+                            if target.Character:FindFirstChild('Head') and target.Character:FindFirstChild('Humanoid') then
                                 if target.Character:FindFirstChild('GRABBING_CONSTRAINT') then
                                     local a = target.Character:FindFirstChild('GRABBING_CONSTRAINT')
                                     if a:GetAttribute('PLAYER_HOLD') then
@@ -438,10 +491,8 @@ task.spawn(function()
                                         if nt then target = nt end
                                     end
                                 end
-                                info.Text = (function()
-                                    local hum = target.Character.Humanoid
-                                    return 'shooting (' .. target.Name .. ') | hp: ' .. math.floor((hum.Health / hum.MaxHealth) * 100) .. '%'
-                                end)()
+                                local hum = target.Character.Humanoid
+                                info.Text = 'shooting (' .. target.Name .. ') | hp: ' .. math.floor((hum.Health / hum.MaxHealth) * 100) .. '%'
                                 local cx, cy
                                 if not badstrafe then t += 0.0001; cx, cy = circlepos(t, 23) end
                                 local now = tick()
@@ -454,21 +505,17 @@ task.spawn(function()
                     end
                 end
             end
-            -- Stomping
             if stomping and target and target.Character then
                 if not bodyeffects.get(target, 'K.O') or bodyeffects.get(target, 'SDeath') or not players:FindFirstChild(target.Name) then
                     utils.update(CFrame.new(x(), yy(), x())); stomping = false; camera.CameraSubject = lplr.Character.Humanoid; info.Text = ''; target = nil; return
                 end
                 if bodyeffects.get(lplr, 'Reload') then utils.update(CFrame.new(x(), yy(), x())); return end
-                if lplr.Character:FindFirstChildOfClass('Tool') then
-                    for i, v in lplr.Character:GetChildren() do if v:IsA('Tool') then v.Parent = lplr.Backpack end end
-                end
+                for i, v in lplr.Character:GetChildren() do if v:IsA('Tool') then v.Parent = lplr.Backpack end end
                 info.Text = 'stomping (' .. target.Name .. ')'
                 utils.update((CFrame.new(target.Character.LowerTorso.Position) * CFrame.Angles(0, math.rad(6), 0)) + Vector3.new(0, stomp_offset or 4, 0))
                 lplr.Character.HumanoidRootPart.Velocity = Vector3.zero
                 replicated.MainEvent:FireServer('Stomp')
             end
-            -- Idle
             if not (killing or stomping) then
                 if showtarget then
                     local showpos = show and utils:getposition(players:FindFirstChild(showtarget)) or nil
@@ -480,67 +527,70 @@ task.spawn(function()
     until not game
 end)
 
--- Backpack/gun tracking loop
+-- Gun tracking
 task.spawn(function()
     repeat task.wait()
-        if not startergui:GetCoreGuiEnabled(Enum.CoreGuiType.Backpack) then
-            startergui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
-        end
-        if lplr and lplr.Character then
-            for i, gun in guns do
-                if not gun or not gun.Parent or not (gun.Parent == lplr.Character or gun.Parent == lplr.Backpack) then table.remove(guns, i) end
+        pcall(function()
+            if not startergui:GetCoreGuiEnabled(Enum.CoreGuiType.Backpack) then startergui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true) end
+            if lplr and lplr.Character then
+                for i, gun in guns do
+                    if not gun or not gun.Parent or not (gun.Parent == lplr.Character or gun.Parent == lplr.Backpack) then table.remove(guns, i) end
+                end
+                for i, v in lplr.Character:GetChildren() do
+                    if v:IsA('Tool') and v:FindFirstChild('Ammo') and not table.find(guns, v) then table.insert(guns, v) end
+                end
+                for i, v in lplr.Backpack:GetChildren() do
+                    if v:IsA('Tool') and v:FindFirstChild('Ammo') and not table.find(guns, v) then table.insert(guns, v) end
+                end
             end
-            for i, v in lplr.Character:GetChildren() do
-                if v:IsA('Tool') and v:FindFirstChild('Ammo') and not table.find(guns, v) then table.insert(guns, v) end
-            end
-            for i, v in lplr.Backpack:GetChildren() do
-                if v:IsA('Tool') and v:FindFirstChild('Ammo') and not table.find(guns, v) then table.insert(guns, v) end
-            end
-        end
+        end)
     until not game
 end)
 
--- Ammo buy loop
+-- Ammo loop
 task.spawn(function()
     repeat task.wait()
-        for i, v in guns do
-            if utils.getfullammo(v) == 0 and localent.Alive then
-                local purchase
-                for i2, a in ammos do
-                    local name = v.Name:lower():gsub('[%[%]]', '')
-                    if name:find(tostring(i2):lower():gsub('[%[%]]', ''), 1, true) then purchase = '[' .. i2 .. ']'; break end
+        pcall(function()
+            for i, v in guns do
+                if utils.getfullammo(v) == 0 and localent.Alive then
+                    local purchase
+                    for i2, a in ammos do
+                        if v.Name:lower():gsub('[%[%]]', ''):find(tostring(i2):lower():gsub('[%[%]]', ''), 1, true) then purchase = '[' .. i2 .. ']'; break end
+                    end
+                    buyinammo = true
+                    if not purchase then continue end
+                    if v and v.Parent and utils.getfullammo(v) > 0 then
+                        utils.reload(v)
+                        repeat task.wait() until not bodyeffects.get(lplr, 'Reload') or not killing or stop
+                    end
+                    info.Text = ''; buyinammo = false
                 end
-                buyinammo = true
-                if not purchase then continue end
-                if v and v.Parent and utils.getfullammo(v) > 0 then
-                    utils.reload(v)
-                    repeat task.wait() until not bodyeffects.get(lplr, 'Reload') or not killing or stop
-                end
-                info.Text = ''; buyinammo = false
             end
-        end
+        end)
     until not game
 end)
 
--- Auto reload when idle
+-- Auto reload idle
 task.spawn(function()
     repeat task.wait()
-        if localent.Alive and lplr.Character and lplr.Character:FindFirstChild('Humanoid') then
-            local com = lplr.Character:FindFirstChild('COMPart')
-            if com then com:Destroy() end
-        end
-        if not killing then
-            for i, v in lplr.Character:GetChildren() do
-                if v:IsA('Tool') and v:FindFirstChild('Ammo') and not killing and not stomping and v.Ammo.Value <= 2 then utils.reload(v) end
+        pcall(function()
+            if localent.Alive and lplr.Character then
+                local com = lplr.Character:FindFirstChild('COMPart')
+                if com then com:Destroy() end
             end
-            for i, v in lplr.Backpack:GetChildren() do
-                if v:IsA('Tool') and v:FindFirstChild('Ammo') and not killing and not stomping and v.Ammo.Value == 0 and utils.getfullammo(v) ~= 0 then
-                    v.Parent = lplr.Character; utils.reload(v)
-                    repeat task.wait() until not bodyeffects.get(lplr, 'Reload')
-                    v.Parent = lplr.Backpack; task.wait(1)
+            if not killing and lplr.Character then
+                for i, v in lplr.Character:GetChildren() do
+                    if v:IsA('Tool') and v:FindFirstChild('Ammo') and v.Ammo.Value <= 2 then utils.reload(v) end
+                end
+                for i, v in lplr.Backpack:GetChildren() do
+                    if v:IsA('Tool') and v:FindFirstChild('Ammo') and v.Ammo.Value == 0 and utils.getfullammo(v) ~= 0 then
+                        v.Parent = lplr.Character; utils.reload(v)
+                        repeat task.wait() until not bodyeffects.get(lplr, 'Reload')
+                        v.Parent = lplr.Backpack; task.wait(1)
+                    end
                 end
             end
-        end
+        end)
     until not game
 end)
 
@@ -548,7 +598,7 @@ end)
 task.spawn(function()
     repeat task.wait()
         if bodyeffects.get(lplr, 'K.O') then
-            lplr.Character.Humanoid.Health = 0
+            pcall(function() lplr.Character.Humanoid.Health = 0 end)
             repeat task.wait() until localent.Alive
             utils.update(CFrame.new(x(), yy(), x()))
         end
@@ -558,61 +608,60 @@ end)
 -- Sentry
 replicated.MainEvent.OnClientEvent:Connect(function(name, plr, handle, forced, aimpos, part, _)
     if name ~= 'ClientBullet' or not sentry or killing or stomping then return end
-    if (assist or sentry) and part then
+    if part then
         local victim
         for i, v in players:GetPlayers() do
-            if part:IsDescendantOf(v.Character) then victim = v; break end
+            if v.Character and part:IsDescendantOf(v.Character) then victim = v; break end
         end
-        if assist and table.find(getgenv().altcontrol.owners, plr.Name) and victim then
-            if victim.Name ~= lplr.Name and not table.find(getgenv().altcontrol.owners, victim.Name) and not table.find(whitelist, victim.Name) then
+        if assist and plr and victim then
+            local shooterName = typeof(plr) == 'Instance' and (plr:IsA('Player') and plr.Name or players:GetPlayerFromCharacter(plr) and players:GetPlayerFromCharacter(plr).Name) or ''
+            if table.find(altcontrol.owners, shooterName) and victim.Name ~= lplr.Name and not table.find(altcontrol.owners, victim.Name) and not table.find(whitelist, victim.Name) then
                 target = victim; killing = true
                 repeat task.wait() until not killing or stop or not assist
                 target = nil
             end
         end
         if sentry and victim and not killing then
-            if victim.Name ~= lplr.Name and table.find(getgenv().altcontrol.owners, victim.Name) then
-                plr = players:GetPlayerFromCharacter(plr)
-                killing = true; target = plr
-                repeat task.wait() until not killing or stop or not sentry
-                target = nil
-                if mode == 'stomp' then
-                    stomping = true; target = plr
-                    repeat task.wait() until not stomping or stop or not sentry
+            if victim.Name ~= lplr.Name and table.find(altcontrol.owners, victim.Name) then
+                local shooter = typeof(plr) == 'Instance' and (plr:IsA('Player') and plr or players:GetPlayerFromCharacter(plr))
+                if shooter then
+                    killing = true; target = shooter
+                    repeat task.wait() until not killing or stop or not sentry
                     target = nil
+                    if mode == 'stomp' then
+                        stomping = true; target = shooter
+                        repeat task.wait() until not stomping or stop or not sentry
+                        target = nil
+                    end
+                    utils.update(CFrame.new(x(), yy(), x()))
                 end
-                utils.update(CFrame.new(x(), yy(), x()))
             end
         end
     end
 end)
 
 -- Kill aura
-local killauraig = function(plrName)
-    if not ka or stop or not localent.Alive or not altcontrol.owners then return end
-    for i, v in altcontrol.owners do
-        local owner = players:FindFirstChild(v)
-        local targ = players:FindFirstChild(plrName)
-        if not targ or not targ.Character or not targ.Character:FindFirstChild('HumanoidRootPart') then continue end
-        if not owner or not owner.Character or not owner.Character:FindFirstChild('HumanoidRootPart') then continue end
-        if targ.Name == lplr.Name or targ.Name == v then continue end
-        if (owner.Character.HumanoidRootPart.Position - targ.Character.HumanoidRootPart.Position).Magnitude > karange then continue end
-        if targ.Character:FindFirstChild('ForceField') or bodyeffects.get(targ, 'SDeath') or table.find(altcontrol.owners, plrName) or table.find(whitelist, targ.Name) then continue end
-        if not bodyeffects.get(targ, 'K.O') then
-            if killing or target then return end
-            target = targ; killing = true
-            repeat task.wait() until not killing or not ka or stop
-            if not void then void = true end
-        end
-    end
-end
-
 task.spawn(function()
     repeat task.wait(0.1)
-        if not ka or stop or not localent.Alive then continue end
+        if not ka or stop or not localent.Alive or not altcontrol.owners then continue end
         for _, v in players:GetPlayers() do
             if not ka then break end
-            killauraig(v.Name)
+            if v == lplr or table.find(altcontrol.owners, v.Name) or table.find(whitelist, v.Name) then continue end
+            if not v.Character or not v.Character:FindFirstChild('HumanoidRootPart') then continue end
+            if v.Character:FindFirstChild('ForceField') or bodyeffects.get(v, 'SDeath') or bodyeffects.get(v, 'K.O') then continue end
+            for _, ownerName in altcontrol.owners do
+                local owner = players:FindFirstChild(ownerName)
+                if owner and owner.Character and owner.Character:FindFirstChild('HumanoidRootPart') then
+                    if (owner.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude <= karange then
+                        if not killing and not target then
+                            target = v; killing = true
+                            repeat task.wait() until not killing or not ka or stop
+                            if not void then void = true end
+                        end
+                        break
+                    end
+                end
+            end
         end
     until not game
 end)
@@ -620,381 +669,195 @@ end)
 -- ══════════════════════════════════════════════════════════════════════════════
 -- WEBSOCKET CLIENT
 -- ══════════════════════════════════════════════════════════════════════════════
-
 local WS_URL = altcontrol.ws_url or 'ws://localhost:8000/ws'
 local WS_TOKEN = altcontrol.ws_token or ''
-
 local wsConnected = false
 local wsSocket = nil
 
-local function wsLog(msg)
-    print('[AltControl WS] ' .. msg)
-end
+local function wsLog(msg) print('[AltControl WS] ' .. msg) end
 
 local function wsSend(data)
-    if wsSocket then
-        pcall(function()
-            wsSocket:Send(http:JSONEncode(data))
-        end)
-    end
+    pcall(function() if wsSocket then wsSocket:Send(http:JSONEncode(data)) end end)
 end
 
--- Send status updates periodically
 local function getStatus()
     local status = 'idle'
-    if killing then status = 'killing'
-    elseif stomping then status = 'stomping'
-    elseif grabbing then status = 'grabbing'
-    end
-
-    local data = {
-        username = lplr.Name,
-        display_name = lplr.DisplayName,
-        server_id = game.JobId,
-        place_id = game.PlaceId,
-        status = status,
-        target = target and target.Name or nil,
-        health = lplr.Character and lplr.Character:FindFirstChild('Humanoid') and math.floor((lplr.Character.Humanoid.Health / lplr.Character.Humanoid.MaxHealth) * 100) or 0,
-        money = pcall(utils.getmoney) and utils.getmoney() or 0,
-        guns = #guns,
-        alive = localent.Alive,
-        sentry = sentry,
-        assist = assist,
-        killaura = ka,
-        void = void,
-        automask = automask,
-        autoarmor = autoarmor,
-        autogun = autogun,
+    if killing then status = 'killing' elseif stomping then status = 'stomping' elseif grabbing then status = 'grabbing' end
+    local hp = 0
+    pcall(function() hp = math.floor((lplr.Character.Humanoid.Health / lplr.Character.Humanoid.MaxHealth) * 100) end)
+    return {
+        username = lplr.Name, display_name = lplr.DisplayName,
+        server_id = game.JobId, place_id = game.PlaceId,
+        status = status, target = target and target.Name or nil,
+        health = hp, money = utils.getmoney(), guns = #guns,
+        alive = localent.Alive, sentry = sentry, assist = assist,
+        killaura = ka, void = void, automask = automask,
+        autoarmor = autoarmor, autogun = autogun,
     }
-    return data
 end
 
--- Command handler
 local function handleCommand(cmd, args)
     args = args or {}
     local targetName = args.target or ''
-
-    wsLog('CMD: ' .. cmd .. ' | target: ' .. targetName)
+    wsLog('CMD: ' .. cmd .. ' | ' .. targetName)
 
     if cmd == 'kill' then
         local user = utils.getname(targetName)
         if not user then wsSend({type='log', msg='Target not found: ' .. targetName}); return end
-        killing = true; target = user
-        wsSend({type='log', msg='Killing ' .. user.Name})
-
+        killing = true; target = user; wsSend({type='log', msg='Killing ' .. user.Name})
     elseif cmd == 'stomp' then
         local user = utils.getname(targetName)
-        if not user then wsSend({type='log', msg='Target not found: ' .. targetName}); return end
-        killing = true; target = user
-        wsSend({type='log', msg='Kill+Stomp ' .. user.Name})
+        if not user then wsSend({type='log', msg='Target not found'}); return end
+        killing = true; target = user; wsSend({type='log', msg='Kill+Stomp ' .. user.Name})
         task.spawn(function()
             repeat task.wait() until not killing
             stomping = true; target = user
             repeat task.wait() until not stomping or bodyeffects.get(user, 'SDeath') or not bodyeffects.get(user, 'K.O')
-            wsSend({type='log', msg='Stomp complete on ' .. user.Name})
         end)
-
     elseif cmd == 'auto' then
         local user = utils.getname(targetName)
         if not user then wsSend({type='log', msg='Target not found'}); return end
-        auto = not auto
-        wsSend({type='log', msg=(auto and 'Enabled' or 'Disabled') .. ' auto kill on ' .. user.Name})
-        if auto then
-            task.spawn(function()
-                repeat task.wait()
-                    if auto and not bodyeffects.get(user, 'SDeath') then
-                        killing = true; target = user
-                        repeat task.wait() until not killing or not auto
-                        if not auto then break end
-                        task.wait(0.1)
-                        stomping = true; target = user
-                        repeat task.wait() until not stomping or not auto or bodyeffects.get(user, 'SDeath')
-                    else
-                        utils.update(CFrame.new(x(), yy(), x()))
-                        task.wait(1)
-                    end
-                until not auto
-            end)
-        end
-
+        auto = not auto; wsSend({type='log', msg=(auto and 'ON' or 'OFF') .. ' auto on ' .. user.Name})
+        if auto then task.spawn(function()
+            repeat task.wait()
+                if auto and not bodyeffects.get(user, 'SDeath') then
+                    killing = true; target = user
+                    repeat task.wait() until not killing or not auto
+                    if not auto then break end; task.wait(0.1)
+                    stomping = true; target = user
+                    repeat task.wait() until not stomping or not auto or bodyeffects.get(user, 'SDeath')
+                else utils.update(CFrame.new(x(), yy(), x())); task.wait(1) end
+            until not auto
+        end) end
     elseif cmd == 'stop' then
-        killing = false; stop = true; stomping = false; auto = false; target = nil
-        info.Text = ''; ka = false; showtarget = nil; show = false; assist = false; void = true
-        if localent.Alive then camera.CameraSubject = lplr.Character.Humanoid; utils.update(CFrame.new(x(), yy(), x())) end
-        stop = false
-        wsSend({type='log', msg='Stopped all actions'})
-
+        killing = false; stop = true; stomping = false; auto = false; target = nil; info.Text = ''
+        ka = false; showtarget = nil; show = false; assist = false; void = true; sentry = false
+        pcall(function() camera.CameraSubject = lplr.Character.Humanoid; utils.update(CFrame.new(x(), yy(), x())) end)
+        stop = false; wsSend({type='log', msg='Stopped'})
     elseif cmd == 'guns' then
-        local dg = altcontrol.default_guns or {'rifle', 'flintlock'}
-        for i, v in dg do
-            local status = pguns[v]
-            if not status then continue end
-            local weapon = status.name:gsub('%s*%- %$%d+', '')
-            if lplr and lplr.Backpack and lplr.Character and lplr.Character:FindFirstChild('Humanoid') and (not lplr.Backpack:FindFirstChild(weapon) and not lplr.Character:FindFirstChild(weapon)) then
-                utils.purchase('weapon', status.name)
-            end
+        for i, v in (altcontrol.default_guns or {'rifle', 'flintlock'}) do
+            local s = pguns[v]; if not s then continue end
+            local w = s.name:gsub('%s*%- %$%d+', '')
+            if not lplr.Backpack:FindFirstChild(w) and not lplr.Character:FindFirstChild(w) then utils.purchase('weapon', s.name) end
         end
         wsSend({type='log', msg='Bought guns'})
-
-    elseif cmd == 'sentry' then
-        sentry = not sentry
-        wsSend({type='log', msg=(sentry and 'Enabled' or 'Disabled') .. ' sentry'})
-
-    elseif cmd == 'assist' then
-        assist = not assist
-        wsSend({type='log', msg=(assist and 'Enabled' or 'Disabled') .. ' assist'})
-
-    elseif cmd == 'killaura' then
-        ka = not ka
-        if not ka and not void then void = true end
-        wsSend({type='log', msg=(ka and 'Enabled' or 'Disabled') .. ' kill aura'})
-
+    elseif cmd == 'sentry' then sentry = not sentry; wsSend({type='log', msg=(sentry and 'ON' or 'OFF') .. ' sentry'})
+    elseif cmd == 'assist' then assist = not assist; wsSend({type='log', msg=(assist and 'ON' or 'OFF') .. ' assist'})
+    elseif cmd == 'killaura' then ka = not ka; if not ka and not void then void = true end; wsSend({type='log', msg=(ka and 'ON' or 'OFF') .. ' killaura'})
     elseif cmd == 'show' then
         local user = utils.getname(targetName)
         if user then showtarget = user.Name; show = true; wsSend({type='log', msg='Following ' .. user.Name}) end
-
-    elseif cmd == 'void' then
-        showtarget = nil; show = false; void = true
-        wsSend({type='log', msg='Voided'})
-
+    elseif cmd == 'void' then showtarget = nil; show = false; void = true; wsSend({type='log', msg='Voided'})
     elseif cmd == 'bring' then
-        local rr = utils.getname(targetName)
+        local rr = utils.getname(targetName); if not rr then return end
         local to = args.target2 and utils.getname(args.target2) or nil
-        if not rr then wsSend({type='log', msg='Target not found'}); return end
-        wsSend({type='log', msg='Bringing ' .. rr.Name})
-        -- simplified bring
-        killing = true; target = rr
-        repeat task.wait() until not killing or stop
+        killing = true; target = rr; repeat task.wait() until not killing or stop
         for i, v in lplr.Character:GetChildren() do if v:IsA('Tool') then v.Parent = lplr.Backpack end end
         void = false
-        utils.update(CFrame.new(rr.Character.LowerTorso.Position) + Vector3.new(0, stomp_offset, 0))
         repeat
             utils.update(CFrame.new(rr.Character.LowerTorso.Position) + Vector3.new(0, stomp_offset, 0))
-            replicated.MainEvent:FireServer('Grabbing', false)
-            task.wait(0.37)
+            replicated.MainEvent:FireServer('Grabbing', false); task.wait(0.37)
         until (rr.Character and rr.Character:FindFirstChild('GRABBING_CONSTRAINT')) or bodyeffects.get(rr, 'Grabbed') or not bodyeffects.get(rr, 'K.O') or bodyeffects.get(rr, 'SDeath')
         if to and to.Character then
             utils.update(CFrame.new(to.Character.LowerTorso.Position) + Vector3.new(3, 5, 0))
-            task.wait(0.37)
-            replicated.MainEvent:FireServer('Grabbing', false)
+            task.wait(0.37); replicated.MainEvent:FireServer('Grabbing', false)
         end
-        task.wait(0.2); void = true; utils.update(CFrame.new(x(), yy(), x()))
-        wsSend({type='log', msg='Bring complete'})
-
+        task.wait(0.2); void = true; utils.update(CFrame.new(x(), yy(), x())); wsSend({type='log', msg='Bring done'})
     elseif cmd == 'automask' then
-        automask = not automask
-        wsSend({type='log', msg=(automask and 'Enabled' or 'Disabled') .. ' auto mask'})
-        if automask then
-            task.spawn(function()
-                repeat task.wait()
-                    if pguns['riot mask'] and localent.Alive and not lplr.Character:FindFirstChild('In-gameMask') and not stop and automask then
-                        utils.purchase('weapon', pguns['riot mask'].name)
-                        local mask; repeat task.wait(); mask = lplr.Backpack:FindFirstChild('[Mask]') until mask or stop
-                        if mask then mask.Parent = lplr.Character; mask:Activate()
-                            repeat task.wait() until lplr.Character:FindFirstChild('In-gameMask')
-                            mask.Parent = lplr.Backpack
-                        end
-                    end
-                until not automask or stop
-            end)
-        end
-
+        automask = not automask; wsSend({type='log', msg=(automask and 'ON' or 'OFF') .. ' automask'})
+        if automask then task.spawn(function()
+            repeat task.wait()
+                if pguns['riot mask'] and localent.Alive and not lplr.Character:FindFirstChild('In-gameMask') and automask then
+                    utils.purchase('weapon', pguns['riot mask'].name)
+                    local mask; repeat task.wait(); mask = lplr.Backpack:FindFirstChild('[Mask]') until mask or stop
+                    if mask then mask.Parent = lplr.Character; mask:Activate()
+                        repeat task.wait() until lplr.Character:FindFirstChild('In-gameMask'); mask.Parent = lplr.Backpack end
+                end
+            until not automask or stop
+        end) end
     elseif cmd == 'autoarmor' then
-        autoarmor = not autoarmor
-        wsSend({type='log', msg=(autoarmor and 'Enabled' or 'Disabled') .. ' auto armor'})
-        if autoarmor then
-            task.spawn(function()
-                repeat task.wait()
-                    if autoarmor and localent.Alive and utils.needarmor() and not stop and pguns['medium armor'] then
-                        utils.purchase('weapon', pguns['medium armor'].name)
-                    end
-                until not autoarmor or stop
-            end)
-        end
-
+        autoarmor = not autoarmor; wsSend({type='log', msg=(autoarmor and 'ON' or 'OFF') .. ' autoarmor'})
+        if autoarmor then task.spawn(function()
+            repeat task.wait()
+                if autoarmor and localent.Alive and utils.needarmor() and pguns['medium armor'] then utils.purchase('weapon', pguns['medium armor'].name) end
+            until not autoarmor or stop
+        end) end
     elseif cmd == 'aguns' then
-        autogun = not autogun
-        wsSend({type='log', msg=(autogun and 'Enabled' or 'Disabled') .. ' auto guns'})
-        if autogun then
-            task.spawn(function()
-                repeat task.wait()
-                    if #guns == 0 or bodyeffects.get(lplr, 'SDeath') then
-                        repeat task.wait() until localent.Alive
-                        local dg = altcontrol.default_guns or {'rifle', 'flintlock'}
-                        for i, v in dg do
-                            local status = pguns[v]; if not status then continue end
-                            local weapon = status.name:gsub('%s*%- %$%d+', '')
-                            if not lplr.Backpack:FindFirstChild(weapon) and not lplr.Character:FindFirstChild(weapon) then
-                                utils.purchase('weapon', status.name)
-                            end
-                        end
+        autogun = not autogun; wsSend({type='log', msg=(autogun and 'ON' or 'OFF') .. ' autoguns'})
+        if autogun then task.spawn(function()
+            repeat task.wait()
+                if (#guns == 0 or bodyeffects.get(lplr, 'SDeath')) then
+                    repeat task.wait() until localent.Alive
+                    for i, v in (altcontrol.default_guns or {'rifle', 'flintlock'}) do
+                        local s = pguns[v]; if not s then continue end
+                        local w = s.name:gsub('%s*%- %$%d+', '')
+                        if not lplr.Backpack:FindFirstChild(w) and not lplr.Character:FindFirstChild(w) then utils.purchase('weapon', s.name) end
                     end
-                until not autogun or stop
-            end)
-        end
-
-    elseif cmd == 'rejoin' then
-        wsSend({type='log', msg='Rejoining...'})
-        teleport:TeleportToPlaceInstance(game.PlaceId, game.JobId, lplr)
-
-    elseif cmd == 'leave' then
-        wsSend({type='log', msg='Leaving...'})
-        lplr:Kick('[AltControl] Kicked via panel')
-
-    elseif cmd == 'reset' then
-        lplr.Character.Humanoid.Health = 0
-        wsSend({type='log', msg='Reset character'})
-
-    elseif cmd == 'emote' then
-        local ename = targetName:lower()
-        if anims[ename] then loadanimation(anims[ename]); wsSend({type='log', msg='Playing emote: ' .. ename}) end
-
-    elseif cmd == 'weld' then
-        weld = not weld; wsSend({type='log', msg=(weld and 'Enabled' or 'Disabled') .. ' weld'})
-
-    elseif cmd == 'punch' then
-        punch = not punch; wsSend({type='log', msg=(punch and 'Enabled' or 'Disabled') .. ' punch'})
-
-    elseif cmd == 'flame' then
-        flamethrower = not flamethrower; wsSend({type='log', msg=(flamethrower and 'Enabled' or 'Disabled') .. ' flamethrower'})
-
-    elseif cmd == 'crash' then
-        wsSend({type='log', msg='Crasher toggled'})
-
+                end
+            until not autogun or stop
+        end) end
+    elseif cmd == 'rejoin' then wsSend({type='log', msg='Rejoining...'}); teleport:TeleportToPlaceInstance(game.PlaceId, game.JobId, lplr)
+    elseif cmd == 'leave' then wsSend({type='log', msg='Leaving...'}); lplr:Kick('[AltControl] Kicked via panel')
+    elseif cmd == 'reset' then pcall(function() lplr.Character.Humanoid.Health = 0 end); wsSend({type='log', msg='Reset'})
+    elseif cmd == 'emote' then local e = targetName:lower(); if anims[e] then loadanimation(anims[e]); wsSend({type='log', msg='Emote: ' .. e}) end
+    elseif cmd == 'weld' then weld = not weld; wsSend({type='log', msg=(weld and 'ON' or 'OFF') .. ' weld'})
+    elseif cmd == 'punch' then punch = not punch; wsSend({type='log', msg=(punch and 'ON' or 'OFF') .. ' punch'})
+    elseif cmd == 'flame' then flamethrower = not flamethrower; wsSend({type='log', msg=(flamethrower and 'ON' or 'OFF') .. ' flame'})
     elseif cmd == 'whitelist' then
-        local user = utils.getname(targetName)
-        if user then
-            if table.find(whitelist, user.Name) then
-                table.remove(whitelist, table.find(whitelist, user.Name))
-                wsSend({type='log', msg='Removed from whitelist: ' .. user.Name})
-            else
-                table.insert(whitelist, user.Name)
-                wsSend({type='log', msg='Whitelisted: ' .. user.Name})
-            end
-        end
-
+        local user = utils.getname(targetName); if not user then return end
+        local idx = table.find(whitelist, user.Name)
+        if idx then table.remove(whitelist, idx); wsSend({type='log', msg='Unwhitelisted ' .. user.Name})
+        else table.insert(whitelist, user.Name); wsSend({type='log', msg='Whitelisted ' .. user.Name}) end
     elseif cmd == 'owner' then
-        local user = utils.getname(targetName)
-        if user then
-            if table.find(altcontrol.owners, user.Name) then
-                table.remove(altcontrol.owners, table.find(altcontrol.owners, user.Name))
-                wsSend({type='log', msg='Removed owner: ' .. user.Name})
-            else
-                table.insert(altcontrol.owners, user.Name)
-                wsSend({type='log', msg='Added owner: ' .. user.Name})
-            end
-        end
-
-    elseif cmd == 'range' then
-        local val = tonumber(targetName)
-        if val then karange = val; wsSend({type='log', msg='KA range: ' .. val}) end
-
-    elseif cmd == 'stomp_offset' then
-        local val = tonumber(targetName)
-        if val then stomp_offset = val; wsSend({type='log', msg='Stomp offset: ' .. val}) end
-
-    elseif cmd == 'setfps' then
-        local val = tonumber(targetName)
-        if val and setfpscap then setfpscap(val); wsSend({type='log', msg='FPS cap: ' .. val}) end
-
+        local user = utils.getname(targetName); if not user then return end
+        local idx = table.find(altcontrol.owners, user.Name)
+        if idx then table.remove(altcontrol.owners, idx); wsSend({type='log', msg='-owner ' .. user.Name})
+        else table.insert(altcontrol.owners, user.Name); wsSend({type='log', msg='+owner ' .. user.Name}) end
+    elseif cmd == 'range' then local v = tonumber(targetName); if v then karange = v; wsSend({type='log', msg='Range: ' .. v}) end
+    elseif cmd == 'stomp_offset' then local v = tonumber(targetName); if v then stomp_offset = v; wsSend({type='log', msg='SO: ' .. v}) end
+    elseif cmd == 'setfps' then local v = tonumber(targetName); if v and setfpscap then setfpscap(v); wsSend({type='log', msg='FPS: ' .. v}) end
     elseif cmd == 'fakepos' then
-        if setfflag then
-            local fake = not (getfflag and getfflag('NextGenReplicatorEnabledWrite4') == 'true')
-            lplr.Character.Humanoid.Health = 0; setfflag('NextGenReplicatorEnabledWrite4', tostring(fake))
-            repeat task.wait() until localent.Alive
-            utils.update(CFrame.new(x(), yy(), x()))
-            wsSend({type='log', msg=(fake and 'Enabled' or 'Disabled') .. ' fakepos'})
-        end
-
-    elseif cmd == 'faststrafe' then
-        badstrafe = not badstrafe; wsSend({type='log', msg=(badstrafe and 'Enabled' or 'Disabled') .. ' fast strafe'})
-
-    elseif cmd == 'hidesc' then
-        local old = runservice:Is3dRenderingEnabled and runservice:Is3dRenderingEnabled() or true
-        runservice:Set3dRenderingEnabled(not old)
-        wsSend({type='log', msg='Screen toggled'})
-
+        pcall(function()
+            local fake = true; lplr.Character.Humanoid.Health = 0; setfflag('NextGenReplicatorEnabledWrite4', 'true')
+            repeat task.wait() until localent.Alive; utils.update(CFrame.new(x(), yy(), x())); wsSend({type='log', msg='Fakepos ON'})
+        end)
+    elseif cmd == 'faststrafe' then badstrafe = not badstrafe; wsSend({type='log', msg=(badstrafe and 'ON' or 'OFF') .. ' faststrafe'})
+    elseif cmd == 'hidesc' then pcall(function() runservice:Set3dRenderingEnabled(not runservice:Is3dRenderingEnabled()) end); wsSend({type='log', msg='Screen toggled'})
     elseif cmd == 'redeem' then
         pcall(function()
             local codes = http:JSONDecode(game:HttpGet('https://raw.githubusercontent.com/ah2r/storage/refs/heads/main/sync/codes.sync'))
             for _, v in codes do utils.redeem(v); task.wait(0.6) end
-        end)
-        wsSend({type='log', msg='Redeemed codes'})
-
-    elseif cmd == 'raw' then
-        -- For raw commands, just log it (chat commands still work alongside WS)
-        wsSend({type='log', msg='Raw: ' .. targetName})
+        end); wsSend({type='log', msg='Redeemed codes'})
     end
 end
 
--- WebSocket connection loop
+-- WS Connection
 local function connectWS()
     while true do
         local ok, socket = pcall(function()
-            return WebSocket and WebSocket.connect(WS_URL) or nil
+            if WebSocket then return WebSocket.connect(WS_URL) end
+            return nil
         end)
-
-        if not ok or not socket then
-            wsLog('Connection failed. Retrying in 5s...')
-            task.wait(5)
-            continue
-        end
-
-        wsSocket = socket
-        wsConnected = true
-        wsLog('Connected!')
-
-        -- Auth
-        wsSend({
-            type = 'auth',
-            token = WS_TOKEN,
-            info = getStatus()
-        })
-
-        -- Status update loop
+        if not ok or not socket then wsLog('WS failed. Retry 5s...'); task.wait(5); continue end
+        wsSocket = socket; wsConnected = true; wsLog('Connected!')
+        wsSend({ type = 'auth', token = WS_TOKEN, info = getStatus() })
         local statusThread = task.spawn(function()
-            while wsConnected do
-                pcall(function()
-                    wsSend({ type = 'status', data = getStatus() })
-                end)
-                task.wait(2)
-            end
+            while wsConnected do pcall(function() wsSend({ type = 'status', data = getStatus() }) end); task.wait(2) end
         end)
-
-        -- Message handler
         socket.OnMessage:Connect(function(raw)
             local ok2, msg = pcall(function() return http:JSONDecode(raw) end)
             if not ok2 then return end
-
-            if msg.type == 'auth_ok' then
-                wsLog('Authenticated!')
-                wsSend({type='log', msg='Bot connected: ' .. lplr.Name .. ' | Server: ' .. game.JobId:sub(1, 8)})
-            elseif msg.type == 'auth_fail' then
-                wsLog('Auth failed: ' .. (msg.message or ''))
-                wsConnected = false
-            elseif msg.type == 'command' then
-                task.spawn(handleCommand, msg.cmd, msg.args)
-            end
+            if msg.type == 'auth_ok' then wsLog('Auth OK!'); wsSend({type='log', msg='Bot: ' .. lplr.Name .. ' | ' .. game.JobId:sub(1,8)})
+            elseif msg.type == 'auth_fail' then wsLog('Auth FAIL'); wsConnected = false
+            elseif msg.type == 'command' then task.spawn(handleCommand, msg.cmd, msg.args) end
         end)
-
-        socket.OnClose:Connect(function()
-            wsLog('Disconnected')
-            wsConnected = false
-            wsSocket = nil
-        end)
-
+        socket.OnClose:Connect(function() wsLog('Disconnected'); wsConnected = false; wsSocket = nil end)
         repeat task.wait(1) until not wsConnected
-
-        -- Clean up
-        pcall(function() if statusThread then task.cancel(statusThread) end end)
-
-        wsLog('Reconnecting in 5s...')
-        task.wait(5)
+        pcall(function() task.cancel(statusThread) end)
+        wsLog('Reconnecting 5s...'); task.wait(5)
     end
 end
 
--- Start
 loadanimation(default)
 task.spawn(connectWS)
-
-wsLog('Alt Control WS loaded! Player: ' .. lplr.Name)
+wsLog('Loaded! Player: ' .. lplr.Name)
