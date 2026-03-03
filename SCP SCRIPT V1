@@ -355,6 +355,7 @@ local weld = false
 local punch = false
 local flamethrower = false
 local auto = false
+local farming = false
 
 local showtarget = altcontrol.owners[1] or nil
 local show = showtarget ~= nil
@@ -714,7 +715,7 @@ local function getStatus()
         health = hp, money = utils.getmoney(), guns = #guns,
         alive = localent.Alive, sentry = sentry, assist = assist,
         killaura = ka, void = void, automask = automask,
-        autoarmor = autoarmor, autogun = autogun,
+        autoarmor = autoarmor, autogun = autogun, farming = farming,
     }
 end
 
@@ -850,6 +851,184 @@ local function handleCommand(cmd, args)
             local codes = http:JSONDecode(game:HttpGet('https://raw.githubusercontent.com/ah2r/storage/refs/heads/main/sync/codes.sync'))
             for _, v in codes do utils.redeem(v); task.wait(0.6) end
         end); wsSend({type='log', msg='Redeemed codes'})
+
+    -- TP to location
+    elseif cmd == 'tp' then
+        local loc = targetName:lower()
+        if pos[loc] then
+            utils.update(CFrame.new(pos[loc]))
+            wsSend({type='log', msg='TP to ' .. loc})
+        else
+            -- try as player name
+            local user = utils.getname(targetName)
+            if user then
+                local p = utils:getposition(user)
+                if p then utils.update(p + Vector3.new(0, 5, 0)); wsSend({type='log', msg='TP to ' .. user.Name}) end
+            else
+                local locs = {}
+                for k, _ in pairs(pos) do table.insert(locs, k) end
+                wsSend({type='log', msg='Unknown location. Available: ' .. table.concat(locs, ', ')})
+            end
+        end
+
+    -- Farm money (auto rob/loot cash drops)
+    elseif cmd == 'farm' then
+        farming = not farming
+        wsSend({type='log', msg=(farming and 'ON' or 'OFF') .. ' farming'})
+        if farming then
+            task.spawn(function()
+                while farming and not stop do
+                    pcall(function()
+                        -- Collect cash drops on the ground
+                        for _, v in workspace:GetDescendants() do
+                            if not farming then break end
+                            if v:IsA('ClickDetector') and v.Parent and v.Parent.Name:lower():find('cash') then
+                                utils.update(v.Parent.CFrame or v.Parent.Position and CFrame.new(v.Parent.Position))
+                                fireclickdetector(v)
+                                task.wait(0.2)
+                            end
+                        end
+                        -- Rob cash register if nearby
+                        for _, v in workspace:GetDescendants() do
+                            if not farming then break end
+                            if v:IsA('ClickDetector') and v.Parent and (v.Parent.Name:lower():find('register') or v.Parent.Name:lower():find('rob') or v.Parent.Name:lower():find('atm')) then
+                                local part = v.Parent:FindFirstChildOfClass('Part') or v.Parent:FindFirstChildOfClass('BasePart') or v.Parent
+                                if part and part:IsA('BasePart') then
+                                    utils.update(CFrame.new(part.Position + Vector3.new(0, 3, 0)))
+                                    fireclickdetector(v)
+                                    task.wait(0.5)
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(1)
+                    if farming then
+                        utils.update(CFrame.new(x(), yy(), x()))
+                        task.wait(2)
+                    end
+                end
+            end)
+        end
+
+    -- Multi-target kill queue
+    elseif cmd == 'multikill' then
+        local names = {}
+        for name in targetName:gmatch('[^,]+') do
+            local trimmed = name:match('^%s*(.-)%s*$')
+            if trimmed and trimmed ~= '' then table.insert(names, trimmed) end
+        end
+        if #names == 0 then wsSend({type='log', msg='Usage: player1,player2,player3'}); return end
+        wsSend({type='log', msg='Kill queue: ' .. table.concat(names, ' > ')})
+        task.spawn(function()
+            for i, name in names do
+                if stop then break end
+                local user = utils.getname(name)
+                if not user then wsSend({type='log', msg='Skip: ' .. name .. ' not found'}); continue end
+                wsSend({type='log', msg='[' .. i .. '/' .. #names .. '] Killing ' .. user.Name})
+                killing = true; target = user
+                repeat task.wait() until not killing or stop
+                if stop then break end
+                -- auto stomp
+                stomping = true; target = user
+                repeat task.wait() until not stomping or stop
+                wsSend({type='log', msg='[' .. i .. '/' .. #names .. '] Done: ' .. user.Name})
+                task.wait(0.5)
+            end
+            utils.update(CFrame.new(x(), yy(), x()))
+            wsSend({type='log', msg='Kill queue complete'})
+        end)
+
+    -- Chat message from panel
+    elseif cmd == 'chat' then
+        pcall(function()
+            local textChannel = game:GetService('TextChatService')
+            local channel = textChannel and textChannel:FindFirstChild('TextChannels') and textChannel.TextChannels:FindFirstChild('RBXGeneral')
+            if channel then
+                channel:SendAsync(targetName)
+                wsSend({type='log', msg='Chat: ' .. targetName})
+            else
+                -- fallback old chat
+                replicated.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(targetName, 'All')
+                wsSend({type='log', msg='Chat (legacy): ' .. targetName})
+            end
+        end)
+
+    -- Player list
+    elseif cmd == 'playerlist' then
+        local list = {}
+        for _, p in players:GetPlayers() do
+            local hp = 0
+            pcall(function() hp = math.floor((p.Character.Humanoid.Health / p.Character.Humanoid.MaxHealth) * 100) end)
+            local isOwner = table.find(altcontrol.owners, p.Name) and true or false
+            local isWl = table.find(whitelist, p.Name) and true or false
+            table.insert(list, {
+                name = p.Name,
+                display = p.DisplayName,
+                hp = hp,
+                alive = p.Character and p.Character:FindFirstChild('Humanoid') and p.Character.Humanoid.Health > 0 or false,
+                ko = bodyeffects.get(p, 'K.O') and true or false,
+                owner = isOwner,
+                whitelisted = isWl,
+            })
+        end
+        wsSend({type='playerlist', players=list})
+
+    -- Join owner's server
+    elseif cmd == 'joinowner' then
+        local ownerName = targetName ~= '' and targetName or (altcontrol.owners[1] or '')
+        wsSend({type='log', msg='Looking for ' .. ownerName .. ' server...'})
+        pcall(function()
+            local pages = players:GetFriendsAsync(lplr.UserId)
+            -- Try to find owner via API
+            local userId
+            local success, result = pcall(function()
+                local url = 'https://users.roblox.com/v1/usernames/users'
+                local body = http:JSONEncode({usernames = {ownerName}, excludeBannedUsers = false})
+                local response = http:RequestAsync({Url = url, Method = 'POST', Headers = {['Content-Type'] = 'application/json'}, Body = body})
+                local data = http:JSONDecode(response.Body)
+                return data.data and data.data[1] and data.data[1].id
+            end)
+            if success and result then userId = result end
+            if userId then
+                local ok2, presence = pcall(function()
+                    local url2 = 'https://presence.roblox.com/v1/presence/users'
+                    local body2 = http:JSONEncode({userIds = {userId}})
+                    local response2 = http:RequestAsync({Url = url2, Method = 'POST', Headers = {['Content-Type'] = 'application/json'}, Body = body2})
+                    return http:JSONDecode(response2.Body)
+                end)
+                if ok2 and presence and presence.userPresences and presence.userPresences[1] then
+                    local p = presence.userPresences[1]
+                    if p.placeId and p.gameId then
+                        wsSend({type='log', msg='Found! Joining ' .. ownerName .. ' server...'})
+                        teleport:TeleportToPlaceInstance(p.placeId, p.gameId, lplr)
+                        return
+                    end
+                end
+            end
+            wsSend({type='log', msg='Could not find ' .. ownerName .. ' server'})
+        end)
+
+    -- Server info/dashboard data
+    elseif cmd == 'dashboard' then
+        local playerCount = #players:GetPlayers()
+        local money = utils.getmoney()
+        local gunList = {}
+        for _, g in guns do table.insert(gunList, g.Name) end
+        wsSend({type='dashboard', data={
+            username = lplr.Name,
+            display = lplr.DisplayName,
+            server = game.JobId,
+            place = game.PlaceId,
+            players = playerCount,
+            money = money,
+            guns = gunList,
+            health = (function() local h = 0; pcall(function() h = math.floor((lplr.Character.Humanoid.Health / lplr.Character.Humanoid.MaxHealth) * 100) end); return h end)(),
+            alive = localent.Alive,
+            sentry = sentry, assist = assist, killaura = ka,
+            void = void, automask = automask, autoarmor = autoarmor,
+            autogun = autogun, farming = farming,
+            karange = karange, stomp_offset = stomp_offset,
+        }})
     end
 end
 
