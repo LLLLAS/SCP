@@ -1,3038 +1,1865 @@
-
-local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+local cloneref = cloneref or function(serv) return serv end;
 
-local Library do
-    Library = {
-        Theme = {},
-        espfont = nil,
-        MenuKeybind = tostring(Enum.KeyCode.RightControl),
-        Flags = {},
-        Tween = {
-            Time = 0.18,
-            Style = Enum.EasingStyle.Quart,
-            Direction = Enum.EasingDirection.Out
-        },
-        FadeSpeed = 0.15,
-        Folders = {
-            Directory = "LinoriaStyle",
-            Configs = "LinoriaStyle/Configs",
-            Assets = "LinoriaStyle/Assets",
-            Sounds = "LinoriaStyle/Sounds",
-        },
-        Pages = {},
-        Sections = {},
-        Connections = {},
-        Threads = {},
-        ThemeMap = {},
-        ThemeItems = {},
-        OpenFrames = {},
-        SetFlags = {},
-        UnnamedConnections = 0,
-        UnnamedFlags = 0,
-        Holder = nil,
-        NotifHolder = nil,
-        UnusedHolder = nil,
-        KeyList = nil,
-        Font = nil,
-        CopiedColor = nil,
-        Fonts = {},
-    }
-    Library.__index = Library
-    Library.Sections.__index = Library.Sections
-    Library.Pages.__index = Library.Pages
-end
 
-gethui = gethui or function() return CoreGui end
+print('loaded!')
 
-local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
-local Mouse = LocalPlayer:GetMouse()
+local replicated = cloneref(game:GetService('ReplicatedStorage'));
+local runservice = cloneref(game:GetService('RunService'));
+local players = cloneref(game:GetService('Players'));
+local teleport = cloneref(game:GetService('TeleportService'));
+local manager = cloneref(game:GetService('VirtualInputManager'));  
+local virtual = cloneref(game:GetService('VirtualUser'));
+local http = cloneref(game:GetService('HttpService'));
+local startergui = cloneref(game:GetService('StarterGui'))
 
-local FromRGB = Color3.fromRGB
-local FromHSV = Color3.fromHSV
-local FromHex = Color3.fromHex
-local RGBSequence = ColorSequence.new
-local RGBSequenceKeypoint = ColorSequenceKeypoint.new
-local NumSequence = NumberSequence.new
-local NumSequenceKeypoint = NumberSequenceKeypoint.new
-local UDim2New = UDim2.new
-local UDimNew = UDim.new
-local UDim2FromOffset = UDim2.fromOffset
-local Vector2New = Vector2.new
-local MathClamp = math.clamp
-local MathFloor = math.floor
-local TableInsert = table.insert
-local TableFind = table.find
-local TableRemove = table.remove
-local TableConcat = table.concat
-local TableClone = table.clone
-local TableUnpack = table.unpack
-local StringFormat = string.format
-local StringFind = string.find
-local StringGSub = string.gsub
-local StringLower = string.lower
-local StringLen = string.len
-local InstanceNew = Instance.new
-local RectNew = Rect.new
+local lplr = players.LocalPlayer;
+local camera = workspace.CurrentCamera;
+local guns = {}
 
-local Themes = {
-    ["Preset"] = {
-        ["Background"]      = FromRGB(15, 15, 23),
-        ["Surface"]         = FromRGB(20, 20, 30),
-        ["Surface2"]        = FromRGB(26, 26, 38),
-        ["Accent"]          = FromRGB(120, 100, 220),
-        ["AccentDark"]      = FromRGB(80, 65, 160),
-        ["Text"]            = FromRGB(220, 220, 230),
-        ["TextMuted"]       = FromRGB(130, 130, 150),
-        ["Border"]          = FromRGB(45, 45, 65),
-        ["Toggle On"]       = FromRGB(120, 100, 220),
-        ["Toggle Off"]      = FromRGB(40, 40, 58),
-        ["Element"]         = FromRGB(30, 30, 45),
-        ["ElementHover"]    = FromRGB(38, 38, 55),
-        ["TopBar"]          = FromRGB(18, 18, 28),
-        -- Status colors
-        ["StatusOn"]        = FromRGB(72, 210, 110),
-        ["StatusOff"]       = FromRGB(210, 72, 72),
-        ["StatusWarn"]      = FromRGB(210, 175, 55),
-        ["AccentGlow"]      = FromRGB(140, 120, 255),
-        -- Status colors for watermark
-        ["StatusOn"]        = FromRGB(80, 220, 120),
-        ["StatusOff"]       = FromRGB(220, 80, 80),
-        ["StatusWarn"]      = FromRGB(220, 180, 60),
-    }
+local utils = {};
+local pguns, ammos = {}, {};
+local shop = workspace:FindFirstChild('Ignored')
+local getconnections = getconnections or function() return {} end;
+
+local pos = {
+	military = Vector3.new(38.92394256591797, 50.73406219482422, -817.4947509765625),
+	revolver = Vector3.new(-638.674194, 21.7201862, -135.108582),
+	db = Vector3.new(-1043.89465, 21.7201843, -271.673889),
+	bank = Vector3.new(-432.1439208984375, 38.9649658203125, -284.1016540527344),
+	ufo = Vector3.new(80.11156463623047, 138.96067810058594, -660.760498046875),
+	downhill = Vector3.new(-557.683105, 7.97003078, -734.802307),
+	uphill = Vector3.new(482.059845, 47.975174, -597.523682),
+	cage = Vector3.new(527.624878, 47.9701843, -106.50116),
+	church = Vector3.new(205.289032, 21.7201843, -87.1190186),
+	jail = Vector3.new(-330.228607, 21.7201805, -79.0901031),
+	prison = Vector3.new(-330.228607, 21.7201805, -79.0901031),
+	school = Vector3.new(-596.092407, 68.0951767, 322.415924),
+	higharmor = Vector3.new(-931.958313, -28.5298119, 561.678772),
+	park = Vector3.new(-260.346985, 22.1200542, -756.058411),
+	taco = Vector3.new(573.98584, 51.0315971, -478.621582),
+	graveyard = Vector3.new(157.339783, 21.7201862, 78.4517593),
+	station = Vector3.new(-428.553986, -21.2798138, 110.969559),
 }
 
-Library.Theme = TableClone(Themes["Preset"])
-
-for _, v in Library.Folders do
-    if not isfolder(v) then makefolder(v) end
+if getconnections then
+	for i, v in getconnections(lplr.Idled) do
+		v:Disconnect();
+	end
+else
+	warn('⚠️ [ALT CONTROL] NO GETCONNECTIONS DETECTED. YOU MAY BE KICKED FOR BEING AFK.');
 end
 
--- ============================================================
--- Tween system
-local Tween = {} do
-    Tween.__index = Tween
+workspace.FallenPartsDestroyHeight = 0/0
 
-    Tween.Create = function(self, Item, Info, Goal, IsRawItem)
-        Item = IsRawItem and Item or Item.Instance
-        Info = Info or TweenInfo.new(Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction)
-        local t = { Tween = TweenService:Create(Item, Info, Goal), Info = Info, Goal = Goal, Item = Item }
-        t.Tween:Play()
-        setmetatable(t, Tween)
-        return t
-    end
+if getthreadidentity() ~= 8 or not fireclickdetector then
+    getgenv().fireclickdetector = function(target)
+        local cd = target:IsA('ClickDetector') and target or target:FindFirstChild('ClickDetector')
+        local originalParent = cd.Parent
+		
+        local holder = Instance.new('Part')
+        holder.Transparency = 1
+        holder.Size = Vector3.new(30, 30, 30)
+        holder.Anchored = true
+        holder.CanCollide = false
+        holder.Parent = workspace
 
-    Tween.GetProperty = function(self, Item)
-        Item = Item or self.Item
-        if Item:IsA("Frame") then return { "BackgroundTransparency" }
-        elseif Item:IsA("TextLabel") or Item:IsA("TextButton") then return { "TextTransparency", "BackgroundTransparency" }
-        elseif Item:IsA("ImageLabel") or Item:IsA("ImageButton") then return { "BackgroundTransparency", "ImageTransparency" }
-        elseif Item:IsA("ScrollingFrame") then return { "BackgroundTransparency", "ScrollBarImageTransparency" }
-        elseif Item:IsA("TextBox") then return { "TextTransparency", "BackgroundTransparency" }
-        elseif Item:IsA("UIStroke") then return { "Transparency" } end
-    end
+        cd.Parent = holder
+        cd.MaxActivationDistance = 1e6
 
-    Tween.FadeItem = function(self, Item, Property, Visibility, Speed)
-        local Old = Item[Property]
-        Item[Property] = Visibility and 1 or Old
-        local t = Tween:Create(Item, TweenInfo.new(Speed or Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), { [Property] = Visibility and Old or 1 }, true)
-        Library:Connect(t.Tween.Completed, function()
-            if not Visibility then task.wait() Item[Property] = Old end
+        local heart
+        heart = runservice.Heartbeat:Connect(function()
+            holder.CFrame = workspace.Camera.CFrame * CFrame.new(0, 0, -20)
+            virtual:ClickButton1(Vector2.new(20, 20), workspace.CurrentCamera.CFrame)
         end)
-        return t
-    end
 
-    Tween.Get = function(self) return self.Tween, self.Info, self.Goal end
+        local restore = function()
+            pcall(function() if heart then heart:Disconnect() end end)
+            cd.Parent = originalParent
+            holder:Destroy()
+        end
 
-    -- Preset animations for common uses
-    Tween.Spring = function(_, Item, Goal, Raw)
-        return Tween:Create(Item, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), Goal, Raw)
+        cd.MouseClick:Once(function()
+            restore()
+        end)
+
+        task.delay(3, restore)
     end
-    Tween.Quick = function(_, Item, Goal, Raw)
-        return Tween:Create(Item, TweenInfo.new(0.1, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), Goal, Raw)
-    end
-    Tween.Smooth = function(_, Item, Goal, Raw)
-        return Tween:Create(Item, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), Goal, Raw)
-    end
-    Tween.Pause = function(self) if self.Tween then self.Tween:Pause() end end
-    Tween.Play = function(self) if self.Tween then self.Tween:Play() end end
-    Tween.Clean = function(self) if self.Tween then Tween:Pause() self = nil end end
 end
 
--- ============================================================
--- Instances system
-Instances = {} do
-    Instances.__index = Instances
+if shop then
+	shop = shop.Shop
 
-    Instances.Create = function(self, Class, Properties)
-        local obj = { Instance = InstanceNew(Class), Properties = Properties, Class = Class }
-        setmetatable(obj, Instances)
-        for k, v in obj.Properties do obj.Instance[k] = v end
-        return obj
-    end
+	for _, v in next, shop:GetChildren() do
+		local str = v.Name
 
-    Instances.FadeItem = function(self, Visibility, Speed)
-        local Item = self.Instance
-        if Visibility then Item.Visible = true end
-        local desc = Item:GetDescendants()
-        TableInsert(desc, Item)
-        local t
-        for _, v in desc do
-            local tp = Tween:GetProperty(v)
-            if not tp then continue end
-            if type(tp) == "table" then
-                for _, p in tp do t = Tween:FadeItem(v, p, not Visibility, Speed) end
-            else t = Tween:FadeItem(v, tp, not Visibility, Speed) end
+		local ammoamount, ammolabel, ammoprice = str:match('(%d+)%s*%[([%w%s]+ Ammo)%]%s*%- %$(%d+)')
+		if ammoamount and ammolabel and ammoprice then
+			local key = ammolabel:lower():gsub('%s+ammo', '')
+			ammos[key] = {
+				name = str,
+				amount = tonumber(ammoamount),
+				label = ammolabel,
+				price = tonumber(ammoprice)
+			}
+			continue
+		end
+
+		local gunlabel, gunprice = str:match('%[([%w%s]+)%]%s*%- %$(%d+)')
+		if gunlabel and gunprice then
+			local key = gunlabel:lower()
+			pguns[key] = {
+				name = str,
+				label = gunlabel,
+				price = tonumber(gunprice)
+			}
+		end
+	end
+end
+
+utils.shoot = function(args)
+	replicated.MainEvent:FireServer('ShootGun', args.tool:FindFirstChild('Handle'), args.startposition, args.position, args.part, Vector3.zero)
+end
+
+utils.reload = function(weapon)
+	replicated.MainEvent:FireServer('Reload', weapon)
+end
+
+utils.update = function(position)
+	position = typeof(position) == 'Vector3' and CFrame.new(position) or position;
+	if lplr and lplr.Character and lplr.Character:FindFirstChild('HumanoidRootPart') and position then
+		lplr.Character.HumanoidRootPart.CFrame = position;
+	end
+end
+
+utils.getposition = function(self, player)
+	local ent = player and typeof(player) == 'Instance' and entity.Entities[player.Name]
+
+	if ent and ent.Alive and ent.RootPart then
+		return ent.RootPart.CFrame
+	end
+
+	return nil
+end
+
+utils.needarmor = function(player)
+	player = player or lplr
+    return tonumber(player.Character.BodyEffects.Armor.Value) < 30
+end
+
+utils.hasarmor = function(player)
+ 	player = player or lplr
+    return tonumber(player.Character.BodyEffects.Armor.Value) > 0
+end
+
+utils.getmoney = function(player)
+	local plr = player or lplr
+    if not plr then return end
+
+	repeat task.wait() until plr:FindFirstChild('DataFolder')
+
+    local text = plr.DataFolder:WaitForChild('Currency')
+    return text.Value
+end
+
+utils.getitem = function(name)
+	for _, v in lplr.Character:GetChildren() do
+        if v.Name:lower():find(name) and v:IsA('Tool') then
+            return v;
+        end;
+    end;
+
+    for _, v in lplr.Backpack:GetChildren() do
+        if v.Name:lower():find(name) and v:IsA('Tool') then
+            return v;
+        end;
+    end;
+
+	return nil
+end
+
+utils.redeem = function(code)
+	replicated.MainEvent:FireServer('EnterPromoCode', code)
+end
+
+utils.getname = function(search)
+	search = tostring(search):lower()
+    for _, player in players:GetPlayers() do
+            if player ~= lplr and (player.Name:lower():find(search) or (player.DisplayName and player.DisplayName:lower():find(search))) then
+            return player
         end
     end
+    return nil
+end
 
-    Instances.AddToTheme = function(self, Properties)
-        if not self.Instance then return end
-        Library:AddToTheme(self, Properties)
-    end
+local seed = Random.new()
+local x = function()
+	return seed:NextNumber(-3000, 3000)
+end;
+local yy = function()
+	return seed:NextNumber(2500, 3800)
+end;
 
-    Instances.ChangeItemTheme = function(self, Properties)
-        if not self.Instance then return end
-        Library:ChangeItemTheme(self, Properties)
-    end
-
-    Instances.Connect = function(self, Event, Callback, Name)
-        if not self.Instance or not self.Instance[Event] then return end
-        return Library:Connect(self.Instance[Event], Callback, Name)
-    end
-
-    Instances.Tween = function(self, Info, Goal)
-        if not self.Instance then return end
-        return Tween:Create(self, Info, Goal)
-    end
-
-    Instances.Disconnect = function(self, Name)
-        if not self.Instance then return end
-        return Library:Disconnect(Name)
-    end
-
-    Instances.Clean = function(self)
-        if not self.Instance then return end
-        self.Instance:Destroy()
-        self = nil
-    end
-
-    Instances.MakeDraggable = function(self)
-        if not self.Instance then return end
-        local Gui = self.Instance
-        local Dragging, DragStart, StartPos = false, nil, nil
-        local function Set(Input)
-            local d = Input.Position - DragStart
-            local nx = MathClamp(StartPos.X.Offset + d.X, 0, Gui.Parent.AbsoluteSize.X - Gui.AbsoluteSize.X)
-            local ny = MathClamp(StartPos.Y.Offset + d.Y, 0, Gui.Parent.AbsoluteSize.Y - Gui.AbsoluteSize.Y)
-            self:Tween(TweenInfo.new(0.1, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2New(0, nx, 0, ny) })
-        end
-        local ic
-        self:Connect("InputBegan", function(Input)
-            if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-                Dragging = true
-                DragStart = Input.Position
-                StartPos = Gui.Position
-                if ic then return end
-                ic = Input.Changed:Connect(function()
-                    if Input.UserInputState == Enum.UserInputState.End then
-                        Dragging = false
-                        ic:Disconnect()
-                        ic = nil
-                    end
-                end)
-            end
-        end)
-        Library:Connect(UserInputService.InputChanged, function(Input)
-            if (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) and Dragging then
-                Set(Input)
-            end
-        end)
-    end
-
-    Instances.OnHover = function(self, fn)
-        if not self.Instance then return end
-        return Library:Connect(self.Instance.MouseEnter, fn)
-    end
-
-    Instances.OnHoverLeave = function(self, fn)
-        if not self.Instance then return end
-        return Library:Connect(self.Instance.MouseLeave, fn)
+for i, v in workspace:GetDescendants() do
+    if v:IsA('Seat') then
+        v.Disabled = true
     end
 end
 
--- Font setup
-Library.Font = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
-Library.Fonts["Gotham"] = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
-Library.Fonts["GothamBold"] = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
-Library.Fonts["Montserrat"] = Font.new("rbxasset://fonts/families/Montserrat.json", Enum.FontWeight.Regular)
-Library.espfont = Library.Fonts["Gotham"]
+workspace.DescendantAdded:Connect(function(instance)
+    if instance:IsA('Seat') then
+        instance.Disabled = true
+    end
+end)
 
--- Holders
-Library.Holder = Instances:Create("ScreenGui", {
-    Parent = gethui(), Name = "\0",
-    ZIndexBehavior = Enum.ZIndexBehavior.Global,
-    DisplayOrder = 2, IgnoreGuiInset = true, ResetOnSpawn = false
+workspace:SetAttribute('Server', 'alt control v4 | discord.gg/altcontrol')
+
+utils.purchase = function(type, itemname, last)
+	if type == 'weapon' then
+		local weapon = itemname:gsub('%s*%- %$%d+', '')
+		if lplr.Character:FindFirstChild(weapon) or lplr.Backpack:FindFirstChild(weapon) then
+			return 'owned'
+		end
+		
+		local shop = workspace.Ignored.Shop:FindFirstChild(itemname)
+		local click = shop and shop:FindFirstChildOfClass('ClickDetector')
+		if not click then return 'nosuch' end
+		
+		local name = itemname:gsub('%[', ''):gsub('%]', ''):gsub('%s*%- %$%d+', '')
+		local head = shop:FindFirstChildOfClass('Part') or shop:FindFirstChildOfClass('BasePart') or shop:FindFirstChild('Head')
+
+		if not head then return 'nosuch' end
+		if not shop then return 'nosuch' end
+		
+		local startingmoney = utils.getmoney()
+
+		local saved = {}
+		for i, v in lplr.Character:GetChildren() do
+			if v:IsA('Tool') then
+				table.insert(saved, v)
+				v.Parent = lplr.Backpack
+			end
+		end
+
+		local data = pguns[name:lower()]
+		local part
+
+		local check = false
+		local timeout = tick()
+
+        if data then
+            for i, v in workspace.Ignored.Shop:GetChildren() do
+                if data.name:lower() == v.Name:lower() then
+                    part = v 
+					break
+                end
+            end
+        end
+
+		if not part then
+			return 'nosuch'
+		end
+
+		task.spawn(function()
+			repeat task.wait()
+				check = startingmoney ~= utils.getmoney() or (lplr.Backpack:FindFirstChild(name) or (lplr.Character and lplr.Character:FindFirstChild(name)))
+			until check or tick() - timeout > 0.9
+		end)
+
+		repeat task.wait()
+			utils.update(head.CFrame + Vector3.new(0, 5, 0))
+			if fireclickdetector then
+				fireclickdetector(click)
+			end
+		until check or tick() - timeout > 0.90
+
+		utils.update(CFrame.new(x(), yy(), x()))
+		for i, v in saved do
+			if v then v.Parent = lplr.Character end
+		end
+
+		local tool = lplr.Backpack:FindFirstChild(weapon) or lplr.Character:FindFirstChild(weapon)
+		if tool then
+			tool.Parent = lplr.Character
+		end
+		
+		if tool then
+			table.insert(guns, tool)
+			return 'success'
+		else
+			return 'failed'
+		end
+	elseif type == 'ammo' then
+		local match = string.match(itemname, '%[([A-Za-z]+)%]')
+		if not match then return 'nosuch' end
+
+		local data = ammos[match:lower()]
+		local shop = workspace.Ignored.Shop:FindFirstChild(data.name)
+		local clickdetector = shop and shop:FindFirstChildOfClass('ClickDetector')
+		if not clickdetector then return 'nosuch' end
+
+		local head = shop:FindFirstChildOfClass('Part') or shop:FindFirstChildOfClass('BasePart') or shop:FindFirstChild('Head')
+		if not head then return 'nosuch' end
+
+		local timeout = tick()
+
+		local saved = {}
+		for i, v in lplr.Character:GetChildren() do
+			if v:IsA('Tool') then
+				table.insert(saved, v)
+				v.Parent = lplr.Backpack
+			end
+		end
+
+		repeat task.wait()
+			utils.update(head.CFrame + Vector3.new(0, 5, 0))
+			if fireclickdetector then
+				fireclickdetector(clickdetector)
+			end
+		until tick() - timeout > .75
+
+		for i, v in saved do
+			if v then v.Parent = lplr.Character end
+		end
+
+		if last then
+			utils.update(CFrame.new(x(), yy(), x()))
+		end
+		return 'success'
+	else
+		return 'invalidtype'
+	end
+end
+
+utils.getfullammo = function(tool)
+	if not tool then return end
+	local ammo = lplr.DataFolder.Inventory:FindFirstChild(tool.Name) and lplr.DataFolder.Inventory[tool.Name].Value or 0;
+    return tonumber(ammo)
+end
+
+local bodyeffects = {}
+bodyeffects.get = function(player, beffect)
+	local ent = player and typeof(player) == 'Instance' and entity.Entities[player.Name]
+
+	if ent and ent.Alive and ent.Character:FindFirstChild('BodyEffects') then
+		local be = ent.Character.BodyEffects:FindFirstChild(beffect)
+		if be then
+			return be.Value
+		end
+	end
+
+	return nil
+end
+
+bodyeffects.instance = function(player)
+	if player and player.Character and player.Character:FindFirstChild('BodyEffects') then
+		local be = player.Character.BodyEffects
+		if be then
+			return be
+		end
+	end
+
+	return nil
+end
+
+task.spawn(function()
+	repeat task.wait()
+		if not startergui:GetCoreGuiEnabled(Enum.CoreGuiType.Backpack) then
+			startergui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+		end
+
+		if lplr and lplr.Character then
+			for i, gun in guns do
+				if not gun or not gun.Parent or not (gun.Parent == lplr.Character or gun.Parent == lplr.Backpack) then
+					table.remove(guns, i)
+				end
+			end
+			
+			for i, v in lplr.Character:GetChildren() do
+				if v:IsA('Tool') and v:FindFirstChild('Ammo') then
+					if not table.find(guns, v) then
+						table.insert(guns, v)
+					end
+				end
+			end
+
+			for i, v in lplr.Backpack:GetChildren() do
+				if v:IsA('Tool') and v:FindFirstChild('Ammo') then
+					if not table.find(guns, v) then
+						table.insert(guns, v)
+					end
+				end
+			end
+		end
+	until not game
+end)
+
+-- kill connection
+
+local stomp_offset = 3;
+local stomping = false;
+local killing = false;
+local grabbing = false;
+local assist = false;
+local mode = 'kill';
+local sentry = false;
+local stop = false;
+local watermark = false;
+local target = nil;
+local autogun = false;
+local buyinammo = false;
+local void = true;
+local ka = false;
+local karange = 35;
+local whitelist = {};
+local automask = false;
+local autoarmor = false;
+
+local showtarget = altcontrol.owners[1] or nil;
+local show = showtarget ~= nil;
+
+local default = 'rbxassetid://5917459365';
+local currentanim;
+
+local anims = {
+	kickinglegs = 120370790028350,
+	spongebobdance = 18443245017,
+	teleport = 104767795538635,
+	crossed = 128386160365167,
+	imagination = 18443237526,
+	yungblud = 15609995579,
+	laugh = 3337966527,
+	floss = 5917459365,
+	sleep = 4686925579,
+	hype = 3695333486,
+	sad = 4841407203
+};
+
+if altcontrol and altcontrol.emotes then
+	for i, v in altcontrol.emotes do
+		anims[i] = v
+	end
+end
+
+local loadanimation = function(animation, speed)
+	if not lplr or not lplr.Character or not lplr.Character:FindFirstChildOfClass('Humanoid') or not lplr.Character.Humanoid:FindFirstChild('Animator') then
+		return;
+	end;
+
+	if currentanim then
+		currentanim:Stop()
+	end
+
+	currentanim = nil
+
+	local anim = Instance.new('Animation')
+	local id = tostring(animation)
+
+	if not id:match('^rbxassetid://') then
+		id = 'rbxassetid://' .. id
+	end
+	
+	anim.AnimationId = id
+
+	local track = lplr.Character.Humanoid.Animator:LoadAnimation(anim)
+	track.Priority = Enum.AnimationPriority.Action4
+	track.Looped = true
+	track:Play()
+
+	track:AdjustSpeed(speed or 1)
+
+	currentanim = track
+	return track
+end;
+
+local m = function()
+	return math.rad(seed:NextInteger(-360, 360));
+end;
+
+local localent = entity.Entities.LocalPlayer
+
+local newins = function(t, args)
+    local ins = Instance.new(t);
+
+    for i, v in args do
+        ins[i] = v;
+    end;
+
+    return ins;
+end
+
+local screen = newins('ScreenGui', {
+    Parent = game:GetService('CoreGui'),
+    Name = 'altcontrol'
 })
-Library.UnusedHolder = Instances:Create("ScreenGui", {
-    Parent = gethui(), Name = "\0",
-    ZIndexBehavior = Enum.ZIndexBehavior.Global,
-    Enabled = false, ResetOnSpawn = false
-})
-Library.NotifHolder = Instances:Create("Frame", {
-    Parent = Library.Holder.Instance, Name = "\0",
-    AnchorPoint = Vector2New(1, 1),
+
+local info = newins('TextLabel', {
+    Position = UDim2.new(0.5, 0, 0.55, 0),
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    TextStrokeColor3 = Color3.new(),
+    TextColor3 = Color3.new(1, 1, 1),
+    Size = UDim2.new(0.2, 0, 0.2, 0),
+    FontSize = Enum.FontSize.Size14,
     BackgroundTransparency = 1,
-    Position = UDim2New(1, -12, 1, -12),
-    Size = UDim2New(0, 0, 1, 0),
-    AutomaticSize = Enum.AutomaticSize.X,
-    BorderSizePixel = 0,
-    BackgroundColor3 = FromRGB(255,255,255)
-})
-Instances:Create("UIListLayout", {
-    Parent = Library.NotifHolder.Instance, Name = "\0",
-    SortOrder = Enum.SortOrder.LayoutOrder,
-    HorizontalAlignment = Enum.HorizontalAlignment.Right,
-    VerticalAlignment = Enum.VerticalAlignment.Bottom,
-    Padding = UDimNew(0, 6)
-})
+    TextStrokeTransparency = 0,
+    Font = Enum.Font.Code,
+    RichText = true,
+    Parent = screen,
+    Text = ''
+});
 
--- ============================================================
--- Library methods
-Library.Unload = function(self)
-    for _, c in self.Connections do c.Connection:Disconnect() end
-    for _, t in self.Threads do coroutine.close(t) end
-    if self.Holder then self.Holder:Clean() end
-    Library = nil
-    getgenv().Library = nil
+if altcontrol and altcontrol.whitelist then
+	for i, v in altcontrol.whitelist do
+		table.insert(whitelist, v)
+	end
 end
 
-Library.Round = function(self, Number, Float)
-    local m = 1 / (Float or 1)
-    return MathFloor(Number * m) / m
+task.spawn(function()
+	repeat task.wait()
+		if target and killing then
+			if bodyeffects.get(target, 'K.O') then
+				killing = false
+				camera.CameraSubject = lplr.Character.Humanoid
+				utils.update(CFrame.new(x(), yy(), x()))
+				info.Text = ''
+				target = nil
+				continue
+			end
+
+			if not players:FindFirstChild(target.Name) then
+				killing = false
+				camera.CameraSubject = lplr.Character.Humanoid
+				utils.update(CFrame.new(x(), yy(), x()))
+				info.Text = ''
+				target = nil
+				continue
+			end
+		end
+	until not game
+end)
+
+local t = 0
+local circlepos = function(t, r)
+    local x = math.cos(t * 20) * r
+    local y = math.sin(t * 20) * r
+    return x, y
 end
 
-Library.Thread = function(self, Function)
-    local t = coroutine.create(Function)
-    coroutine.wrap(function() coroutine.resume(t) end)()
-    TableInsert(self.Threads, t)
-    return t
-end
-
-Library.SafeCall = function(self, Function, ...)
-    local args = { ... }
-    local ok, res = pcall(Function, TableUnpack(args))
-    if not ok then
-        LocalPlayer:Kick("LinoriaStyle Error: " .. tostring(res))
-        return false
-    end
-    return ok
-end
-
-Library.Connect = function(self, Event, Callback, Name)
-    Name = Name or StringFormat("conn_%s_%s", self.UnnamedConnections + 1, HttpService:GenerateGUID(false))
-    local c = { Event = Event, Callback = Callback, Name = Name, Connection = nil }
-    Library:Thread(function() c.Connection = Event:Connect(Callback) end)
-    TableInsert(self.Connections, c)
-    return c
-end
-
-Library.Disconnect = function(self, Name)
-    for _, c in self.Connections do
-        if c.Name == Name then c.Connection:Disconnect() break end
-    end
-end
-
-Library.EscapePattern = function(self, s)
-    if string.match(s, "[%(%)%.%%%+%-%*%?%[%]%^%$]") then
-        return StringGSub(s, "[%(%)%.%%%+%-%*%?%[%]%^%$]", "%%%1")
-    end
-    return s
-end
-
-Library.NextFlag = function(self)
-    return StringFormat("flag_%s_%s", self.UnnamedFlags + 1, HttpService:GenerateGUID(false))
-end
-
-Library.AddToTheme = function(self, Item, Properties)
-    Item = Item.Instance or Item
-    local td = { Item = Item, Properties = Properties }
-    for p, v in td.Properties do
-        if type(v) == "string" then Item[p] = self.Theme[v]
-        else Item[p] = v() end
-    end
-    TableInsert(self.ThemeItems, td)
-    self.ThemeMap[Item] = td
-end
-
-Library.ChangeItemTheme = function(self, Item, Properties)
-    Item = Item.Instance or Item
-    if not self.ThemeMap[Item] then return end
-    self.ThemeMap[Item].Properties = Properties
-end
-
-Library.ChangeTheme = function(self, ThemeName, Color)
-    self.Theme[ThemeName] = Color
-    for _, item in self.ThemeItems do
-        for p, v in item.Properties do
-            if type(v) == "string" and v == ThemeName then item.Item[p] = Color
-            elseif type(v) == "function" then item.Item[p] = v() end
-        end
-    end
-end
-
-Library.GetLighterColor = function(self, Color, Inc)
-    local h, s, v = Color:ToHSV()
-    return FromHSV(h, s, MathClamp(v * Inc, 0, 1))
-end
-
-Library.IsMouseOverFrame = function(self, Frame)
-    Frame = Frame.Instance
-    local mp = Vector2New(Mouse.X, Mouse.Y)
-    return mp.X >= Frame.AbsolutePosition.X and mp.X <= Frame.AbsolutePosition.X + Frame.AbsoluteSize.X
-        and mp.Y >= Frame.AbsolutePosition.Y and mp.Y <= Frame.AbsolutePosition.Y + Frame.AbsoluteSize.Y
-end
-
-Library.GetConfig = function(self)
-    local Config = {}
-    Library:SafeCall(function()
-        for i, v in Library.Flags do
-            if type(v) == "table" and v.Key then
-                Config[i] = { Key = tostring(v.Key), Mode = v.Mode, Toggled = v.Toggled }
-            elseif type(v) == "table" and v.Color then
-                Config[i] = { Color = "#" .. v.HexValue, Alpha = v.Alpha }
-            else
-                Config[i] = v
-            end
-        end
-    end)
-    return HttpService:JSONEncode(Config)
-end
-
-Library.LoadConfig = function(self, Config)
-    local d = HttpService:JSONDecode(Config)
-    return Library:SafeCall(function()
-        for i, v in d do
-            local fn = Library.SetFlags[i]
-            if not fn then continue end
-            if type(v) == "table" and v.Key then fn(v)
-            elseif type(v) == "table" and v.Color then fn(v.Color, v.Alpha)
-            else fn(v) end
-        end
-    end)
-end
-
-Library.DeleteConfig = function(self, Config)
-    local path = Library.Folders.Configs .. "/" .. Config
-    if isfile(path) then delfile(path) end
-end
-
-Library.RefreshConfigsList = function(self, Element)
-    local list = listfiles(Library.Folders.Configs)
-    local ret = {}
-    for _, f in list do
-        if f:sub(-5) == ".json" then
-            local pos = f:find(".json", 1, true)
-            local start = pos
-            local ch = f:sub(pos, pos)
-            while ch ~= "/" and ch ~= "\\" and ch ~= "" do
-                pos = pos - 1
-                ch = f:sub(pos, pos)
-            end
-            if ch == "/" or ch == "\\" then
-                TableInsert(ret, f:sub(pos + 1, start - 1))
-            end
-        end
-    end
-    Element:Refresh(ret)
-end
-
--- ============================================================
--- Helper: UICorner
-local function Corner(parent, radius)
-    local c = InstanceNew("UICorner")
-    c.CornerRadius = UDimNew(0, radius or 4)
-    c.Parent = parent
-    return c
-end
-
--- ============================================================
--- Colorpicker
-Library.CreateColorpicker = function(self, Data)
-    local Colorpicker = {
-        Hue = 0, Saturation = 0, Value = 0, Alpha = 0,
-        IsOpen = false, IsOpen2 = false,
-        Color = FromRGB(0,0,0), HexValue = "000000",
-        Flag = Data.Flag
-    }
-
-    local T = Library.Theme
-    local Items = {}
-
-    -- FIX: Swatch shows actual picked colour (not accent/placeholder)
-    Items["ColorpickerButton"] = Instances:Create("TextButton", {
-        Parent = Data.Parent.Instance, Name = "\0",
-        FontFace = Library.Font, TextColor3 = FromRGB(0,0,0),
-        Text = "", AutoButtonColor = false,
-        Size = UDim2New(0, 16, 0, 16),
-        BorderSizePixel = 0, TextSize = 13,
-        BackgroundColor3 = FromRGB(255, 255, 255)  -- will be updated on Set()
-    })
-    Corner(Items["ColorpickerButton"].Instance, 3)
-
-    Instances:Create("UIStroke", {
-        Parent = Items["ColorpickerButton"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1,
-        LineJoinMode = Enum.LineJoinMode.Miter,
-        ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    }):AddToTheme({ Color = "Border" })
-
-    Items["ColorpickerWindow"] = Instances:Create("Frame", {
-        Parent = Library.UnusedHolder.Instance, Name = "\0",
-        Visible = false,
-        Position = UDim2New(0, 0, 0, 0),
-        Size = UDim2New(0, 238, 0, 260),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Surface
-    })
-    Corner(Items["ColorpickerWindow"].Instance, 6)
-
-    Instances:Create("UIStroke", {
-        Parent = Items["ColorpickerWindow"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1,
-        LineJoinMode = Enum.LineJoinMode.Miter
-    }):AddToTheme({ Color = "Border" })
-
-    Items["Palette"] = Instances:Create("TextButton", {
-        Parent = Items["ColorpickerWindow"].Instance, Name = "\0",
-        Text = "", AutoButtonColor = false,
-        Position = UDim2New(0, 8, 0, 8),
-        Size = UDim2New(1, -32, 1, -56),
-        BorderSizePixel = 0, ZIndex = 2,
-        BackgroundColor3 = FromRGB(255,0,0)
-    })
-    Corner(Items["Palette"].Instance, 3)
-
-    Items["Saturation"] = Instances:Create("Frame", {
-        Parent = Items["Palette"].Instance, Name = "\0",
-        Size = UDim2New(1,0,1,0), BorderSizePixel = 0, ZIndex = 2,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Corner(Items["Saturation"].Instance, 3)
-    Instances:Create("UIGradient", {
-        Parent = Items["Saturation"].Instance, Name = "\0",
-        Transparency = NumSequence{ NumSequenceKeypoint(0,1), NumSequenceKeypoint(1,0) }
-    })
-
-    Items["Value"] = Instances:Create("Frame", {
-        Parent = Items["Palette"].Instance, Name = "\0",
-        Size = UDim2New(1,0,1,0), BorderSizePixel = 0, ZIndex = 2,
-        BackgroundColor3 = FromRGB(0,0,0)
-    })
-    Corner(Items["Value"].Instance, 3)
-    Instances:Create("UIGradient", {
-        Parent = Items["Value"].Instance, Name = "\0",
-        Rotation = 90,
-        Transparency = NumSequence{ NumSequenceKeypoint(0,1), NumSequenceKeypoint(1,0) }
-    })
-
-    Items["PaletteDragger"] = Instances:Create("Frame", {
-        Parent = Items["Palette"].Instance, Name = "\0",
-        Size = UDim2New(0,10,0,10), AnchorPoint = Vector2New(0.5,0.5),
-        Position = UDim2New(0,8,0,8), BorderSizePixel = 0, ZIndex = 4,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Corner(Items["PaletteDragger"].Instance, 99)
-    Instances:Create("UIStroke", {
-        Parent = Items["PaletteDragger"].Instance, Name = "\0",
-        Color = FromRGB(0,0,0), Thickness = 1.5
-    })
-
-    Items["Hue"] = Instances:Create("TextButton", {
-        Parent = Items["ColorpickerWindow"].Instance, Name = "\0",
-        Text = "", AutoButtonColor = false,
-        AnchorPoint = Vector2New(1,0),
-        Position = UDim2New(1, -8, 0, 8),
-        Size = UDim2New(0, 12, 1, -56), ZIndex = 2,
-        BorderSizePixel = 0, BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Corner(Items["Hue"].Instance, 3)
-
-    Items["HueInline"] = Instances:Create("TextButton", {
-        Parent = Items["Hue"].Instance, Name = "\0",
-        Text = "", AutoButtonColor = false,
-        Size = UDim2New(1,0,1,0), ZIndex = 2,
-        BorderSizePixel = 0, BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Corner(Items["HueInline"].Instance, 3)
-    Instances:Create("UIGradient", {
-        Parent = Items["HueInline"].Instance, Name = "\0",
-        Rotation = 90,
-        Color = RGBSequence{
-            RGBSequenceKeypoint(0, FromRGB(255,0,0)),
-            RGBSequenceKeypoint(0.17, FromRGB(255,255,0)),
-            RGBSequenceKeypoint(0.33, FromRGB(0,255,0)),
-            RGBSequenceKeypoint(0.5, FromRGB(0,255,255)),
-            RGBSequenceKeypoint(0.67, FromRGB(0,0,255)),
-            RGBSequenceKeypoint(0.83, FromRGB(255,0,255)),
-            RGBSequenceKeypoint(1, FromRGB(255,0,0))
-        }
-    })
-
-    Items["HueDragger"] = Instances:Create("Frame", {
-        Parent = Items["Hue"].Instance, Name = "\0",
-        Size = UDim2New(1,0,0,3), AnchorPoint = Vector2New(0,0.5),
-        Position = UDim2New(0,0,0,0), ZIndex = 3,
-        BorderSizePixel = 0, BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Corner(Items["HueDragger"].Instance, 2)
-    Instances:Create("UIStroke", {
-        Parent = Items["HueDragger"].Instance, Name = "\0",
-        Color = FromRGB(0,0,0), Thickness = 1
-    })
-
-    Items["Alpha"] = Instances:Create("TextButton", {
-        Parent = Items["ColorpickerWindow"].Instance, Name = "\0",
-        Text = "", AutoButtonColor = false,
-        AnchorPoint = Vector2New(0,1),
-        Position = UDim2New(0, 8, 1, -28),
-        Size = UDim2New(1, -28, 0, 10), ZIndex = 2,
-        BorderSizePixel = 0, BackgroundColor3 = FromRGB(140,255,213)
-    })
-    Corner(Items["Alpha"].Instance, 3)
-
-    Items["Checkers"] = Instances:Create("ImageLabel", {
-        Parent = Items["Alpha"].Instance, Name = "\0",
-        ScaleType = Enum.ScaleType.Tile,
-        TileSize = UDim2New(0,6,0,6),
-        Image = "http://www.roblox.com/asset/?id=18274452449",
-        BackgroundTransparency = 1,
-        Size = UDim2New(1,0,1,0), ZIndex = 2,
-        BorderSizePixel = 0, BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Instances:Create("UIGradient", {
-        Parent = Items["Checkers"].Instance, Name = "\0",
-        Transparency = NumSequence{ NumSequenceKeypoint(0,1), NumSequenceKeypoint(0.37,0.5), NumSequenceKeypoint(1,0) }
-    })
-
-    Items["AlphaDragger"] = Instances:Create("Frame", {
-        Parent = Items["Alpha"].Instance, Name = "\0",
-        Size = UDim2New(0,3,1,0), AnchorPoint = Vector2New(0.5,0),
-        Position = UDim2New(0,8,0,0), ZIndex = 3,
-        BorderSizePixel = 0, BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Corner(Items["AlphaDragger"].Instance, 2)
-    Instances:Create("UIStroke", {
-        Parent = Items["AlphaDragger"].Instance, Name = "\0",
-        Color = FromRGB(0,0,0), Thickness = 1
-    })
-
-    Items["HexInput"] = Instances:Create("TextBox", {
-        Parent = Items["ColorpickerWindow"].Instance, Name = "\0",
-        FontFace = Library.Font,
-        ClearTextOnFocus = false,
-        TextColor3 = T.Text,
-        Text = "",
-        AnchorPoint = Vector2New(0,1),
-        Size = UDim2New(1, -16, 0, 20),
-        PlaceholderColor3 = T.TextMuted,
-        Position = UDim2New(0, 8, 1, -4),
-        BorderSizePixel = 0, TextSize = 12,
-        BackgroundColor3 = T.Element
-    })
-    Corner(Items["HexInput"].Instance, 3)
-    Items["HexInput"]:AddToTheme({ TextColor3 = "Text", BackgroundColor3 = "Element" })
-
-    Instances:Create("UIPadding", {
-        Parent = Items["HexInput"].Instance, Name = "\0",
-        PaddingLeft = UDimNew(0, 6)
-    })
-
-    Items["ColorpickerWindow2"] = Instances:Create("Frame", {
-        Parent = Library.UnusedHolder.Instance, Name = "\0",
-        Position = UDim2New(0,0,0,0),
-        Size = UDim2New(0,80,0,0),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Surface,
-        AutomaticSize = Enum.AutomaticSize.Y
-    })
-    Corner(Items["ColorpickerWindow2"].Instance, 5)
-    Instances:Create("UIStroke", {
-        Parent = Items["ColorpickerWindow2"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1
-    }):AddToTheme({ Color = "Border" })
-    Instances:Create("UIListLayout", {
-        Parent = Items["ColorpickerWindow2"].Instance, Name = "\0",
-        Padding = UDimNew(0, 1), SortOrder = Enum.SortOrder.LayoutOrder
-    })
-    Instances:Create("UIPadding", {
-        Parent = Items["ColorpickerWindow2"].Instance, Name = "\0",
-        PaddingTop = UDimNew(0, 4), PaddingBottom = UDimNew(0, 4),
-        PaddingLeft = UDimNew(0, 4), PaddingRight = UDimNew(0, 4)
-    })
-
-    local function AddCPButton(Name, Callback)
-        local btn = Instances:Create("TextButton", {
-            Parent = Items["ColorpickerWindow2"].Instance, Name = "\0",
-            FontFace = Library.Font, TextColor3 = T.Text,
-            Text = Name, AutoButtonColor = false,
-            BackgroundTransparency = 1,
-            Size = UDim2New(1,0,0,20),
-            BorderSizePixel = 0, TextSize = 12,
-            BackgroundColor3 = T.ElementHover
-        })
-        btn:AddToTheme({ TextColor3 = "Text" })
-        btn:Connect("MouseButton1Down", function()
-            Callback()
-            Colorpicker:SetOpen2(false)
-        end)
-        return btn
-    end
-
-    AddCPButton("Copy", function()
-        local r,g,b = MathFloor(Colorpicker.Color.R*255), MathFloor(Colorpicker.Color.G*255), MathFloor(Colorpicker.Color.B*255)
-        setclipboard(r..","..g..","..b)
-        Library.CopiedColor = r..","..g..","..b
-    end)
-    AddCPButton("Paste", function()
-        if Library.CopiedColor then
-            local r,g,b = Library.CopiedColor:match("(%d+),%s*(%d+),%s*(%d+)")
-            Colorpicker:Set({tonumber(r),tonumber(g),tonumber(b)}, Colorpicker.Alpha)
-        end
-    end)
-
-    local SlidingPalette, SlidingHue, SlidingAlpha = false, false, false
-    local Debounce = false
-    local RenderStepped, RenderStepped2
-
-    function Colorpicker:Get() return Colorpicker.Color, Colorpicker.Alpha end
-
-    function Colorpicker:SetOpen(Bool)
-        if Debounce then return end
-        Colorpicker.IsOpen = Bool
-        Debounce = true
-        if Colorpicker.IsOpen then
-            Items["ColorpickerWindow"].Instance.Visible = true
-            Items["ColorpickerWindow"].Instance.Parent = Library.Holder.Instance
-            RenderStepped = RunService.RenderStepped:Connect(function()
-                Items["ColorpickerWindow"].Instance.Position = UDim2New(0,
-                    Items["ColorpickerButton"].Instance.AbsolutePosition.X,
-                    0,
-                    Items["ColorpickerButton"].Instance.AbsolutePosition.Y + Items["ColorpickerButton"].Instance.AbsoluteSize.Y + 65)
-            end)
-            for _, v in Library.OpenFrames do
-                if v ~= Colorpicker then v:SetOpen(false) end
-            end
-            Library.OpenFrames[Colorpicker] = Colorpicker
-        else
-            Library.OpenFrames[Colorpicker] = nil
-            if RenderStepped then RenderStepped:Disconnect() RenderStepped = nil end
-        end
-
-        local desc = Items["ColorpickerWindow"].Instance:GetDescendants()
-        TableInsert(desc, Items["ColorpickerWindow"].Instance)
-        local nt
-        for _, v in desc do
-            local tp = Tween:GetProperty(v)
-            if not tp then continue end
-            if not v.ClassName:find("UI") then v.ZIndex = Colorpicker.IsOpen and 104 or 1 end
-            if type(tp) == "table" then
-                for _, p in tp do nt = Tween:FadeItem(v, p, Bool, Library.FadeSpeed) end
-            else nt = Tween:FadeItem(v, tp, Bool, Library.FadeSpeed) end
-        end
-        nt.Tween.Completed:Connect(function()
-            Debounce = false
-            Items["ColorpickerWindow"].Instance.Visible = Colorpicker.IsOpen
-            task.wait(0.2)
-            Items["ColorpickerWindow"].Instance.Parent = not Colorpicker.IsOpen and Library.UnusedHolder.Instance or Library.Holder.Instance
-        end)
-    end
-
-    function Colorpicker:SetOpen2(Bool)
-        Colorpicker.IsOpen2 = Bool
-        if Bool then
-            Items["ColorpickerWindow2"].Instance.Visible = true
-            Items["ColorpickerWindow2"].Instance.Parent = Library.Holder.Instance
-            RenderStepped2 = RunService.RenderStepped:Connect(function()
-                Items["ColorpickerWindow2"].Instance.Position = UDim2New(0,
-                    Items["ColorpickerButton"].Instance.AbsolutePosition.X + Items["ColorpickerButton"].Instance.AbsoluteSize.X,
-                    0,
-                    Items["ColorpickerButton"].Instance.AbsolutePosition.Y + Items["ColorpickerButton"].Instance.AbsoluteSize.Y + 65)
-            end)
-        else
-            if RenderStepped2 then RenderStepped2:Disconnect() RenderStepped2 = nil end
-            Items["ColorpickerWindow2"].Instance.Visible = false
-            Items["ColorpickerWindow2"].Instance.Parent = Library.UnusedHolder.Instance
-        end
-    end
-
-    function Colorpicker:SlidePalette(Input)
-        if not Input or not SlidingPalette then return end
-        -- FIX: correct saturation/value calculation
-        local px = Items["Palette"].Instance.AbsolutePosition
-        local ps = Items["Palette"].Instance.AbsoluteSize
-        local dx = MathClamp((Input.Position.X - px.X) / ps.X, 0, 1)
-        local dy = MathClamp((Input.Position.Y - px.Y) / ps.Y, 0, 1)
-        Colorpicker.Saturation = dx          -- left=0 right=1
-        Colorpicker.Value      = 1 - dy      -- top=1 bottom=0
-        Items["PaletteDragger"]:Tween(TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-            { Position = UDim2New(MathClamp(dx,0,0.99), 0, MathClamp(dy,0,0.99), 0) })
-        Colorpicker:Update()
-    end
-
-    function Colorpicker:SlideHue(Input)
-        if not Input or not SlidingHue then return end
-        Colorpicker.Hue = MathClamp((Input.Position.Y - Items["Hue"].Instance.AbsolutePosition.Y) / Items["Hue"].Instance.AbsoluteSize.Y, 0, 1)
-        local dy = MathClamp((Input.Position.Y - Items["Hue"].Instance.AbsolutePosition.Y) / Items["Hue"].Instance.AbsoluteSize.Y, 0, 0.99)
-        Items["HueDragger"]:Tween(TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2New(0,0,dy,0) })
-        Colorpicker:Update()
-    end
-
-    function Colorpicker:SlideAlpha(Input)
-        if not Input or not SlidingAlpha then return end
-        Colorpicker.Alpha = MathClamp((Input.Position.X - Items["Alpha"].Instance.AbsolutePosition.X) / Items["Alpha"].Instance.AbsoluteSize.X, 0, 1)
-        local dx = MathClamp((Input.Position.X - Items["Alpha"].Instance.AbsolutePosition.X) / Items["Alpha"].Instance.AbsoluteSize.X, 0, 0.99)
-        Items["AlphaDragger"]:Tween(TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2New(dx,0,0,0) })
-        Colorpicker:Update(true)
-    end
-
-    function Colorpicker:Update(IsFromAlpha)
-        Colorpicker.Color = FromHSV(Colorpicker.Hue, Colorpicker.Saturation, Colorpicker.Value)
-        Colorpicker.HexValue = Colorpicker.Color:ToHex()
-        Library.Flags[Colorpicker.Flag] = { Alpha = Colorpicker.Alpha, Color = Colorpicker.Color, HexValue = Colorpicker.HexValue, Transparency = 1 - Colorpicker.Alpha }
-        Items["ColorpickerButton"]:Tween(nil, { BackgroundColor3 = Colorpicker.Color })
-        Items["Palette"]:Tween(nil, { BackgroundColor3 = FromHSV(Colorpicker.Hue, 1, 1) })
-        Items["HexInput"].Instance.Text = "#" .. Colorpicker.HexValue
-        if not IsFromAlpha then Items["Alpha"]:Tween(nil, { BackgroundColor3 = Colorpicker.Color }) end
-        if Data.Callback then Library:SafeCall(Data.Callback, Colorpicker.Color, Colorpicker.Alpha) end
-    end
-
-    function Colorpicker:Set(Color, Alpha)
-        if type(Color) == "table" then Color = FromRGB(Color[1], Color[2], Color[3])
-        elseif type(Color) == "string" then Color = FromHex(Color) end
-        Colorpicker.Hue, Colorpicker.Saturation, Colorpicker.Value = Color:ToHSV()
-        Colorpicker.Alpha = Alpha or 0
-        -- FIX: sat=X (left to right), value=Y inverted (top=white, bottom=black)
-        Items["PaletteDragger"]:Tween(TweenInfo.new(0.1,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),
-            { Position = UDim2New(MathClamp(Colorpicker.Saturation,0,0.99),0,MathClamp(1-Colorpicker.Value,0,0.99),0) })
-        Items["HueDragger"]:Tween(TweenInfo.new(0.1,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), { Position = UDim2New(0,0,MathClamp(Colorpicker.Hue,0,0.99),0) })
-        Items["AlphaDragger"]:Tween(TweenInfo.new(0.1,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), { Position = UDim2New(MathClamp(Colorpicker.Alpha,0,0.99),0,0,0) })
-        Colorpicker:Update(false)
-    end
-
-    Items["Palette"]:Connect("InputBegan", function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then SlidingPalette = true Colorpicker:SlidePalette(i) end end)
-    Items["Palette"]:Connect("InputEnded", function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then SlidingPalette = false end end)
-    Items["HueInline"]:Connect("InputBegan", function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then SlidingHue = true Colorpicker:SlideHue(i) end end)
-    Items["HueInline"]:Connect("InputEnded", function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then SlidingHue = false end end)
-    Items["Alpha"]:Connect("InputBegan", function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then SlidingAlpha = true Colorpicker:SlideAlpha(i) end end)
-    Items["Alpha"]:Connect("InputEnded", function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then SlidingAlpha = false end end)
-    Items["HexInput"]:Connect("FocusLost", function() Colorpicker:Set(tostring(Items["HexInput"].Instance.Text), Colorpicker.Alpha) end)
-    Items["ColorpickerButton"]:Connect("MouseButton1Down", function() Colorpicker:SetOpen(not Colorpicker.IsOpen) end)
-    Items["ColorpickerButton"]:Connect("MouseButton2Down", function() Colorpicker:SetOpen2(not Colorpicker.IsOpen2) end)
-
-    Library:Connect(UserInputService.InputChanged, function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseMovement then
-            if SlidingPalette then Colorpicker:SlidePalette(Input)
-            elseif SlidingHue then Colorpicker:SlideHue(Input)
-            elseif SlidingAlpha then Colorpicker:SlideAlpha(Input) end
-        end
-    end)
-    Library:Connect(UserInputService.InputBegan, function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-            if not Colorpicker.IsOpen then return end
-            if Library:IsMouseOverFrame(Items["ColorpickerWindow"]) or Library:IsMouseOverFrame(Items["ColorpickerWindow2"]) then return end
-            Colorpicker:SetOpen(false) Colorpicker:SetOpen2(false)
-        end
-    end)
-
-    if Data.Default then Colorpicker:Set(Data.Default, Data.Alpha) end
-    Library.SetFlags[Colorpicker.Flag] = function(c, a) Colorpicker:Set(c, a) end
-    return Colorpicker, Items
-end
-
--- ============================================================
--- Keybind
-Library.CreateKeybind = function(self, Data)
-    local Keybind = {
-        IsOpen = false, Key = "", Toggled = false, Mode = "",
-        Flag = Data.Flag, Picking = false, Value = ""
-    }
-
-    local KeyListItem
-    if Library.KeyList then KeyListItem = Library.KeyList:Add("", "") end
-
-    local Items = {}
-    local T = Library.Theme
-
-    Items["KeyButton"] = Instances:Create("TextButton", {
-        Parent = Data.Parent.Instance, Name = "\0",
-        FontFace = Library.Font, TextColor3 = T.TextMuted,
-        Text = "[ Unbound ]", AutoButtonColor = false,
-        Size = UDim2New(0,0,0,16),
-        BorderSizePixel = 0, TextSize = 11,
-        AutomaticSize = Enum.AutomaticSize.X,
-        BackgroundColor3 = T.Element
-    })
-    Corner(Items["KeyButton"].Instance, 3)
-    Instances:Create("UIPadding", { Parent = Items["KeyButton"].Instance, Name = "\0",
-        PaddingLeft = UDimNew(0,6), PaddingRight = UDimNew(0,6) })
-    Items["KeyButton"]:AddToTheme({ TextColor3 = "TextMuted", BackgroundColor3 = "Element" })
-
-    Items["KeybindWindow"] = Instances:Create("Frame", {
-        Parent = Library.UnusedHolder.Instance, Name = "\0",
-        Visible = false, ZIndex = 5,
-        Size = UDim2New(0,90,0,72),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Surface
-    })
-    Corner(Items["KeybindWindow"].Instance, 5)
-    Instances:Create("UIStroke", { Parent = Items["KeybindWindow"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
-    Instances:Create("UIPadding", { Parent = Items["KeybindWindow"].Instance, Name = "\0",
-        PaddingTop = UDimNew(0,4), PaddingBottom = UDimNew(0,4),
-        PaddingLeft = UDimNew(0,4), PaddingRight = UDimNew(0,4) })
-    Instances:Create("UIListLayout", { Parent = Items["KeybindWindow"].Instance, Name = "\0",
-        Padding = UDimNew(0,2), SortOrder = Enum.SortOrder.LayoutOrder })
-
-    local function MakeMode(name)
-        local btn = Instances:Create("TextButton", {
-            Parent = Items["KeybindWindow"].Instance, Name = "\0",
-            FontFace = Library.Font, TextColor3 = T.TextMuted,
-            Text = name, AutoButtonColor = false,
-            BackgroundTransparency = 1,
-            Size = UDim2New(1,0,0,20),
-            BorderSizePixel = 0, TextSize = 12,
-            BackgroundColor3 = T.ElementHover
-        })
-        Corner(btn.Instance, 3)
-        btn:AddToTheme({ TextColor3 = "TextMuted" })
-        local liner = Instances:Create("Frame", {
-            Parent = btn.Instance, Name = "\0",
-            BackgroundTransparency = 1,
-            Size = UDim2New(0,2,0.6,0),
-            AnchorPoint = Vector2New(0,0.5),
-            Position = UDim2New(0,2,0.5,0),
-            BorderSizePixel = 0,
-            BackgroundColor3 = T.Accent
-        })
-        Corner(liner.Instance, 2)
-        liner:AddToTheme({ BackgroundColor3 = "Accent" })
-        return btn, liner
-    end
-
-    local ToggleBtn, ToggleLiner = MakeMode("Toggle")
-    local HoldBtn, HoldLiner = MakeMode("Hold")
-    local AlwaysBtn, AlwaysLiner = MakeMode("Always On")
-
-    Items["Toggle"] = ToggleBtn
-    Items["ToggleLiner"] = ToggleLiner
-    Items["Hold"] = HoldBtn
-    Items["HoldLiner"] = HoldLiner
-    Items["AlwaysOn"] = AlwaysBtn
-    Items["AlwaysOnLiner"] = AlwaysLiner
-
-    Items["KeyButton"]:OnHover(function()
-        Items["KeyButton"]:Tween(nil, { BackgroundColor3 = Library:GetLighterColor(Library.Theme.Element, 1.4) })
-    end)
-    Items["KeyButton"]:OnHoverLeave(function()
-        Items["KeyButton"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
-    end)
-
-    local Modes = {
-        ["Toggle"] = { ToggleBtn, ToggleLiner },
-        ["Hold"] = { HoldBtn, HoldLiner },
-        ["Always On"] = { AlwaysBtn, AlwaysLiner }
-    }
-
-    function Keybind:Get() return Keybind.Mode, Keybind.Key, Keybind.Toggled end
-
-    local Update = function()
-        if KeyListItem then
-            KeyListItem:SetText(Data.Name, Keybind.Value)
-            KeyListItem:SetStatus(Keybind.Toggled)
-        end
-    end
-
-    local KbDebounce = false
-    local KbRenderStepped
-
-    function Keybind:SetOpen(Bool)
-        if KbDebounce then return end
-        Keybind.IsOpen = Bool
-        KbDebounce = true
-        if Keybind.IsOpen then
-            Items["KeybindWindow"].Instance.Visible = true
-            Items["KeybindWindow"].Instance.Parent = Library.Holder.Instance
-            KbRenderStepped = RunService.RenderStepped:Connect(function()
-                Items["KeybindWindow"].Instance.Position = UDim2New(0,
-                    Items["KeyButton"].Instance.AbsolutePosition.X,
-                    0,
-                    Items["KeyButton"].Instance.AbsolutePosition.Y + Items["KeyButton"].Instance.AbsoluteSize.Y + 65)
-            end)
-        else
-            if KbRenderStepped then KbRenderStepped:Disconnect() KbRenderStepped = nil end
-        end
-        local desc = Items["KeybindWindow"].Instance:GetDescendants()
-        TableInsert(desc, Items["KeybindWindow"].Instance)
-        local nt
-        for _, v in desc do
-            local tp = Tween:GetProperty(v)
-            if not tp then continue end
-            if type(tp) == "table" then
-                for _, p in tp do nt = Tween:FadeItem(v, p, Bool, Library.FadeSpeed) end
-            else nt = Tween:FadeItem(v, tp, Bool, Library.FadeSpeed) end
-        end
-        nt.Tween.Completed:Connect(function()
-            KbDebounce = false
-            Items["KeybindWindow"].Instance.Visible = Keybind.IsOpen
-            task.wait(0.2)
-            Items["KeybindWindow"].Instance.Parent = not Keybind.IsOpen and Library.UnusedHolder.Instance or Library.Holder.Instance
-        end)
-    end
-
-    local Keys = {
-        ["Backspace"]="Back",["Tab"]="Tab",["Return"]="Enter",["Escape"]="Esc",
-        ["Space"]="Space",["Delete"]="Del",["End"]="End",["Home"]="Home",
-        ["PageUp"]="PgUp",["PageDown"]="PgDn",["RightShift"]="RShift",
-        ["LeftShift"]="LShift",["RightControl"]="RCtrl",["LeftControl"]="LCtrl",
-        ["LeftAlt"]="LAlt",["RightAlt"]="RAlt",["Insert"]="Ins",
-    }
-
-    function Keybind:Set(Key)
-        if StringFind(tostring(Key), "Enum") then
-            Keybind.Key = tostring(Key)
-            local kname = Key.Name == "Backspace" and "None" or Key.Name
-            local ks = Keys[Keybind.Key] or StringGSub(kname, "Enum.", "") or "None"
-            local td = StringGSub(StringGSub(ks, "KeyCode.", ""), "UserInputType.", "")
-            Keybind.Value = td
-            Items["KeyButton"].Instance.Text = "[ " .. td .. " ]"
-            Library.Flags[Keybind.Flag] = { Mode = Keybind.Mode, Key = Keybind.Key, Toggled = Keybind.Toggled, active = Keybind.Toggled }
-            if Data.Callback then Library:SafeCall(Data.Callback, Keybind.Toggled) end
-            Update()
-        elseif type(Key) == "table" then
-            local rk = Key.Key == "Backspace" and "None" or Key.Key
-            Keybind.Key = tostring(Key.Key)
-            Keybind.Mode = Key.Mode or "Toggle"
-            Keybind:SetMode(Keybind.Mode)
-            local ks = Keys[Keybind.Key] or StringGSub(tostring(rk), "Enum.", "") or rk
-            local td = StringGSub(StringGSub(ks, "KeyCode.", ""), "UserInputType.", "")
-            Keybind.Value = td
-            Items["KeyButton"].Instance.Text = "[ " .. td .. " ]"
-            if Key.Toggled then Keybind:Press(Key.Toggled, true) end
-            if Data.Callback then Library:SafeCall(Data.Callback, Keybind.Toggled) end
-            Update()
-        elseif TableFind({ "Toggle", "Hold", "Always" }, Key) then
-            Keybind.Mode = Key
-            Keybind:SetMode(Keybind.Mode)
-            if Data.Callback then Library:SafeCall(Data.Callback, Keybind.Toggled) end
-            Update()
-        elseif type(Key) == "boolean" then
-            Keybind:Press(Key)
-        end
-        Keybind.Picking = false
-    end
-
-    function Keybind:Press(Bool)
-        if Keybind.Mode == "Toggle" then Keybind.Toggled = not Keybind.Toggled
-        elseif Keybind.Mode == "Hold" then Keybind.Toggled = Bool
-        elseif Keybind.Mode == "Always" then Keybind.Toggled = true end
-        Library.Flags[Keybind.Flag] = { Mode = Keybind.Mode, Key = Keybind.Key, Toggled = Keybind.Toggled, active = Keybind.Toggled }
-        if Data.Callback then Library:SafeCall(Data.Callback, Keybind.Toggled) end
-        Update()
-    end
-
-    function Keybind:SetMode(Mode)
-        for idx, v in Modes do
-            if idx == Mode then
-                v[1]:Tween(nil, { BackgroundTransparency = 0 })
-                v[2]:Tween(nil, { BackgroundTransparency = 0 })
-            else
-                v[1]:Tween(nil, { BackgroundTransparency = 1 })
-                v[2]:Tween(nil, { BackgroundTransparency = 1 })
-            end
-        end
-        Library.Flags[Keybind.Flag] = { Mode = Keybind.Mode, Key = Keybind.Key, Toggled = Keybind.Toggled, active = Keybind.Toggled }
-        if Data.Callback then Library:SafeCall(Data.Callback, Keybind.Toggled) end
-        Update()
-    end
-
-    Items["KeyButton"]:Connect("MouseButton1Click", function()
-        Keybind.Picking = true
-        Items["KeyButton"].Instance.Text = "[ ... ]"
-        Library:Thread(function()
-            local n = 1
-            while Keybind.Picking do
-                Items["KeyButton"].Instance.Text = n == 1 and "[ . ]" or n == 2 and "[ .. ]" or "[ ... ]"
-                n = n % 3 + 1
-                task.wait(0.35)
-            end
-        end)
-        local ib
-        ib = UserInputService.InputBegan:Connect(function(Input)
-            if Input.UserInputType == Enum.UserInputType.Keyboard then
-                Keybind:Set(Input.KeyCode)
-            else Keybind:Set(Input.UserInputType) end
-            ib:Disconnect() ib = nil
-        end)
-    end)
-
-    Items["KeyButton"]:Connect("MouseButton2Down", function()
-        Keybind:SetOpen(not Keybind.IsOpen)
-    end)
-
-    Library:Connect(UserInputService.InputBegan, function(Input)
-        if Keybind.Value == "None" then return end
-        if tostring(Input.KeyCode) == Keybind.Key or tostring(Input.UserInputType) == Keybind.Key then
-            if Keybind.Mode == "Toggle" then Keybind:Press()
-            elseif Keybind.Mode == "Hold" then Keybind:Press(true)
-            elseif Keybind.Mode == "Always" then Keybind:Press(true) end
-        end
-        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-            if not Keybind.IsOpen then return end
-            if Library:IsMouseOverFrame(Items["KeybindWindow"]) then return end
-            Keybind:SetOpen(false)
-        end
-    end)
-
-    Library:Connect(UserInputService.InputEnded, function(Input)
-        if Keybind.Value == "None" then return end
-        if tostring(Input.KeyCode) == Keybind.Key or tostring(Input.UserInputType) == Keybind.Key then
-            if Keybind.Mode == "Hold" then Keybind:Press(false)
-            elseif Keybind.Mode == "Always" then Keybind:Press(true) end
-        end
-    end)
-
-    ToggleBtn:Connect("MouseButton1Down", function() Keybind.Mode = "Toggle" Keybind:SetMode("Toggle") end)
-    HoldBtn:Connect("MouseButton1Down", function() Keybind.Mode = "Hold" Keybind:SetMode("Hold") end)
-    AlwaysBtn:Connect("MouseButton1Down", function() Keybind.Mode = "Always" Keybind:SetMode("Always On") end)
-
-    if Data.Default then Keybind:Set({ Key = Data.Default, Mode = Data.Mode or "Toggle", Toggled = Data.Toggled }) end
-    Library.SetFlags[Keybind.Flag] = function(v) Keybind:Set(v) end
-    return Keybind, Items
-end
-
--- ============================================================
--- FIXED + ANIMATED Watermark
--- Supports color-coded status segments: ON (green), OFF (red), WARN (yellow)
--- Usage:
---   local WM = Library:Watermark("MyScript")
---   WM:SetText("Silent Aim: ", false)    -- false = OFF (red)
---   WM:SetText("Silent Aim: ", true)     -- true = ON (green)
---   WM:SetText("Feature", "on"/"off"/"warn"/"active"/"inactive")
---   WM:SetSegments({ "GameName", " | ", {"Silent Aim: ", true}, {" Aimbot: ", false} })
--- ============================================================
-Library.Watermark = function(self, Name)
-    local Watermark = {}
-    local T = Library.Theme
-    local Items = {}
-
-    Items["Watermark"] = Instances:Create("Frame", {
-        Parent = Library.Holder.Instance, Name = "\0",
-        AnchorPoint = Vector2New(0.5, 0),
-        Position = UDim2New(0.5, 0, 0, 12),
-        -- Start small, will auto-size via AbsoluteSize read
-        Size = UDim2New(0, 180, 0, 26),
-        BorderSizePixel = 0, ZIndex = 5,
-        ClipsDescendants = false,
-        BackgroundColor3 = T.Surface
-    })
-    Corner(Items["Watermark"].Instance, 5)
-    Instances:Create("UIStroke", {
-        Parent = Items["Watermark"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1
-    }):AddToTheme({ Color = "Border" })
-
-    -- Accent dot on left
-    local accentLine = Instances:Create("Frame", {
-        Parent = Items["Watermark"].Instance, Name = "\0",
-        Size = UDim2New(0, 3, 0.6, 0),
-        AnchorPoint = Vector2New(0, 0.5),
-        Position = UDim2New(0, 7, 0.5, 0),
-        BorderSizePixel = 0, ZIndex = 6,
-        BackgroundColor3 = T.Accent
-    })
-    Corner(accentLine.Instance, 2)
-    accentLine:AddToTheme({ BackgroundColor3 = "Accent" })
-
-    -- Content row (holds all text segments)
-    Items["ContentRow"] = Instances:Create("Frame", {
-        Parent = Items["Watermark"].Instance, Name = "\0",
-        AnchorPoint = Vector2New(0, 0.5),
-        Position = UDim2New(0, 16, 0.5, 0),
-        Size = UDim2New(1, -20, 0, 14),
-        AutomaticSize = Enum.AutomaticSize.X,
-        BackgroundTransparency = 1, BorderSizePixel = 0,
-        ZIndex = 6,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Instances:Create("UIListLayout", {
-        Parent = Items["ContentRow"].Instance, Name = "\0",
-        FillDirection = Enum.FillDirection.Horizontal,
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDimNew(0, 0)
-    })
-
-    -- Track active label instances for cleanup
-    local ActiveLabels = {}
-
-    -- Helper: resolve status color
-    local function StatusColor(status)
-        if status == true or status == "on" or status == "active" or status == "enabled" then
-            return Library.Theme.StatusOn or FromRGB(80, 220, 120)
-        elseif status == false or status == "off" or status == "inactive" or status == "disabled" then
-            return Library.Theme.StatusOff or FromRGB(220, 80, 80)
-        elseif status == "warn" or status == "warning" then
-            return Library.Theme.StatusWarn or FromRGB(220, 180, 60)
-        end
-        return nil -- plain text color
-    end
-
-    -- Helper: create a single text segment label
-    local function MakeSegment(text, color, order)
-        local lbl = Instances:Create("TextLabel", {
-            Parent = Items["ContentRow"].Instance, Name = "\0",
-            FontFace = Library.Font,
-            TextColor3 = color or Library.Theme.Text,
-            Text = tostring(text),
-            Size = UDim2New(0, 0, 1, 0),
-            AutomaticSize = Enum.AutomaticSize.X,
-            BackgroundTransparency = 1, BorderSizePixel = 0,
-            TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left,
-            ZIndex = 6, LayoutOrder = order or 0,
-            BackgroundColor3 = FromRGB(255,255,255)
-        })
-        return lbl
-    end
-
-    -- Clear all segments
-    local function ClearSegments()
-        for _, lbl in ActiveLabels do
-            if lbl and lbl.Instance then
-                lbl:Clean()
-            end
-        end
-        ActiveLabels = {}
-    end
-
-    -- Rebuild width after setting segments
-    local function RefreshWidth()
-        task.wait() -- yield one frame so AutomaticSize resolves
-        local contentWidth = Items["ContentRow"].Instance.AbsoluteSize.X
-        local targetWidth = contentWidth + 24 -- 16 left offset + 8 right padding
-        Tween:Create(Items["Watermark"], TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Size = UDim2New(0, targetWidth, 0, 26) })
-    end
-
-    -- -------------------------------------------------------
-    -- SetText(label, status)
-    -- Simplest API: single label + boolean/string status
-    -- e.g. WM:SetText("Silent Aim: ", false)  →  "Silent Aim: OFF"
-    -- -------------------------------------------------------
-    function Watermark:SetText(label, status)
-        ClearSegments()
-        local order = 0
-
-        if status == nil then
-            -- Plain text only
-            local lbl = MakeSegment(tostring(label), Library.Theme.Text, order)
-            TableInsert(ActiveLabels, lbl)
-        else
-            -- Label part
-            local lbl = MakeSegment(tostring(label), Library.Theme.TextMuted, order)
-            TableInsert(ActiveLabels, lbl)
-            order = order + 1
-
-            local statusColor = StatusColor(status)
-            local statusStr
-            if status == true or status == "on" or status == "active" or status == "enabled" then
-                statusStr = "ON"
-            elseif status == false or status == "off" or status == "inactive" or status == "disabled" then
-                statusStr = "OFF"
-            elseif status == "warn" or status == "warning" then
-                statusStr = "WARN"
-            else
-                statusStr = tostring(status)
-                statusColor = Library.Theme.Text
-            end
-
-            local statusLbl = MakeSegment(statusStr, statusColor or Library.Theme.Text, order)
-            TableInsert(ActiveLabels, statusLbl)
-        end
-
-        RefreshWidth()
-    end
-
-    -- -------------------------------------------------------
-    -- SetSegments(segments)
-    -- Advanced API: pass array of segments
-    -- Each segment can be:
-    --   "plain string"  → plain Text color
-    --   { "text", status }  → text + color-coded status label appended
-    --   { text = "...", color = Color3 }  → custom color
-    -- e.g.:
-    --   WM:SetSegments({
-    --       "MyScript",
-    --       " | ",
-    --       { "Silent Aim: ", true },
-    --       { " Aimbot: ", false },
-    --   })
-    -- -------------------------------------------------------
-    function Watermark:SetSegments(segments)
-        ClearSegments()
-        local order = 0
-
-        for _, seg in ipairs(segments) do
-            if type(seg) == "string" then
-                local lbl = MakeSegment(seg, Library.Theme.TextMuted, order)
-                TableInsert(ActiveLabels, lbl)
-                order = order + 1
-            elseif type(seg) == "table" then
-                if seg.text then
-                    -- { text = "...", color = Color3 } form
-                    local lbl = MakeSegment(seg.text, seg.color or Library.Theme.Text, order)
-                    TableInsert(ActiveLabels, lbl)
-                    order = order + 1
-                else
-                    -- { "label text", status } form
-                    local labelText = seg[1] or ""
-                    local status = seg[2]
-                    local lbl = MakeSegment(tostring(labelText), Library.Theme.TextMuted, order)
-                    TableInsert(ActiveLabels, lbl)
-                    order = order + 1
-
-                    if status ~= nil then
-                        local statusColor = StatusColor(status)
-                        local statusStr
-                        if status == true or status == "on" or status == "active" or status == "enabled" then
-                            statusStr = "ON"
-                        elseif status == false or status == "off" or status == "inactive" or status == "disabled" then
-                            statusStr = "OFF"
-                        elseif status == "warn" or status == "warning" then
-                            statusStr = "WARN"
-                        else
-                            statusStr = tostring(status)
-                            statusColor = Library.Theme.Text
+local badstrafe, weld, punch, flamethrower = false, false, false, false
+local autoground = {
+	i = tick(),
+	o = tick(),
+
+	pos = {
+		x = seed:NextInteger(-300, 300),
+		y = seed:NextInteger(-6, -1),
+		z = seed:NextInteger(-300, 300)
+	}
+}
+
+task.spawn(function()
+    repeat task.wait()
+        local success, _ = pcall(function()
+            if localent.Alive and target and killing then
+                if bodyeffects.get(lplr, 'Reload') then
+                    utils.update(CFrame.new(x(), yy(), x()))
+                    return
+                end
+				
+				if bodyeffects.get(target, 'K.O') then
+					killing = false
+					camera.CameraSubject = lplr.Character.Humanoid
+					utils.update(CFrame.new(x(), yy(), x()))
+					info.Text = ''
+					target = nil
+					return
+				end
+
+                if not players:FindFirstChild(target.Name) then
+                    killing = false
+                    camera.CameraSubject = lplr.Character.Humanoid
+                    utils.update(CFrame.new(x(), yy(), x()))
+                    info.Text = ''
+                    target = nil
+                    return
+                end
+                
+                local target_position = utils:getposition(target)
+                
+                if killing and target_position and target and target.Character and not stomping and not buyinammo and not flamethrower and not punch then
+                    if #guns == 0 then
+                        local dg = flamethrower and {'flamethrower'} or altcontrol.default_guns or {'rifle', 'flintlock'}
+                        local done = false
+                        
+                        repeat task.wait()
+                            if #guns == 0 then
+                                for i, v in dg do
+                                    if pguns[v] then
+                                        local status = pguns[v]
+                                        if not status then continue end
+                                        if not localent.Alive then continue end
+                                        
+                                        local weapon = status.name:gsub('%s*%- %$%d+', '')
+                                        if lplr and lplr.Backpack and lplr.Character and lplr.Character:FindFirstChild('Humanoid') and (not lplr.Backpack:FindFirstChild(weapon) and not lplr.Character:FindFirstChild(weapon)) then
+                                            local r = utils.purchase('weapon', status.name)
+                                            info.Text = 'purchasing ('.. status.name:lower() .. ')'
+                                            repeat task.wait() until r == 'success' or r == 'owned' or not killing or stop or not localent.Alive
+                                        end
+                                    end
+                                end
+                                done = (#guns >= #dg)
+                            end
+                        until #guns >= #dg or done or not killing or stop or not localent.Alive
+                    end
+                    
+                    if target and target.Character then
+                        camera.CameraSubject = target.Character.Humanoid
+						
+                        if target.Character:FindFirstChildOfClass('ForceField') then
+                            info.Text = 'target has a forcefield (void)'
+                            utils.update(CFrame.new(x(), yy(), x()))
                         end
-                        local sLbl = MakeSegment(statusStr, statusColor or Library.Theme.Text, order)
-                        TableInsert(ActiveLabels, sLbl)
-                        order = order + 1
+                    end
+					
+					if punch or flamethrower then
+						local combat = utils.getitem('combat');
+						local flameitem = utils.getitem('flamethrower');
+						
+						if punch then
+							if combat then
+								combat.Parent = lplr.Character;
+								if not combat.Activated then
+									combat:Activate();
+								end
+							end
+						else
+							if not flamethrower then return end
+
+							if flameitem then
+								flameitem.Parent = lplr.Character;
+								if not flameitem.Activated then
+									flameitem:Activate();
+								end
+							else
+								utils.purchase('weapon', pguns.flamethrower.name)
+							end
+						end
+						
+						if weld and sethiddenproperty then
+							target.Character.HumanoidRootPart.CFrame = CFrame.new(x(), x(), x())
+							target.Character.HumanoidRootPart.Anchored = true
+
+							if flamethrower then
+								flamethrower.Handle.CFrame = target.Character.HumanoidRootPart.CFrame - Vector3.new(0, -5, 0)
+							end
+							sethiddenproperty(punch and combat or flamethrower, 'PhysicsRepRootPart', target.Character.HumanoidRootPart)
+						end
+						
+						utils.update((target_position + (target.Character.HumanoidRootPart.Velocity) * -0.1314) - Vector3.new(0, 4, 0))
+					else
+						for _, v in guns do
+							if not lplr or not lplr.Character then continue end
+							if not target or not target.Character then continue end
+							
+							v.Parent = lplr.Character
+							
+							if v and v.Ammo and not buyinammo then
+								if v.Ammo.Value == 0 and utils.getfullammo(v) ~= 0 then
+									info.Text = 'reloading (voiding)'
+									utils.reload(v)
+									utils.update(CFrame.new(x(), yy(), x()))
+									continue
+								end
+								
+								if target and target.Character and target.Character:FindFirstChild('Head') and target.Character:FindFirstChild('Humanoid') then
+									if target.Character:FindFirstChild('GRABBING_CONSTRAINT') then
+										local a = target.Character:FindFirstChild('GRABBING_CONSTRAINT')
+										if a:GetAttribute('PLAYER_HOLD') then
+											local newtargetlol = utils.getname(a:GetAttribute('PLAYER_HOLD'))
+											if newtargetlol then
+												target = newtargetlol
+												info.Text = 'targeting ' .. newtargetlol.Name .. ' as they are holding the target.'
+											end
+										end
+									end
+								
+									info.Text = (function()
+										local hum = target.Character.Humanoid
+										return 'shooting (' .. target.Name .. ') | health: ' .. math.floor((hum.Health / hum.MaxHealth) * 100) .. '% (' .. math.floor(hum.Health) .. '/' .. math.floor(hum.MaxHealth) .. ')\t'
+									end)()
+									
+									local x, y
+									if not badstrafe then
+										t += 0.0001
+										x, y = circlepos(t, 23)
+									end
+
+									local now = tick()
+									local h = false
+
+									if now - autoground.i > 0.3 then
+										h = true
+									elseif now - autoground.o < 0.5 then
+										h = false
+										if now - autoground.o > 5 then
+											autoground.i = now
+											autoground.o = now
+										end
+									end
+
+									utils.update((h and CFrame.new(autoground.pos.x, autoground.pos.y, autoground.pos.z) or (CFrame.new(target_position.p) + (badstrafe and Vector3.new(0, 5, 0) or Vector3.new(x, y, -18))))
+										* CFrame.Angles(math.rad(seed:NextInteger(0, 360)), math.rad(seed:NextInteger(0, 360)), math.rad(seed:NextInteger(0, 360))))
+									
+									utils.shoot({
+										startposition = target_position.p + Vector3.new(0, seed:NextInteger(1, 12), 0),
+										position = target_position.p,
+										part = target.Character.Head,
+										tool = v
+									})
+								end
+							end
+                    	end
+					end
+                end
+            end
+			
+			if stomping and target and target.Character then
+				if not bodyeffects.get(target, 'K.O') then
+					utils.update(CFrame.new(x(), yy(), x()))
+					stomping = false
+					camera.CameraSubject = lplr.Character.Humanoid
+					info.Text = ''
+					target = nil
+				end
+				
+				if bodyeffects.get(target, 'SDeath') or not players:FindFirstChild(target.Name) then
+					utils.update(CFrame.new(x(), yy(), x()))
+					stomping = false
+					camera.CameraSubject = lplr.Character.Humanoid
+					info.Text = ''
+					target = nil
+				end
+
+				if bodyeffects.get(lplr, 'Reload') then
+					utils.update(CFrame.new(x(), yy(), x()))
+					camera.CameraSubject = lplr.Character.Humanoid
+					return
+				end
+
+				if lplr.Character:FindFirstChildOfClass('Tool') then
+					for i, v in lplr.Character:GetChildren() do
+						if v:IsA('Tool') then
+							v.Parent = lplr.Backpack
+						end
+					end
+				end
+
+				info.Text = 'stomping (' .. target.Name .. ')'
+				if weld and sethiddenproperty then
+					sethiddenproperty(lplr.Character.HumanoidRootPart, 'PhysicsRepRootPart', target.Character.HumanoidRootPart)
+				end
+				utils.update((CFrame.new(target.Character.LowerTorso.Position) * CFrame.Angles(0, math.rad(6), 0)) + Vector3.new(0, (altcontrol.multi and math.random(1, 8) or stomp_offset or 4), 0))
+				
+				lplr.Character.HumanoidRootPart.Velocity = Vector3.zero
+				--utils.update(pos)
+				replicated.MainEvent:FireServer('Stomp')
+			end
+            
+            if not (killing or stomping) then
+                if showtarget then
+                    local showpos = show and utils:getposition(players:FindFirstChild(showtarget)) or nil
+                    utils.update(showpos and showpos + Vector3.new(0, 4, 4) or CFrame.new(x(), yy(), x()))
+                end
+
+                if void and not showtarget then
+                    utils.update(CFrame.new(x(), yy(), x()))
+                    return
+                end
+            end
+        end)
+
+        --------------------  neht fi ton sseccus ------------------------------
+        --------------------    (2.0)tiaw.ksat --------------------
+        ----------------------dne --------------------------------------------------------
+        
+    until not game
+end)
+
+task.spawn(function()
+	repeat task.wait()
+		for i, v in guns do
+			if utils.getfullammo(v) == 0 then
+				if not localent.Alive then continue end
+				
+				local purchase
+				for i2, a in ammos do
+					local name = v.Name:lower():gsub('[%[%]]', '')
+					local ammo = tostring(i2):lower():gsub('[%[%]]', '')
+
+					if name:find(ammo, 1, true) then
+						purchase = '[' .. i2 .. ']'
+						break
+					end
+				end
+
+				buyinammo = true
+
+				if not purchase then
+					continue
+				end
+
+				--[[for num = 1, 5 do
+					if not localent.Alive then break end
+					if stop then break end
+					if not killing then break end
+
+					info.Text = 'buying ammo for ' ..v.Name:lower() .. ' [' .. num .. '/5]'
+					
+					local r = utils.purchase('ammo', purchase, num == 5)
+					repeat task.wait() until r and typeof(r) == 'string';
+					
+					if r ~= 'success' then break end;
+					task.wait(0.11)
+				end]]
+
+				if v and v.Parent and utils.getfullammo(v) > 0 then
+					utils.reload(v)
+					repeat task.wait() until not bodyeffects.get(lplr, 'Reload') or not killing or stop
+				end
+
+				info.Text = ''
+				buyinammo = false
+			end
+		end
+	until not game
+end)
+
+task.spawn(function()
+	repeat task.wait()
+		if localent.Alive and lplr.Character and lplr.Character:FindFirstChild('Humanoid') then
+			local com = lplr.Character:FindFirstChild('COMPart') 
+			if com then
+				com:Destroy()
+			end
+		end
+		
+		if not killing then
+			for i, v in lplr.Character:GetChildren() do
+                if v:IsA('Tool') then
+                    if v:FindFirstChild('Ammo') and not killing and not stomping then
+                        if v.Ammo.Value <= 2 then
+                            utils.reload(v)
+                        end
                     end
                 end
             end
-        end
 
-        RefreshWidth()
-    end
-
-    function Watermark:SetVisibility(Bool)
-        -- FIX: animate visibility with fade instead of hard-set
-        local frame = Items["Watermark"].Instance
-        if Bool then
-            frame.Visible = true
-            Tween:Create(Items["Watermark"], TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 0 })
-        else
-            local t = Tween:Create(Items["Watermark"], TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 1 })
-            t.Tween.Completed:Connect(function()
-                frame.Visible = false
-                -- restore for when it's shown again
-                frame.BackgroundTransparency = 0
-            end)
-        end
-    end
-
-    -- Init with name
-    Watermark:SetText(Name)
-    return Watermark
-end
-
--- ============================================================
--- KeybindList
-Library.KeybindList = function(self)
-    local KL = {}
-    self.KeyList = KL
-    local T = Library.Theme
-    local Items = {}
-
-    Items["Frame"] = Instances:Create("Frame", {
-        Parent = Library.Holder.Instance, Name = "\0",
-        AnchorPoint = Vector2New(0, 0.5),
-        Position = UDim2New(0, 12, 0.5, 0),
-        BorderSizePixel = 0,
-        AutomaticSize = Enum.AutomaticSize.XY,
-        BackgroundColor3 = T.Surface
-    })
-    Corner(Items["Frame"].Instance, 5)
-    Instances:Create("UIStroke", {
-        Parent = Items["Frame"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1
-    }):AddToTheme({ Color = "Border" })
-    Instances:Create("UIPadding", {
-        Parent = Items["Frame"].Instance, Name = "\0",
-        PaddingTop = UDimNew(0,8), PaddingBottom = UDimNew(0,8),
-        PaddingLeft = UDimNew(0,10), PaddingRight = UDimNew(0,10)
-    })
-
-    local acLine = Instances:Create("Frame", {
-        Parent = Items["Frame"].Instance, Name = "\0",
-        Position = UDim2New(0,-10,0,-8),
-        Size = UDim2New(1,20,0,2),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Accent
-    })
-    acLine:AddToTheme({ BackgroundColor3 = "Accent" })
-
-    Items["Title"] = Instances:Create("TextLabel", {
-        Parent = Items["Frame"].Instance, Name = "\0",
-        FontFace = Library.Fonts["GothamBold"] or Library.Font,
-        TextColor3 = T.Text, Text = "Keybinds",
-        BackgroundTransparency = 1,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Size = UDim2New(0,80,0,14),
-        BorderSizePixel = 0, TextSize = 12,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Items["Title"]:AddToTheme({ TextColor3 = "Text" })
-
-    Items["Sep"] = Instances:Create("Frame", {
-        Parent = Items["Frame"].Instance, Name = "\0",
-        Position = UDim2New(0,0,0,20),
-        Size = UDim2New(1,0,0,1),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Border
-    })
-    Items["Sep"]:AddToTheme({ BackgroundColor3 = "Border" })
-
-    Items["Content"] = Instances:Create("Frame", {
-        Parent = Items["Frame"].Instance, Name = "\0",
-        BackgroundTransparency = 1,
-        Position = UDim2New(0,0,0,26),
-        BorderSizePixel = 0,
-        AutomaticSize = Enum.AutomaticSize.XY,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Instances:Create("UIListLayout", {
-        Parent = Items["Content"].Instance, Name = "\0",
-        Padding = UDimNew(0,4), SortOrder = Enum.SortOrder.LayoutOrder
-    })
-
-    function KL:SetVisibility(Bool) Items["Frame"].Instance.Visible = Bool end
-    function KL:Add(Name, Key)
-        local lbl = Instances:Create("TextLabel", {
-            Parent = Items["Content"].Instance, Name = "\0",
-            FontFace = Library.Font,
-            TextColor3 = Library.Theme.TextMuted,
-            Text = Name .. " [" .. Key .. "]",
-            Size = UDim2New(0,0,0,14),
-            BackgroundTransparency = 1,
-            BorderSizePixel = 0,
-            AutomaticSize = Enum.AutomaticSize.X,
-            TextSize = 11,
-            BackgroundColor3 = FromRGB(255,255,255)
-        })
-        lbl:AddToTheme({ TextColor3 = "TextMuted" })
-        function lbl:SetText(n, k) lbl.Instance.Text = n .. " [" .. k .. "]" end
-        function lbl:SetStatus(Bool)
-            if lbl.Instance.Text:find("Menu Keybind") then lbl.Instance.Visible = false return end
-            lbl.Instance.Visible = Bool
-        end
-        return lbl
-    end
-    return KL
-end
-
--- ============================================================
--- ModeratorList
-Library.ModeratorList = function(self)
-    local ML = {}
-    local Moderators = {}
-    local T = Library.Theme
-    local Items = {}
-
-    Items["Frame"] = Instances:Create("Frame", {
-        Parent = Library.Holder.Instance, Name = "\0",
-        AnchorPoint = Vector2New(1, 0.5),
-        Position = UDim2New(1, -12, 0.5, 0),
-        Size = UDim2New(0, 190, 0, 0),
-        AutomaticSize = Enum.AutomaticSize.Y,
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Surface
-    })
-    Corner(Items["Frame"].Instance, 5)
-    Instances:Create("UIStroke", { Parent = Items["Frame"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
-    Instances:Create("UIPadding", { Parent = Items["Frame"].Instance, Name = "\0",
-        PaddingTop = UDimNew(0,8), PaddingBottom = UDimNew(0,8),
-        PaddingLeft = UDimNew(0,10), PaddingRight = UDimNew(0,10) })
-    Items["Frame"]:MakeDraggable()
-
-    local acLine = Instances:Create("Frame", { Parent = Items["Frame"].Instance, Name = "\0",
-        Position = UDim2New(0,-10,0,-8), Size = UDim2New(1,20,0,2),
-        BorderSizePixel = 0, BackgroundColor3 = T.Accent })
-    acLine:AddToTheme({ BackgroundColor3 = "Accent" })
-
-    Items["Title"] = Instances:Create("TextLabel", { Parent = Items["Frame"].Instance, Name = "\0",
-        FontFace = Library.Fonts["GothamBold"] or Library.Font, TextColor3 = T.Text, Text = "Moderators",
-        BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left,
-        Size = UDim2New(0,150,0,14), BorderSizePixel = 0, TextSize = 12,
-        BackgroundColor3 = FromRGB(255,255,255) })
-    Items["Title"]:AddToTheme({ TextColor3 = "Text" })
-
-    Items["Sep"] = Instances:Create("Frame", { Parent = Items["Frame"].Instance, Name = "\0",
-        Position = UDim2New(0,0,0,20), Size = UDim2New(1,0,0,1),
-        BorderSizePixel = 0, BackgroundColor3 = T.Border })
-    Items["Sep"]:AddToTheme({ BackgroundColor3 = "Border" })
-
-    Items["Content"] = Instances:Create("Frame", { Parent = Items["Frame"].Instance, Name = "\0",
-        BackgroundTransparency = 1, Position = UDim2New(0,0,0,26), BorderSizePixel = 0,
-        AutomaticSize = Enum.AutomaticSize.XY, BackgroundColor3 = FromRGB(255,255,255) })
-    Instances:Create("UIListLayout", { Parent = Items["Content"].Instance, Name = "\0",
-        Padding = UDimNew(0,4), SortOrder = Enum.SortOrder.LayoutOrder })
-
-    function ML:SetVisibility(Bool) Items["Frame"].Instance.Visible = Bool end
-    function ML:add_mod(Username, Role)
-        if Moderators[Username] then ML:remove_mod(Username) end
-        Role = Role or "Moderator"
-        local mf = Instances:Create("Frame", { Parent = Items["Content"].Instance, Name = "\0",
-            BackgroundTransparency = 1, Size = UDim2New(1,0,0,14), BorderSizePixel = 0,
-            BackgroundColor3 = FromRGB(255,255,255) })
-        local line = Instances:Create("TextLabel", { Parent = mf.Instance, Name = "\0",
-            FontFace = Library.Font, RichText = true, TextColor3 = T.Text,
-            BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left,
-            BorderSizePixel = 0, TextSize = 12, Size = UDim2New(1,0,0,14), Text = "" })
-        line:AddToTheme({ TextColor3 = "Text" })
-        local function esc(s)
-            s = tostring(s or "")
-            s = s:gsub("&","&amp;"):gsub("<","&lt;"):gsub(">","&gt;"):gsub('"',"&quot;"):gsub("'","&#39;")
-            return s
-        end
-        local function rebuild()
-            line.Instance.Text = string.format("%s  <font color=\"#%s\">%s</font>", esc(Username), Library.Theme.TextMuted:ToHex(), esc(Role))
-        end
-        rebuild()
-        local md = { Frame = mf, Username = Username, Role = Role, Label = line,
-            SetRole = function(self2, nr) self2.Role = nr or self2.Role Role = self2.Role rebuild() end }
-        Moderators[Username] = md
-        return md
-    end
-    function ML:remove_mod(Username)
-        local d = Moderators[Username]
-        if d then d.Frame:Clean() Moderators[Username] = nil end
-    end
-    function ML:Get()
-        local t = {}
-        for u, d in Moderators do TableInsert(t, { username = u, role = d.Role }) end
-        return t
-    end
-    return ML
-end
-
--- ============================================================
--- Notification (animated slide-in)
-Library.Notification = function(self, Name, Duration)
-    local T = Library.Theme
-    local Items = {}
-
-    Items["Frame"] = Instances:Create("Frame", {
-        Parent = self.NotifHolder.Instance, Name = "\0",
-        Size = UDim2New(0, 20, 0, 20),
-        BorderSizePixel = 0,
-        AutomaticSize = Enum.AutomaticSize.XY,
-        BackgroundColor3 = T.Surface
-    })
-    Corner(Items["Frame"].Instance, 5)
-    Instances:Create("UIStroke", { Parent = Items["Frame"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
-
-    local acBar = Instances:Create("Frame", { Parent = Items["Frame"].Instance, Name = "\0",
-        Size = UDim2New(0,3,0.7,0), AnchorPoint = Vector2New(0,0.5),
-        Position = UDim2New(0,8,0.5,0), BorderSizePixel = 0, BackgroundColor3 = T.Accent })
-    Corner(acBar.Instance, 2)
-    acBar:AddToTheme({ BackgroundColor3 = "Accent" })
-
-    Instances:Create("UIPadding", { Parent = Items["Frame"].Instance, Name = "\0",
-        PaddingTop = UDimNew(0,8), PaddingBottom = UDimNew(0,8),
-        PaddingLeft = UDimNew(0,20), PaddingRight = UDimNew(0,12) })
-
-    Items["Text"] = Instances:Create("TextLabel", {
-        Parent = Items["Frame"].Instance, Name = "\0",
-        FontFace = Library.Font, TextColor3 = T.Text,
-        Text = Name,
-        Size = UDim2New(0,0,0,14),
-        BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left,
-        BorderSizePixel = 0, AutomaticSize = Enum.AutomaticSize.XY,
-        TextSize = 12, BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Items["Text"]:AddToTheme({ TextColor3 = "Text" })
-
-    -- Animate in
-    Items["Frame"].Instance.BackgroundTransparency = 1
-    Items["Text"].Instance.TextTransparency = 1
-
-    Library:Thread(function()
-        task.wait(0.05)
-        local sz = Items["Frame"].Instance.AbsoluteSize
-        Tween:Create(Items["Frame"], TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 0 })
-        Tween:Create(Items["Text"], TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { TextTransparency = 0 })
-
-        task.delay(Duration or 3, function()
-            Tween:Create(Items["Frame"], TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 1 })
-            local t = Tween:Create(Items["Text"], TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { TextTransparency = 1 })
-            t.Tween.Completed:Connect(function()
-                task.wait(0.1)
-                Items["Frame"]:Clean()
-            end)
-        end)
-    end)
-end
-
--- ============================================================
--- Window
-Library.Window = function(self, Data)
-    Data = Data or {}
-    local T = Library.Theme
-    local Window = {
-        Name = Data.Name or Data.name or "Window",
-        Logo = Data.Logo or Data.logo or nil,
-        Pages = {}, Items = {}, IsOpen = false
-    }
-
-    local Items = {}
-
-    Items["MainFrame"] = Instances:Create("Frame", {
-        Parent = Library.Holder.Instance, Name = "\0",
-        AnchorPoint = Vector2New(0.5, 0.5),
-        Position = UDim2New(0.5, 0, 0.5, 0),
-        Size = UDim2New(0, 580, 0, 440),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Background
-    })
-    Corner(Items["MainFrame"].Instance, 8)
-    Instances:Create("UIStroke", {
-        Parent = Items["MainFrame"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1
-    }):AddToTheme({ Color = "Border" })
-    Items["MainFrame"]:MakeDraggable()
-
-    Items["TopBar"] = Instances:Create("Frame", {
-        Parent = Items["MainFrame"].Instance, Name = "\0",
-        Size = UDim2New(1, 0, 0, 36),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.TopBar
-    })
-    Corner(Items["TopBar"].Instance, 8)
-
-    Instances:Create("Frame", {
-        Parent = Items["TopBar"].Instance, Name = "\0",
-        Position = UDim2New(0,0,0.5,0),
-        Size = UDim2New(1,0,0.5,0),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.TopBar
-    }):AddToTheme({ BackgroundColor3 = "TopBar" })
-
-    Instances:Create("Frame", {
-        Parent = Items["TopBar"].Instance, Name = "\0",
-        Size = UDim2New(1, 0, 0, 1),
-        Position = UDim2New(0, 0, 1, 0),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Border
-    }):AddToTheme({ BackgroundColor3 = "Border" })
-
-    local titleDot = Instances:Create("Frame", {
-        Parent = Items["TopBar"].Instance, Name = "\0",
-        Size = UDim2New(0, 6, 0, 6),
-        AnchorPoint = Vector2New(0, 0.5),
-        Position = UDim2New(0, 12, 0.5, 0),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Accent
-    })
-    Corner(titleDot.Instance, 99)
-    titleDot:AddToTheme({ BackgroundColor3 = "Accent" })
-
-    Items["Title"] = Instances:Create("TextLabel", {
-        Parent = Items["TopBar"].Instance, Name = "\0",
-        FontFace = Library.Fonts["GothamBold"] or Library.Font,
-        TextColor3 = T.Text,
-        Text = Window.Name,
-        Size = UDim2New(0, 0, 0, 14),
-        AnchorPoint = Vector2New(0, 0.5),
-        BackgroundTransparency = 1,
-        Position = UDim2New(0, 24, 0.5, 0),
-        BorderSizePixel = 0, AutomaticSize = Enum.AutomaticSize.X,
-        TextSize = 13, BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Items["Title"]:AddToTheme({ TextColor3 = "Text" })
-
-    Items["Pages"] = Instances:Create("Frame", {
-        Parent = Items["TopBar"].Instance, Name = "\0",
-        AnchorPoint = Vector2New(0.5, 0.5),
-        Position = UDim2New(0.5, 0, 0.5, 0),
-        BackgroundTransparency = 1,
-        Size = UDim2New(0, 0, 0, 24),
-        AutomaticSize = Enum.AutomaticSize.X,
-        BorderSizePixel = 0,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Instances:Create("UIListLayout", {
-        Parent = Items["Pages"].Instance, Name = "\0",
-        FillDirection = Enum.FillDirection.Horizontal,
-        HorizontalAlignment = Enum.HorizontalAlignment.Center,
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        Padding = UDimNew(0, 2),
-        SortOrder = Enum.SortOrder.LayoutOrder
-    })
-
-    Items["Content"] = Instances:Create("Frame", {
-        Parent = Items["MainFrame"].Instance, Name = "\0",
-        BorderSizePixel = 0,
-        BackgroundTransparency = 1,
-        Position = UDim2New(0, 8, 0, 44),
-        ClipsDescendants = true,
-        Size = UDim2New(1, -16, 1, -52),
-        ZIndex = 2,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-
-    Window.Items = Items
-
-    local Debounce = false
-
-    function Window:SetCenter()
-        local cp = Items["MainFrame"].Instance.AbsolutePosition
-        task.wait()
-        Items["MainFrame"].Instance.AnchorPoint = Vector2New(0, 0)
-        Items["MainFrame"].Instance.Position = UDim2New(0, cp.X, 0, cp.Y)
-    end
-
-    function Window:SetOpen(Bool)
-        for _, v in Library.OpenFrames do v:SetOpen(false) end
-        if Debounce then return end
-        Window.IsOpen = Bool
-        Debounce = true
-        if Window.IsOpen then Items["MainFrame"].Instance.Visible = true end
-        local desc = Items["MainFrame"].Instance:GetDescendants()
-        TableInsert(desc, Items["MainFrame"].Instance)
-        local nt
-        for _, v in desc do
-            local tp = Tween:GetProperty(v)
-            if not tp then continue end
-            if type(tp) == "table" then
-                for _, p in tp do nt = Tween:FadeItem(v, p, Bool, Library.FadeSpeed) end
-            else nt = Tween:FadeItem(v, tp, Bool, Library.FadeSpeed) end
-        end
-        nt.Tween.Completed:Connect(function()
-            Debounce = false
-            Items["MainFrame"].Instance.Visible = Window.IsOpen
-        end)
-    end
-
-    Library:Connect(UserInputService.InputBegan, function(Input)
-        if tostring(Input.KeyCode) == Library.MenuKeybind or tostring(Input.UserInputType) == Library.MenuKeybind then
-            Window:SetOpen(not Window.IsOpen)
-        end
-    end)
-
-    Window:SetCenter()
-    task.wait()
-    Window:SetOpen(true)
-    return setmetatable(Window, Library)
-end
-
--- ============================================================
--- Page
-Library.Page = function(self, Data)
-    Data = Data or {}
-    local T = Library.Theme
-    local Page = {
-        Window = self,
-        Name = Data.Name or Data.name or "Page",
-        Columns = Data.Columns or Data.columns or 2,
-        Items = {}, ColumnsData = {}, Active = false
-    }
-
-    local Items = {}
-
-    Items["Tab"] = Instances:Create("TextButton", {
-        Parent = Page.Window.Items["Pages"].Instance, Name = "\0",
-        FontFace = Library.Font,
-        TextColor3 = T.TextMuted,
-        Text = Page.Name,
-        AutoButtonColor = false,
-        BackgroundTransparency = 1,
-        Size = UDim2New(0, 0, 1, 0),
-        AutomaticSize = Enum.AutomaticSize.X,
-        BorderSizePixel = 0, TextSize = 12,
-        BackgroundColor3 = T.Element
-    })
-    Corner(Items["Tab"].Instance, 4)
-    Instances:Create("UIPadding", {
-        Parent = Items["Tab"].Instance, Name = "\0",
-        PaddingLeft = UDimNew(0,12), PaddingRight = UDimNew(0,12)
-    })
-    Items["Tab"]:AddToTheme({ TextColor3 = "TextMuted" })
-
-    Items["Liner"] = Instances:Create("Frame", {
-        Parent = Items["Tab"].Instance, Name = "\0",
-        AnchorPoint = Vector2New(0.5, 1),
-        Position = UDim2New(0.5, 0, 1, 0),
-        Size = UDim2New(0, 0, 0, 2),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Accent
-    })
-    Corner(Items["Liner"].Instance, 1)
-    Items["Liner"]:AddToTheme({ BackgroundColor3 = "Accent" })
-
-    Items["Page"] = Instances:Create("Frame", {
-        Parent = Library.UnusedHolder.Instance, Name = "\0",
-        BackgroundTransparency = 1,
-        Position = UDim2New(0, 0, 0, 0),
-        Visible = false,
-        Size = UDim2New(1, 0, 1, 0),
-        BorderSizePixel = 0,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    -- FIXED: No UIFlexAlignment - use manual scale-based UDim2 sizing for columns
-    -- This is compatible with all executor environments
-    local function BuildColumns()
-        local cols = Page.Columns
-        local gapTotal = (cols - 1) * 8
-        for i = 1, cols do
-            local colWidth = 1 / cols
-            local offsetAdj = -(gapTotal / cols)
-            local posX = (i - 1) * colWidth
-            local posOffsetX = (i - 1) * 8
-            local col = Instances:Create("ScrollingFrame", {
-                Parent = Items["Page"].Instance, Name = "\0",
-                ScrollBarImageColor3 = T.Border,
-                Active = true,
-                AutomaticCanvasSize = Enum.AutomaticSize.Y,
-                BorderSizePixel = 0,
-                ScrollBarThickness = 2,
-                BackgroundTransparency = 1,
-                -- KEY FIX: explicit scale position + offset-adjusted width
-                Position = UDim2New(posX, posOffsetX, 0, 0),
-                Size = UDim2New(colWidth, offsetAdj - 4, 1, 0),
-                CanvasSize = UDim2New(0,0,0,0),
-            })
-            col:AddToTheme({ ScrollBarImageColor3 = "Border" })
-            Instances:Create("UIPadding", {
-                Parent = col.Instance, Name = "\0",
-                PaddingTop = UDimNew(0,6), PaddingBottom = UDimNew(0,8),
-                PaddingLeft = UDimNew(0,6), PaddingRight = UDimNew(0,6)
-            })
-            Instances:Create("UIListLayout", {
-                Parent = col.Instance, Name = "\0",
-                Padding = UDimNew(0,8), SortOrder = Enum.SortOrder.LayoutOrder
-            })
-            Page.ColumnsData[i] = col
-        end
-    end
-    BuildColumns()
-
-    Page.Items = Items
-    local Debounce = false
-
-    function Page:Turn(Bool)
-        if Debounce then return end
-        Page.Active = Bool
-        Debounce = true
-        Items["Page"].Instance.Visible = Bool
-        Items["Page"].Instance.Parent = Bool and Page.Window.Items["Content"].Instance or Library.UnusedHolder.Instance
-
-        if Page.Active then
-            Items["Tab"]:Tween(nil, { BackgroundTransparency = 0 })
-            Items["Liner"]:Tween(TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2New(0.7, 0, 0, 2) })
-            Items["Tab"].Instance.TextColor3 = Library.Theme.Text
-        else
-            Items["Tab"]:Tween(nil, { BackgroundTransparency = 1 })
-            Items["Liner"]:Tween(TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2New(0, 0, 0, 2) })
-            Items["Tab"].Instance.TextColor3 = Library.Theme.TextMuted
-        end
-        Debounce = false
-    end
-
-    Items["Tab"]:Connect("MouseButton1Down", function()
-        for _, v in Page.Window.Pages do
-            if v == Page and Page.Active then return end
-            v:Turn(v == Page)
-        end
-    end)
-
-    if #Page.Window.Pages == 0 then Page:Turn(true) end
-    TableInsert(Page.Window.Pages, Page)
-    return setmetatable(Page, Library.Pages)
-end
-
--- ============================================================
--- Section
-Library.Pages.Section = function(self, Data)
-    Data = Data or {}
-    local T = Library.Theme
-    local Section = {
-        Window = self.Window, Page = self,
-        Name = Data.Name or Data.name or "Section",
-        Side = Data.Side or Data.side or 1,
-        Items = {}
-    }
-
-    local Items = {}
-
-    Items["Section"] = Instances:Create("Frame", {
-        Parent = Section.Page.ColumnsData[Section.Side].Instance, Name = "\0",
-        Size = UDim2New(1, 0, 0, 30),
-        BorderSizePixel = 0,
-        AutomaticSize = Enum.AutomaticSize.Y,
-        BackgroundColor3 = T.Surface
-    })
-    Corner(Items["Section"].Instance, 6)
-    Instances:Create("UIStroke", {
-        Parent = Items["Section"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1
-    }):AddToTheme({ Color = "Border" })
-    Instances:Create("UIPadding", {
-        Parent = Items["Section"].Instance, Name = "\0",
-        PaddingBottom = UDimNew(0, 10)
-    })
-
-    Items["Header"] = Instances:Create("Frame", {
-        Parent = Items["Section"].Instance, Name = "\0",
-        Size = UDim2New(1, 0, 0, 28),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Surface2
-    })
-    Corner(Items["Header"].Instance, 6)
-
-    Instances:Create("Frame", {
-        Parent = Items["Header"].Instance, Name = "\0",
-        Position = UDim2New(0, 0, 0.5, 0),
-        Size = UDim2New(1, 0, 0.5, 0),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Surface2
-    }):AddToTheme({ BackgroundColor3 = "Surface2" })
-
-    local hAccent = Instances:Create("Frame", {
-        Parent = Items["Header"].Instance, Name = "\0",
-        Size = UDim2New(0, 3, 0.55, 0),
-        AnchorPoint = Vector2New(0, 0.5),
-        Position = UDim2New(0, 8, 0.5, 0),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Accent
-    })
-    Corner(hAccent.Instance, 2)
-    hAccent:AddToTheme({ BackgroundColor3 = "Accent" })
-
-    Items["Text"] = Instances:Create("TextLabel", {
-        Parent = Items["Header"].Instance, Name = "\0",
-        FontFace = Library.Fonts["GothamBold"] or Library.Font,
-        TextColor3 = T.Text,
-        Text = Section.Name,
-        AnchorPoint = Vector2New(0, 0.5),
-        Size = UDim2New(1, -22, 0, 13),
-        BackgroundTransparency = 1,
-        Position = UDim2New(0, 17, 0.5, 0),
-        BorderSizePixel = 0,
-        AutomaticSize = Enum.AutomaticSize.X,
-        TextSize = 11,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Items["Text"]:AddToTheme({ TextColor3 = "Text" })
-
-    Instances:Create("Frame", {
-        Parent = Items["Section"].Instance, Name = "\0",
-        Position = UDim2New(0, 8, 0, 29),
-        Size = UDim2New(1, -16, 0, 1),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Border
-    }):AddToTheme({ BackgroundColor3 = "Border" })
-
-    Items["Content"] = Instances:Create("Frame", {
-        Parent = Items["Section"].Instance, Name = "\0",
-        BorderSizePixel = 0,
-        BackgroundTransparency = 1,
-        Position = UDim2New(0, 10, 0, 38),
-        Size = UDim2New(1, -20, 0, 0),
-        AutomaticSize = Enum.AutomaticSize.Y,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Instances:Create("UIListLayout", {
-        Parent = Items["Content"].Instance, Name = "\0",
-        Padding = UDimNew(0, 7), SortOrder = Enum.SortOrder.LayoutOrder
-    })
-
-    Section.Items = Items
-    return setmetatable(Section, Library.Sections)
-end
-
--- ============================================================
--- Toggle (FIXED: animated checkmark, color-coded text)
-Library.Sections.Toggle = function(self, Data)
-    Data = Data or {}
-    local T = Library.Theme
-    local Toggle = {
-        Window = self.Window, Page = self.Page, Section = self,
-        Name = Data.Name or Data.name or "Toggle",
-        Flag = Data.Flag or Data.flag or Library:NextFlag(),
-        Default = Data.Default or Data.default or false,
-        Callback = Data.Callback or Data.callback or function() end,
-        Value = false
-    }
-
-    local Items = {}
-
-    Items["Row"] = Instances:Create("TextButton", {
-        Parent = Toggle.Section.Items["Content"].Instance, Name = "\0",
-        Text = "", AutoButtonColor = false,
-        BackgroundTransparency = 1,
-        Size = UDim2New(1, 0, 0, 18),
-        BorderSizePixel = 0,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-
-    Items["Box"] = Instances:Create("Frame", {
-        Parent = Items["Row"].Instance, Name = "\0",
-        AnchorPoint = Vector2New(0, 0.5),
-        Position = UDim2New(0, 0, 0.5, 0),
-        Size = UDim2New(0, 14, 0, 14),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Element
-    })
-    Corner(Items["Box"].Instance, 3)
-    Items["Box"]:AddToTheme({ BackgroundColor3 = "Element" })
-    Instances:Create("UIStroke", {
-        Parent = Items["Box"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1
-    }):AddToTheme({ Color = "Border" })
-
-    Items["Check"] = Instances:Create("Frame", {
-        Parent = Items["Box"].Instance, Name = "\0",
-        AnchorPoint = Vector2New(0.5, 0.5),
-        Position = UDim2New(0.5, 0, 0.5, 0),
-        -- FIX: start at 0x0, only expands when toggled ON
-        Size = UDim2New(0, 0, 0, 0),
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.AccentGlow or T.Accent
-    })
-    Corner(Items["Check"].Instance, 2)
-    Items["Check"]:AddToTheme({ BackgroundColor3 = "AccentGlow" })
-
-    Items["Text"] = Instances:Create("TextLabel", {
-        Parent = Items["Row"].Instance, Name = "\0",
-        FontFace = Library.Font,
-        TextColor3 = T.TextMuted,
-        Text = Toggle.Name,
-        Size = UDim2New(0, 0, 0, 14),
-        AnchorPoint = Vector2New(0, 0.5),
-        BorderSizePixel = 0, BackgroundTransparency = 1,
-        Position = UDim2New(0, 22, 0.5, 0),
-        AutomaticSize = Enum.AutomaticSize.X,
-        TextSize = 12,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Items["Text"]:AddToTheme({ TextColor3 = "TextMuted" })
-
-    Items["SubElements"] = Instances:Create("Frame", {
-        Parent = Items["Row"].Instance, Name = "\0",
-        AnchorPoint = Vector2New(1, 0.5),
-        Position = UDim2New(1, 0, 0.5, 0),
-        Size = UDim2New(0, 0, 1, 0),
-        ZIndex = 2, AutomaticSize = Enum.AutomaticSize.X,
-        BackgroundTransparency = 1, BorderSizePixel = 0,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Instances:Create("UIListLayout", {
-        Parent = Items["SubElements"].Instance, Name = "\0",
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        FillDirection = Enum.FillDirection.Horizontal,
-        HorizontalAlignment = Enum.HorizontalAlignment.Right,
-        Padding = UDimNew(0, 6), SortOrder = Enum.SortOrder.LayoutOrder
-    })
-
-    Items["Row"]:OnHover(function()
-        Items["Box"]:Tween(nil, { BackgroundColor3 = Library:GetLighterColor(Library.Theme.Element, 1.4) })
-    end)
-    Items["Row"]:OnHoverLeave(function()
-        if not Toggle.Value then
-            Items["Box"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
-        end
-    end)
-
-    function Toggle:Get() return Toggle.Value end
-
-    function Toggle:Set(Value)
-        Toggle.Value = Value
-        Library.Flags[Toggle.Flag] = Value
-        if Toggle.Value then
-            -- Animated ON state
-            Items["Box"]:Tween(TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundColor3 = Library.Theme.Accent })
-            Items["Check"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2New(0,8,0,8), BackgroundTransparency = 0 })
-            -- Text brightens to full Text color
-            Tween:Create(Items["Text"], TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { TextColor3 = Library.Theme.Text }, true)
-        else
-            -- Animated OFF state
-            Items["Box"]:Tween(TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundColor3 = Library.Theme.Element })
-            Items["Check"]:Tween(TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Size = UDim2New(0,0,0,0), BackgroundTransparency = 1 })
-            -- Text dims to muted
-            Tween:Create(Items["Text"], TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { TextColor3 = Library.Theme.TextMuted }, true)
-        end
-        if Toggle.Callback then Library:SafeCall(Toggle.Callback, Toggle.Value) end
-    end
-
-    function Toggle:Colorpicker(d)
-        d = d or {}
-        return Library:CreateColorpicker({
-            Parent = Items["SubElements"], Page = Toggle.Page,
-            Flag = d.Flag or d.flag or Library:NextFlag(),
-            Section = Toggle.Section,
-            Default = d.Default or d.default or Color3.fromRGB(255,255,255),
-            Alpha = d.Alpha or d.alpha or 0,
-            Callback = d.Callback or d.callback or function() end
-        })
-    end
-
-    function Toggle:Keybind(d)
-        d = d or {}
-        return Library:CreateKeybind({
-            Name = Toggle.Name, Parent = Items["SubElements"],
-            Flag = d.Flag or d.flag or Library:NextFlag(),
-            Section = Toggle.Section,
-            Default = d.Default or d.default or Enum.KeyCode.RightShift,
-            Mode = d.Mode or d.mode or "Toggle",
-            Callback = d.Callback or d.callback or function() end
-        })
-    end
-
-    function Toggle:SetVisibility(Bool) Items["Row"].Instance.Visible = Bool end
-
-    Items["Row"]:Connect("MouseButton1Down", function() Toggle:Set(not Toggle.Value) end)
-    Toggle:Set(Toggle.Default)
-    Library.SetFlags[Toggle.Flag] = function(v) Toggle:Set(v) end
-    return Toggle
-end
-
--- ============================================================
--- Button
-Library.Sections.Button = function(self, Data)
-    Data = Data or {}
-    local T = Library.Theme
-    local Button = {
-        Window = self.Window, Page = self.Page, Section = self,
-        Name = Data.Name or Data.name or "Button",
-        Callback = Data.Callback or Data.callback or function() end
-    }
-    local Items = {}
-
-    Items["Button"] = Instances:Create("TextButton", {
-        Parent = Button.Section.Items["Content"].Instance, Name = "\0",
-        FontFace = Library.Font,
-        TextColor3 = T.Text,
-        Text = Button.Name,
-        AutoButtonColor = false,
-        Size = UDim2New(1, 0, 0, 22),
-        BorderSizePixel = 0, TextSize = 12,
-        BackgroundColor3 = T.Element
-    })
-    Corner(Items["Button"].Instance, 4)
-    Items["Button"]:AddToTheme({ BackgroundColor3 = "Element", TextColor3 = "Text" })
-    Instances:Create("UIStroke", { Parent = Items["Button"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
-
-    Items["Button"]:OnHover(function()
-        Items["Button"]:Tween(nil, { BackgroundColor3 = Library:GetLighterColor(Library.Theme.Element, 1.4) })
-    end)
-    Items["Button"]:OnHoverLeave(function()
-        Items["Button"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
-    end)
-
-    function Button:SetVisibility(Bool) Items["Button"].Instance.Visible = Bool end
-    function Button:Press()
-        -- Flash accent color then return
-        Items["Button"]:Tween(TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-            { BackgroundColor3 = Library.Theme.Accent })
-        Library:SafeCall(Button.Callback)
-        task.delay(0.18, function()
-            Items["Button"]:Tween(TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-                { BackgroundColor3 = Library.Theme.Element })
-        end)
-    end
-
-    Items["Button"]:Connect("MouseButton1Down", function() Button:Press() end)
-    return Button
-end
-
--- ============================================================
--- Slider
-Library.Sections.Slider = function(self, Data)
-    Data = Data or {}
-    local T = Library.Theme
-    local Slider = {
-        Window = self.Window, Page = self.Page, Section = self,
-        Name = Data.Name or Data.name or "Slider",
-        Flag = Data.Flag or Data.flag or Library:NextFlag(),
-        Min = Data.Min or Data.min or 0,
-        Decimals = Data.Decimals or Data.decimals or 1,
-        Suffix = Data.Suffix or Data.suffix or "",
-        Max = Data.Max or Data.max or 100,
-        Default = Data.Default or Data.default or 0,
-        Callback = Data.Callback or Data.callback or function() end,
-        Value = 0, Sliding = false
-    }
-    local Items = {}
-
-    Items["Container"] = Instances:Create("Frame", {
-        Parent = Slider.Section.Items["Content"].Instance, Name = "\0",
-        BackgroundTransparency = 1,
-        Size = UDim2New(1, 0, 0, 34),
-        BorderSizePixel = 0,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-
-    local topRow = Instances:Create("Frame", {
-        Parent = Items["Container"].Instance, Name = "\0",
-        BackgroundTransparency = 1,
-        Size = UDim2New(1,0,0,14),
-        BorderSizePixel = 0,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-
-    Items["Text"] = Instances:Create("TextLabel", {
-        Parent = topRow.Instance, Name = "\0",
-        FontFace = Library.Font, TextColor3 = T.TextMuted,
-        Text = Slider.Name,
-        BackgroundTransparency = 1,
-        Size = UDim2New(0,0,1,0),
-        AutomaticSize = Enum.AutomaticSize.X,
-        BorderSizePixel = 0, TextSize = 12,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Items["Text"]:AddToTheme({ TextColor3 = "TextMuted" })
-
-    Items["Value"] = Instances:Create("TextBox", {
-        Parent = topRow.Instance, Name = "\0",
-        FontFace = Library.Font, Active = false,
-        TextColor3 = T.TextMuted, TextSize = 11,
-        Size = UDim2New(0,0,1,0),
-        AnchorPoint = Vector2New(1,0),
-        Position = UDim2New(1,0,0,0),
-        AutomaticSize = Enum.AutomaticSize.X,
-        BackgroundTransparency = 1, BorderSizePixel = 0,
-        Text = "0", Selectable = false,
-        ClearTextOnFocus = false,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Items["Value"]:AddToTheme({ TextColor3 = "TextMuted" })
-
-    Items["Track"] = Instances:Create("TextButton", {
-        Parent = Items["Container"].Instance, Name = "\0",
-        Text = "", AutoButtonColor = false,
-        AnchorPoint = Vector2New(0,1),
-        Position = UDim2New(0,0,1,0),
-        Size = UDim2New(1,0,0,10),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Element
-    })
-    Corner(Items["Track"].Instance, 99)
-    Items["Track"]:AddToTheme({ BackgroundColor3 = "Element" })
-    Instances:Create("UIStroke", { Parent = Items["Track"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
-
-    Items["Fill"] = Instances:Create("Frame", {
-        Parent = Items["Track"].Instance, Name = "\0",
-        Position = UDim2New(0,1,0,1),
-        Size = UDim2New(0.5,0,1,-2),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Accent
-    })
-    Corner(Items["Fill"].Instance, 99)
-    Items["Fill"]:AddToTheme({ BackgroundColor3 = "Accent" })
-
-    Items["Track"]:OnHover(function()
-        Items["Track"]:Tween(nil, { BackgroundColor3 = Library:GetLighterColor(Library.Theme.Element, 1.4) })
-    end)
-    Items["Track"]:OnHoverLeave(function()
-        Items["Track"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
-    end)
-
-    function Slider:Get() return Slider.Value end
-    function Slider:Set(Value)
-        -- FIX: inline round to avoid self confusion
-        local m = 1 / (Slider.Decimals or 1)
-        Slider.Value = MathClamp(MathFloor(Value * m) / m, Slider.Min, Slider.Max)
-        Library.Flags[Slider.Flag] = Slider.Value
-        local pct = (Slider.Value - Slider.Min) / (Slider.Max - Slider.Min)
-        Items["Fill"]:Tween(TweenInfo.new(0.1, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-            { Size = UDim2New(pct, -2, 1, -2) })
-        Items["Value"].Instance.Text = StringFormat("%s%s", Slider.Value, Slider.Suffix)
-        if Slider.Value <= Slider.Min then Items["Fill"].Instance.Visible = false
-        else Items["Fill"].Instance.Visible = true end
-        if Slider.Callback then Library:SafeCall(Slider.Callback, Slider.Value) end
-    end
-
-    Items["Track"]:Connect("InputBegan", function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-            Slider.Sliding = true
-            local sx = (Input.Position.X - Items["Track"].Instance.AbsolutePosition.X) / Items["Track"].Instance.AbsoluteSize.X
-            Slider:Set(((Slider.Max - Slider.Min) * sx) + Slider.Min)
-        end
-    end)
-    Items["Track"]:Connect("InputEnded", function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseButton1 then Slider.Sliding = false end
-    end)
-    Library:Connect(UserInputService.InputChanged, function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseMovement and Slider.Sliding then
-            local sx = (Input.Position.X - Items["Track"].Instance.AbsolutePosition.X) / Items["Track"].Instance.AbsoluteSize.X
-            Slider:Set(((Slider.Max - Slider.Min) * sx) + Slider.Min)
-        end
-    end)
-
-    if Slider.Default then Slider:Set(Slider.Default) end
-    Library.SetFlags[Slider.Flag] = function(v) Slider:Set(v) end
-    return Slider
-end
-
--- ============================================================
--- Dropdown
-Library.Sections.Dropdown = function(self, Data)
-    Data = Data or {}
-    local T = Library.Theme
-    local Dropdown = {
-        Window = self.Window, Page = self.Page, Section = self,
-        Name = Data.Name or Data.name or "Dropdown",
-        Flag = Data.Flag or Data.flag or Library:NextFlag(),
-        Items = Data.Items or Data.items or Data.Options or Data.options or {},
-        Default = Data.Default or Data.default or nil,
-        MaxSize = Data.MaxSize or Data.maxsize or 80,
-        Callback = Data.Callback or Data.callback or function() end,
-        Multi = Data.Multi or Data.multi or false,
-        Options = {}, Value = {}, IsOpen = false
-    }
-    local Items = {}
-
-    Items["Container"] = Instances:Create("Frame", {
-        Parent = Dropdown.Section.Items["Content"].Instance, Name = "\0",
-        BackgroundTransparency = 1,
-        Size = UDim2New(1,0,0,34),
-        ZIndex = 2, BorderSizePixel = 0,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-
-    Items["Text"] = Instances:Create("TextLabel", {
-        Parent = Items["Container"].Instance, Name = "\0",
-        FontFace = Library.Font, TextColor3 = T.TextMuted,
-        Text = Dropdown.Name,
-        BackgroundTransparency = 1,
-        Size = UDim2New(0,0,0,14),
-        AutomaticSize = Enum.AutomaticSize.X,
-        BorderSizePixel = 0, TextSize = 12,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Items["Text"]:AddToTheme({ TextColor3 = "TextMuted" })
-
-    Items["Button"] = Instances:Create("TextButton", {
-        Parent = Items["Container"].Instance, Name = "\0",
-        Text = "", AutoButtonColor = false,
-        AnchorPoint = Vector2New(0,1),
-        Position = UDim2New(0,0,1,0),
-        Size = UDim2New(1,0,0,18),
-        BorderSizePixel = 0, TextSize = 12,
-        BackgroundColor3 = T.Element
-    })
-    Corner(Items["Button"].Instance, 4)
-    Items["Button"]:AddToTheme({ BackgroundColor3 = "Element" })
-    Instances:Create("UIStroke", { Parent = Items["Button"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
-
-    Items["Selected"] = Instances:Create("TextLabel", {
-        Parent = Items["Button"].Instance, Name = "\0",
-        FontFace = Library.Font, TextColor3 = T.TextMuted,
-        Text = "-", AnchorPoint = Vector2New(0,0.5),
-        Size = UDim2New(1,-20,0,12),
-        BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left,
-        Position = UDim2New(0,8,0.5,0),
-        BorderSizePixel = 0, TextSize = 11,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Items["Selected"]:AddToTheme({ TextColor3 = "TextMuted" })
-
-    Items["Arrow"] = Instances:Create("TextLabel", {
-        Parent = Items["Button"].Instance, Name = "\0",
-        FontFace = Library.Font, TextColor3 = T.TextMuted,
-        Text = "▾", AnchorPoint = Vector2New(1,0.5),
-        Size = UDim2New(0,14,0,12),
-        BackgroundTransparency = 1,
-        Position = UDim2New(1,-4,0.5,0),
-        BorderSizePixel = 0, TextSize = 12,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Items["Arrow"]:AddToTheme({ TextColor3 = "TextMuted" })
-
-    Items["OptionHolder"] = Instances:Create("TextButton", {
-        Parent = Library.Holder.Instance, Name = "\0",
-        Text = "", AutoButtonColor = false,
-        Visible = false,
-        Position = UDim2New(0,0,1,0),
-        Size = UDim2New(0,100,0,100),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Surface
-    })
-    Corner(Items["OptionHolder"].Instance, 5)
-    Items["OptionHolder"]:AddToTheme({ BackgroundColor3 = "Surface" })
-    Instances:Create("UIStroke", { Parent = Items["OptionHolder"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
-
-    Items["Search"] = Instances:Create("TextBox", {
-        Parent = Items["OptionHolder"].Instance, Name = "\0",
-        FontFace = Library.Font,
-        TextColor3 = T.Text, TextTransparency = 0.4,
-        Text = "",
-        Size = UDim2New(1,-8,0,14),
-        Position = UDim2New(0,4,0,5),
-        BackgroundTransparency = 1, BorderSizePixel = 0,
-        PlaceholderColor3 = T.TextMuted,
-        PlaceholderText = "Search...",
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextSize = 11,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Items["Search"]:AddToTheme({ TextColor3 = "Text" })
-
-    Instances:Create("Frame", {
-        Parent = Items["OptionHolder"].Instance, Name = "\0",
-        Position = UDim2New(0,4,0,22),
-        Size = UDim2New(1,-8,0,1),
-        BorderSizePixel = 0,
-        BackgroundColor3 = T.Border
-    }):AddToTheme({ BackgroundColor3 = "Border" })
-
-    Items["Holder"] = Instances:Create("ScrollingFrame", {
-        Parent = Items["OptionHolder"].Instance, Name = "\0",
-        Active = true,
-        AutomaticCanvasSize = Enum.AutomaticSize.Y,
-        BorderSizePixel = 0, CanvasSize = UDim2New(0,0,0,0),
-        ScrollBarImageColor3 = T.Border,
-        ScrollBarThickness = 2,
-        Size = UDim2New(1,-4,1,-28),
-        BackgroundTransparency = 1,
-        Position = UDim2New(0,0,0,26),
-    })
-    Items["Holder"]:AddToTheme({ ScrollBarImageColor3 = "Border" })
-    Instances:Create("UIPadding", { Parent = Items["Holder"].Instance, Name = "\0",
-        PaddingTop = UDimNew(0,4), PaddingBottom = UDimNew(0,4),
-        PaddingLeft = UDimNew(0,6), PaddingRight = UDimNew(0,8) })
-    Instances:Create("UIListLayout", { Parent = Items["Holder"].Instance, Name = "\0",
-        Padding = UDimNew(0,3), SortOrder = Enum.SortOrder.LayoutOrder })
-
-    Items["Button"]:OnHover(function()
-        Items["Button"]:Tween(nil, { BackgroundColor3 = Library:GetLighterColor(Library.Theme.Element, 1.4) })
-    end)
-    Items["Button"]:OnHoverLeave(function()
-        Items["Button"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
-    end)
-
-    function Dropdown:Get() return Dropdown.Value end
-
-    function Dropdown:Set(Option)
-        if Data.Multi then
-            if type(Option) ~= "table" then return end
-            Dropdown.Value = Option
-            Library.Flags[Dropdown.Flag] = Option
-            for _, v in Option do
-                local od = Dropdown.Options[v]
-                if od then od.Selected = true od:Toggle("Active") end
-            end
-            Items["Selected"].Instance.Text = #Option > 0 and TableConcat(Option, ", ") or "-"
-        else
-            if not Dropdown.Options[Option] then return end
-            Dropdown.Value = Option
-            Library.Flags[Dropdown.Flag] = Option
-            for _, v in Dropdown.Options do
-                if v.Name ~= Option then v.Selected = false v:Toggle("Inactive")
-                else v.Selected = true v:Toggle("Active") end
-            end
-            Items["Selected"].Instance.Text = Option
-        end
-        if Dropdown.Callback then Library:SafeCall(Dropdown.Callback, Dropdown.Value) end
-    end
-
-    local DDDebounce = false
-    local DDRenderStepped
-
-    function Dropdown:SetOpen(Bool)
-        if DDDebounce then return end
-        Dropdown.IsOpen = Bool
-        DDDebounce = true
-        if Bool then
-            Items["OptionHolder"].Instance.Visible = true
-            Items["OptionHolder"].Instance.Parent = Library.Holder.Instance
-            DDRenderStepped = RunService.RenderStepped:Connect(function()
-                Items["OptionHolder"].Instance.Position = UDim2New(0,
-                    Items["Button"].Instance.AbsolutePosition.X, 0,
-                    Items["Button"].Instance.AbsolutePosition.Y + Items["Button"].Instance.AbsoluteSize.Y + 65)
-                Items["OptionHolder"].Instance.Size = UDim2New(0, Items["Button"].Instance.AbsoluteSize.X, 0, Dropdown.MaxSize)
-            end)
-            for _, v in Library.OpenFrames do
-                if v ~= Dropdown then v:SetOpen(false) end
-            end
-            Library.OpenFrames[Dropdown] = Dropdown
-            Items["Arrow"].Instance.Text = "▴"
-        else
-            if DDRenderStepped then DDRenderStepped:Disconnect() DDRenderStepped = nil end
-            Library.OpenFrames[Dropdown] = nil
-            Items["Arrow"].Instance.Text = "▾"
-        end
-
-        local all = Items["OptionHolder"].Instance:GetDescendants()
-        TableInsert(all, Items["OptionHolder"].Instance)
-        local nt
-        for _, v in all do
-            local tp = Tween:GetProperty(v)
-            if not tp then continue end
-            if not v.ClassName:find("UI") then v.ZIndex = Dropdown.IsOpen and 10 or 1 end
-            if type(tp) == "table" then
-                for _, p in tp do nt = Tween:FadeItem(v, p, Bool, 0.15) end
-            else nt = Tween:FadeItem(v, tp, Bool, 0.15) end
-        end
-        Library:Connect(nt.Tween.Completed, function()
-            DDDebounce = false
-            Items["OptionHolder"].Instance.Visible = Dropdown.IsOpen
-            task.wait(0.2)
-            Items["OptionHolder"].Instance.Parent = not Dropdown.IsOpen and Library.UnusedHolder.Instance or Library.Holder.Instance
-        end)
-    end
-
-    function Dropdown:Add(Option)
-        local first = #Dropdown.Options == 0
-        local btn = Instances:Create("TextButton", {
-            Parent = Items["Holder"].Instance, Name = "\0",
-            FontFace = Library.Font, Text = "", AutoButtonColor = false,
-            BackgroundTransparency = 1,
-            Size = UDim2New(1,0,0,18),
-            BorderSizePixel = 0, TextSize = 12,
-            BackgroundColor3 = T.ElementHover
-        })
-        Corner(btn.Instance, 3)
-        btn:AddToTheme({ BackgroundColor3 = "ElementHover" })
-
-        local liner = Instances:Create("Frame", {
-            Parent = btn.Instance, Name = "\0",
-            BackgroundTransparency = 1,
-            Size = UDim2New(0,2,0.6,0),
-            AnchorPoint = Vector2New(0,0.5),
-            Position = UDim2New(0,3,0.5,0),
-            BorderSizePixel = 0,
-            BackgroundColor3 = T.Accent
-        })
-        Corner(liner.Instance, 2)
-        liner:AddToTheme({ BackgroundColor3 = "Accent" })
-
-        local txt = Instances:Create("TextLabel", {
-            Parent = btn.Instance, Name = "\0",
-            FontFace = Library.Font, TextColor3 = T.TextMuted,
-            Text = Option,
-            Size = UDim2New(1,-12,0,12),
-            AnchorPoint = Vector2New(0,0.5),
-            BackgroundTransparency = 1,
-            Position = UDim2New(0,10,0.5,0),
-            AutomaticSize = Enum.AutomaticSize.X,
-            BorderSizePixel = 0, TextSize = 11,
-            BackgroundColor3 = FromRGB(255,255,255)
-        })
-        txt:AddToTheme({ TextColor3 = "TextMuted" })
-
-        local od = { Button = btn, Selected = false, Name = Option, Text = txt, Liner = liner, IsFirstOption = first }
-
-        function od:Toggle(Status)
-            if Status == "Active" then
-                od.Liner:Tween(nil, { BackgroundTransparency = 0 })
-                od.Text:Tween(nil, { TextTransparency = 0 })
-                od.Button:Tween(nil, { BackgroundTransparency = 0 })
-            else
-                od.Liner:Tween(nil, { BackgroundTransparency = 1 })
-                od.Text:Tween(nil, { TextTransparency = 0.4 })
-                od.Button:Tween(nil, { BackgroundTransparency = 1 })
-            end
-        end
-
-        function od:Set()
-            od.Selected = not od.Selected
-            if Data.Multi then
-                local idx = TableFind(Dropdown.Value, od.Name)
-                if idx then TableRemove(Dropdown.Value, idx)
-                else TableInsert(Dropdown.Value, od.Name) end
-                od:Toggle(idx and "Inactive" or "Active")
-                Library.Flags[Dropdown.Flag] = Dropdown.Value
-                Items["Selected"].Instance.Text = #Dropdown.Value > 0 and TableConcat(Dropdown.Value, ", ") or "-"
-            else
-                if od.Selected then
-                    Dropdown.Value = od.Name
-                    Library.Flags[Dropdown.Flag] = od.Name
-                    od:Toggle("Active")
-                    for _, v in Dropdown.Options do if v ~= od then v.Selected = false v:Toggle("Inactive") end end
-                    Items["Selected"].Instance.Text = od.Name
-                else
-                    Dropdown.Value = nil
-                    Library.Flags[Dropdown.Flag] = nil
-                    od:Toggle("Inactive")
-                    Items["Selected"].Instance.Text = "-"
+            for i, v in lplr.Backpack:GetChildren() do
+                if v:IsA('Tool') then
+                    if v:FindFirstChild('Ammo') and not killing and not stomping then
+                        if v.Ammo.Value == 0 and utils.getfullammo(v) ~= 0 then
+                            v.Parent = lplr.Character
+                            utils.reload(v)
+
+                            repeat task.wait() until not bodyeffects.get(lplr, 'Reload')
+							
+                            v.Parent = lplr.Backpack
+                            task.wait(1)
+                        end
+                    end
                 end
             end
-            if Dropdown.Callback then Library:SafeCall(Dropdown.Callback, Dropdown.Value) end
+		end
+	until not game
+end)
+--[[
+task.spawn(function()
+	repeat task.wait() 
+		if sentry then
+			for i, v in getgenv().altcontrol.owners do
+				local plr = players:FindFirstChild(v)
+				if plr and plr.Character and plr.Character:FindFirstChild('Humanoid') then
+					if bodyeffects.get(plr, 'LastDamager') ~= '' and bodyeffects.get(plr, 'LastDamager') ~= nil then
+						local r = bodyeffects.get(plr, 'LastDamager')
+						local gr = players:FindFirstChild(r.Name)
+
+						if gr and gr.Character and gr.Character:FindFirstChild('Humanoid') then
+							if killing or target then continue end
+
+							killing = true
+							target = gr
+							repeat task.wait() until not killing or not sentry or stop
+							
+							if mode == 'stomp' then
+								stomping = true
+								target = gr
+								repeat task.wait() until not stomping or not sentry or stop
+							end
+
+							target = nil
+						end
+					end
+				end
+			end
+		end
+	until not game
+end)]]
+
+replicated.MainEvent.OnClientEvent:Connect(function(name, plr, handle, forced, aimpos, part, _)
+	if name ~= 'ClientBullet' then return end
+	if not sentry then return end
+	if killing or stomping then return end
+
+	if assist and part then
+		local victim
+		for i, v in players:GetPlayers() do
+			if part:IsDescendantOf(v.Character) then
+				victim = v
+				break
+			end
+		end
+
+		if table.find(getgenv().altcontrol.owners, plr.Name) and victim then
+            if victim.Name ~= lplr.Name and not table.find(getgenv().altcontrol.owners, victim.Name) and not table.find(whitelist, victim.Name) then
+				target = victim
+				killing = true
+				repeat task.wait() until not killing or stop or not assist
+				target = nil
+			end
+		end
+	end
+
+	if sentry and part and not killing then
+		local victim
+		for i, v in players:GetPlayers() do
+			if part:IsDescendantOf(v.Character) then
+				victim = v
+				break
+			end
+		end
+
+		if victim then
+            if victim.Name ~= lplr.Name and table.find(getgenv().altcontrol.owners, victim.Name) and not table.find(whitelist, victim.Name) then
+				plr = players:GetPlayerFromCharacter(plr)
+				killing = true
+				target = plr
+
+				repeat task.wait() until not killing or stop or not sentry
+				target = nil
+				
+				if mode == 'stomp' then
+					stomping = true
+					target = plr
+					repeat task.wait() until not stomping or stop or not sentry
+					target = nil
+				end
+
+				utils.update(CFrame.new(x(), yy(), x()))
+			end
+		end
+	end
+end)
+
+local killauraig = function(plr)
+    if not ka then return end
+    if stop then return end
+    if not localent.Alive then return end
+	if not altcontrol.owners then return end
+    
+    for i, v in altcontrol.owners do
+        local owner = players:FindFirstChild(v)
+        local targ = players:FindFirstChild(plr)
+
+        if not targ or not targ.Character or not targ.Character:FindFirstChild('Humanoid') or not targ.Character:FindFirstChild('HumanoidRootPart') then continue end
+        if not owner or not owner.Character or not owner.Character:FindFirstChild('Humanoid') or not owner.Character:FindFirstChild('HumanoidRootPart') then continue end
+        
+        if targ.Name == lplr.Name or targ.Name == v or plr.Name == owner.Name or plr.Name == lplr.Name then continue end
+        if not targ.Character.HumanoidRootPart or not owner.Character.HumanoidRootPart or (owner.Character.HumanoidRootPart.Position - targ.Character.HumanoidRootPart.Position).Magnitude > karange then continue end
+        if targ.Character:FindFirstChild('ForceField') or bodyeffects.get(plr, 'SDeath') or targ.Character:FindFirstChild('GRABBING_CONSTRAINT') or table.find(altcontrol.owners, plr.Name) then
+            continue
         end
 
-        btn:Connect("MouseButton1Down", function() od:Set() end)
-        Dropdown.Options[od.Name] = od
-        return od
+		if table.find(whitelist, targ.Name) then continue end
+		if not bodyeffects.get(targ, 'K.O') then
+			if killing or target then return end
+
+			target = targ
+			killing = true
+
+			repeat task.wait() until not killing or not ka or stop
+
+			if not void then
+				void = true
+			end
+		end
     end
+end
 
-    function Dropdown:Remove(Option)
-        local od = Dropdown.Options[Option]
-        if od then od.Button:Clean() Dropdown.Options[Option] = nil end
-    end
+task.spawn(function()
+	repeat task.wait(0.1)
+		if not ka then continue end
+		if stop then continue end
+		if not localent.Alive then continue end
 
-    function Dropdown:Refresh(List)
-        for _, v in Dropdown.Options do Dropdown:Remove(v.Name) end
-        for _, v in List do Dropdown:Add(v) end
-    end
+		for _, v in players:GetPlayers() do
+			if not ka then break end
+			killauraig(v.Name)
+		end
+	until not game
+end)
 
-    for _, v in Dropdown.Items do Dropdown:Add(v) end
+return function(api)
+	task.spawn(function()
+		repeat task.wait()
+			if bodyeffects.get(lplr, 'K.O') then
+				api.reset()
+				repeat task.wait() until localent.Alive
+				utils.update(CFrame.new(x(), yy(), x()))
+				continue
+			end
+		until not game
+	end)
+	
+	api.new('.k', {'!k', '.kill', '!kill'}, function(self, targetss)
+		local targets = {}
 
-    Items["Button"]:Connect("MouseButton1Down", function() Dropdown:SetOpen(not Dropdown.IsOpen) end)
+		if not targetss then
+			api.chat('you must specify who to target', watermark)
+			return
+		end
 
-    Library:Connect(UserInputService.InputBegan, function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-            if not Dropdown.IsOpen then return end
-            if Library:IsMouseOverFrame(Items["OptionHolder"]) then return end
-            Dropdown:SetOpen(false)
-        end
-    end)
-
-    local SearchStepped
-    Items["Search"]:Connect("Focused", function()
-        SearchStepped = RunService.RenderStepped:Connect(function()
-            for _, v in Dropdown.Options do
-                if Items["Search"].Instance.Text ~= "" then
-                    v.Button.Instance.Visible = StringFind(StringLower(v.Name), Library:EscapePattern(StringLower(Items["Search"].Instance.Text))) and true or false
-                else v.Button.Instance.Visible = true end
+		if targetss:find(',') then
+			for _, name in string.split(targetss, ',') do
+                local t = api.getname(name)
+                if t and t ~= lplr then
+                    table.insert(targets, t)
+                end
             end
-        end)
-    end)
-    Items["Search"]:Connect("FocusLost", function()
-        if SearchStepped then SearchStepped:Disconnect() SearchStepped = nil end
-    end)
+		else
+			local user = api.getname(targetss)
+			table.insert(targets, user)
+		end
 
-    Library.SetFlags[Dropdown.Flag] = function(v) Dropdown:Set(v) end
-    if Dropdown.Default then Dropdown:Set(Dropdown.Default)
-    else
-        for _, v in Dropdown.Options do
-            if v.IsFirstOption then Dropdown:Set(v.Name) break end
-        end
-    end
-    return Dropdown
-end
+		if not targets or #targets == 0 then
+			api.chat('no targets found', watermark)
+			return
+		end
 
--- ============================================================
--- Label
-Library.Sections.Label = function(self, Name)
-    local T = Library.Theme
-    local Label = { Window = self.Window, Page = self.Page, Section = self, Name = Name or "Label" }
-    local Items = {}
+		api.chat('Okay!', watermark)
+		for i, v in targets do
+			killing = true
+			target = v
+			repeat task.wait() until not killing
+		end
 
-    Items["Row"] = Instances:Create("Frame", {
-        Parent = Label.Section.Items["Content"].Instance, Name = "\0",
-        BackgroundTransparency = 1,
-        Size = UDim2New(1,0,0,16),
-        BorderSizePixel = 0,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Items["Text"] = Instances:Create("TextLabel", {
-        Parent = Items["Row"].Instance, Name = "\0",
-        FontFace = Library.Font, TextColor3 = T.TextMuted,
-        Text = Label.Name,
-        BackgroundTransparency = 1,
-        Size = UDim2New(0,0,1,0),
-        AutomaticSize = Enum.AutomaticSize.X,
-        BorderSizePixel = 0, TextSize = 12,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Items["Text"]:AddToTheme({ TextColor3 = "TextMuted" })
+		api.chat('The deed is done...', watermark)
+	end);
 
-    Items["SubElements"] = Instances:Create("Frame", {
-        Parent = Items["Row"].Instance, Name = "\0",
-        AnchorPoint = Vector2New(1,0.5),
-        Position = UDim2New(1,0,0.5,0),
-        Size = UDim2New(0,0,1,0),
-        ZIndex = 2, AutomaticSize = Enum.AutomaticSize.X,
-        BackgroundTransparency = 1, BorderSizePixel = 0,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Instances:Create("UIListLayout", { Parent = Items["SubElements"].Instance, Name = "\0",
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        FillDirection = Enum.FillDirection.Horizontal,
-        HorizontalAlignment = Enum.HorizontalAlignment.Right,
-        Padding = UDimNew(0,6), SortOrder = Enum.SortOrder.LayoutOrder })
+	local anticrashCon
+	local crasher
 
-    function Label:SetText(Text) Items["Text"].Instance.Text = tostring(Text) end
-    function Label:SetVisibility(Bool) Items["Row"].Instance.Visible = Bool end
+	local d = function(accessory)
+		if accessory:IsA('Accessory') then
+			accessory:Destroy()
+		end
+	end
 
-    function Label:Colorpicker(d)
-        d = d or {}
-        return Library:CreateColorpicker({
-            Parent = Items["SubElements"], Page = Label.Page,
-            Flag = d.Flag or d.flag or Library:NextFlag(),
-            Section = Label.Section,
-            Default = d.Default or d.default or Color3.fromRGB(255,255,255),
-            Alpha = d.Alpha or d.alpha or 0,
-            Callback = d.Callback or d.callback or function() end
-        })
-    end
+	api.new('.c', {'!c', '!crash'}, function(self)
+		if anticrashCon then
+			anticrashCon:Disconnect()
+			anticrashCon = nil
+		end
 
-    function Label:Keybind(d)
-        d = d or {}
-        return Library:CreateKeybind({
-            Name = d.Name or d.name or "Keybind",
-            Parent = Items["SubElements"],
-            Flag = d.Flag or d.flag or Library:NextFlag(),
-            Section = Label.Section,
-            Default = d.Default or d.default or Enum.KeyCode.RightShift,
-            Mode = d.Mode or d.mode or "Toggle",
-            Callback = d.Callback or d.callback or function() end
-        })
-    end
+		for _, v in lplr.Character:GetChildren() do
+			d(v)
+		end
 
-    return Label
-end
+		anticrashCon = lplr.Character.ChildAdded:Connect(d)
 
--- ============================================================
--- Textbox
-Library.Sections.Textbox = function(self, Data)
-    Data = Data or {}
-    local T = Library.Theme
-    local Textbox = {
-        Window = self.Window, Page = self.Page, Section = self,
-        Name = Data.Name or Data.name or "Textbox",
-        Flag = Data.Flag or Data.flag or Library:NextFlag(),
-        Default = Data.Default or Data.default or "",
-        Callback = Data.Callback or Data.callback or function() end,
-        Placeholder = Data.Placeholder or Data.placeholder or "...",
-        Finished = Data.Finished or Data.finished or false,
-        Numeric = Data.Numeric or Data.numeric or false,
-        Value = ""
-    }
-    local Items = {}
+		crasher = not crasher
+		api.chat((crasher and 'started' or 'disabled')..' crasher', watermark)
+		if not crasher then return end
 
-    Items["Row"] = Instances:Create("Frame", {
-        Parent = Textbox.Section.Items["Content"].Instance, Name = "\0",
-        BackgroundTransparency = 1,
-        Size = UDim2New(1,0,0,20),
-        BorderSizePixel = 0,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
+		if crasher then
+			repeat
+				for i, v in lplr.Backpack:GetChildren() do
+					lplr.Character.Humanoid:EquipTool(v)
+					task.wait(0.1)
+					lplr.Character.Humanoid:UnequipTools()
+				end
+				task.wait()
+			until not crasher
+		else
+			return
+		end
+	end)
 
-    Items["Input"] = Instances:Create("TextBox", {
-        Parent = Items["Row"].Instance, Name = "\0",
-        FontFace = Library.Font,
-        CursorPosition = -1,
-        TextColor3 = T.Text,
-        Size = UDim2New(0.58,0,1,0),
-        BorderSizePixel = 0,
-        PlaceholderColor3 = T.TextMuted,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        PlaceholderText = Textbox.Placeholder,
-        TextSize = 11,
-        BackgroundColor3 = T.Element
-    })
-    Corner(Items["Input"].Instance, 4)
-    Items["Input"]:AddToTheme({ TextColor3 = "Text", BackgroundColor3 = "Element" })
-    Instances:Create("UIPadding", { Parent = Items["Input"].Instance, Name = "\0",
-        PaddingLeft = UDimNew(0,6) })
-    Instances:Create("UIStroke", { Parent = Items["Input"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
+	api.new('.sc', {'.cancel', '!sc', '!cancel'}, function()
+		crasher = not crasher
+		api.chat((crasher and 'started' or 'disabled')..' crasher', watermark)
+	end)
 
-    Items["Label"] = Instances:Create("TextLabel", {
-        Parent = Items["Row"].Instance, Name = "\0",
-        FontFace = Library.Font, TextColor3 = T.TextMuted,
-        Text = Textbox.Name,
-        AnchorPoint = Vector2New(1,0.5),
-        Size = UDim2New(0,0,0,14),
-        BackgroundTransparency = 1,
-        Position = UDim2New(1,0,0.5,0),
-        AutomaticSize = Enum.AutomaticSize.X,
-        BorderSizePixel = 0, TextSize = 12,
-        BackgroundColor3 = FromRGB(255,255,255)
-    })
-    Items["Label"]:AddToTheme({ TextColor3 = "TextMuted" })
+	api.new('.s', {'!s'}, function(self, targetss)
+		local targets = {}
 
-    Items["Input"]:OnHover(function()
-        Items["Input"]:Tween(nil, { BackgroundColor3 = Library:GetLighterColor(Library.Theme.Element, 1.4) })
-    end)
-    Items["Input"]:OnHoverLeave(function()
-        Items["Input"]:Tween(nil, { BackgroundColor3 = Library.Theme.Element })
-    end)
+		if not targetss then
+			api.chat('you must specify who to target', watermark)
+			return
+		end
 
-    function Textbox:Get() return Textbox.Value end
-    function Textbox:SetVisibility(Bool) Items["Row"].Instance.Visible = Bool end
-    function Textbox:Set(Value)
-        if Textbox.Numeric then
-            if (not tonumber(Value)) and StringLen(tostring(Value)) > 0 then Value = Textbox.Value end
-        end
-        Textbox.Value = Value
-        Items["Input"].Instance.Text = Value
-        Library.Flags[Textbox.Flag] = Value
-        if Textbox.Callback then Library:SafeCall(Textbox.Callback, Textbox.Value) end
-    end
-
-    if Textbox.Finished then
-        Items["Input"]:Connect("FocusLost", function(enter)
-            if enter then Textbox:Set(Items["Input"].Instance.Text) end
-        end)
-    else
-        Items["Input"].Instance:GetPropertyChangedSignal("Text"):Connect(function()
-            Textbox:Set(Items["Input"].Instance.Text)
-        end)
-    end
-
-    if Textbox.Default then Textbox:Set(Textbox.Default) end
-    Library.SetFlags[Textbox.Flag] = function(v) Textbox:Set(v) end
-    return Textbox
-end
-
--- ============================================================
--- Settings page
-Library.CreateSettingsPage = function(self, Window, KeybindList, Watermark, ModeratorList)
-    local SP = Window:Page({ Name = "Settings", Columns = 2 })
-    local SS = SP:Section({ Name = "Settings", Side = 1 }) do
-        SS:Button({ Name = "Unload", Callback = function() Library:Unload() end })
-        SS:Toggle({ Name = "Watermark", Flag = "Watermark", Default = true, Callback = function(v) Watermark:SetVisibility(v) end })
-        SS:Toggle({ Name = "Keybind List", Flag = "Keybind list", Default = true, Callback = function(v) KeybindList:SetVisibility(v) end })
-        SS:Toggle({ Name = "Moderator List", Flag = "Moderator list", Default = true, Callback = function(v) if ModeratorList then ModeratorList:SetVisibility(v) end end })
-        SS:Label("Menu Keybind"):Keybind({ Name = "Menu Keybind", Flag = "MenuKeybind", Default = Library.MenuKeybind, Mode = "Toggle", Callback = function() Library.MenuKeybind = Library.Flags["MenuKeybind"].Key end })
-        SS:Slider({ Name = "Tween Speed", Default = 0.18, Flag = "Tween Speed", Decimals = 0.01, Suffix = "s", Max = 2, Min = 0, Callback = function(v) Library.Tween.Time = v end })
-        SS:Dropdown({ Name = "Tween Style", Flag = "Tween style", MaxSize = 200, Items = { "Linear", "Quad", "Quart", "Back", "Bounce", "Circular", "Cubic", "Elastic", "Exponential", "Sine", "Quint" }, Default = "Quart", Callback = function(v) if not v then v = "Quart" end Library.Tween.Style = Enum.EasingStyle[v] end })
-        SS:Dropdown({ Name = "Tween Direction", Flag = "Tween direction", Items = { "In", "Out", "InOut" }, Default = "Out", Callback = function(v) if not v then v = "Out" end Library.Tween.Direction = Enum.EasingDirection[v] end })
-    end
-
-    local CS = SP:Section({ Name = "Configs", Side = 2 }) do
-        local configName, configSelected
-        local cDropdown = CS:Dropdown({ Name = "Profiles", Flag = "Profiles list", Multi = false, Items = {}, Callback = function(v) configSelected = v end })
-        CS:Textbox({ Name = "Config name", Default = "", Flag = "ConfigName", Placeholder = "...", Callback = function(v) configName = v end })
-        CS:Button({ Name = "Create", Callback = function()
-            if configName ~= "" and not isfile(Library.Folders.Configs .. "/" .. configName .. ".json") then
-                writefile(Library.Folders.Configs .. "/" .. configName .. ".json", Library:GetConfig())
-                Library:RefreshConfigsList(cDropdown)
-                Library:Notification("Created " .. configName, 4)
+		if targetss:find(',') then
+			for _, name in string.split(targetss, ',') do
+                local t = api.getname(name)
+                if t and t ~= lplr then
+                    table.insert(targets, t)
+                end
             end
-        end })
-        CS:Button({ Name = "Delete", Callback = function()
-            if configSelected then
-                delfile(Library.Folders.Configs .. "/" .. configSelected .. ".json")
-                Library:RefreshConfigsList(cDropdown)
-                Library:Notification("Deleted " .. configSelected, 4)
-            end
-        end })
-        CS:Button({ Name = "Load", Callback = function()
-            if configSelected then
-                local ok = Library:LoadConfig(readfile(Library.Folders.Configs .. "/" .. configSelected .. ".json"))
-                Library:Notification(ok and ("Loaded " .. configSelected) or "Load failed", 4)
-            end
-        end })
-        CS:Button({ Name = "Save", Callback = function()
-            if configSelected then
-                writefile(Library.Folders.Configs .. "/" .. configSelected .. ".json", Library:GetConfig())
-                Library:Notification("Saved " .. configSelected, 4)
-            end
-        end })
-        CS:Button({ Name = "Refresh", Callback = function() Library:RefreshConfigsList(cDropdown) end })
-        Library:RefreshConfigsList(cDropdown)
-    end
+		else
+			local user = api.getname(targetss)
+			table.insert(targets, user)
+		end
 
-    local TS = SP:Section({ Name = "Theming", Side = 2 }) do
-        for k, v in Library.Theme do
-            TS:Label(k):Colorpicker({ Flag = "Theme_" .. k, Default = v, Callback = function(col) Library:ChangeTheme(k, col) end })
+		if not targets or #targets == 0 then
+			api.chat('no targets found', watermark)
+			return
+		end
+
+		api.chat('Okay!', watermark)
+
+		for i, v in targets do 
+			killing = true
+			target = v
+
+			repeat task.wait() until not killing
+
+			stomping = true
+			target = v
+
+			repeat task.wait() until not stomping or bodyeffects.get(v, 'SDeath') or not bodyeffects.get(v, 'K.O')
+		end
+
+		api.chat('The deed is done...', watermark)
+	end);
+
+	local auto = false
+	api.new('.a', {'!a', '!auto', '.auto'}, function(self, targetss)
+		auto = not auto
+		api.chat((auto and 'enabled' or 'disabled')..' auto kill', watermark)
+		
+		if not auto then
+			return
+		end
+
+		if not targetss then
+			api.chat('you must specify who to target', watermark)
+			return
+		end
+
+		local targets = {}
+
+		if targetss:find(',') then
+			for _, name in string.split(targetss, ',') do
+                local t = api.getname(name)
+                if t and t ~= lplr then
+                    table.insert(targets, t)
+                end
+            end
+		else
+			local user = api.getname(targetss)
+			if not user then
+				auto = not auto
+				api.chat('target not found')
+				return
+			end
+			table.insert(targets, user)
+		end
+
+		repeat task.wait()
+			if auto then
+				for i, v in targets do
+					if not players:FindFirstChild(v.Name) then
+						local idx = table.find(targets, v.Name)
+						if idx then
+							table.remove(targets, idx)
+						end
+					end
+
+					if not bodyeffects.get(v, 'SDeath') then
+						killing = true
+						target = v
+
+						repeat task.wait() until not killing or not auto
+						if not auto then break end
+						task.wait(0.1)
+
+						stomping = true
+						target = v
+
+						repeat task.wait() until not stomping or not auto or bodyeffects.get(v, 'SDeath') or not bodyeffects.get(v, 'K.O')
+					else
+						camera.CameraSubject = lplr.Character.Humanoid
+						utils.update(CFrame.new(x(), yy(), x()))
+						info.Text = 'retargetting (void)'
+					end
+				end
+			end
+		until not auto
+	end);
+
+	--> issue, doesnt teleport on to player, kils, doenst pick up
+	--[[api.new('.tp', {'!tp'}, function(player, to)
+		if not pos[to] then
+			api.chat('place not found', watermark)
+			return
+		end
+
+		killing = true
+		target = player
+
+		repeat task.wait() until not killing or stop
+
+		task.wait(0.37)
+		void = false
+
+		repeat
+			utils.update(CFrame.new(player.Character.UpperTorso.Position) + Vector3.new(0, stomp_offset, 0))
+			replicated.MainEvent:FireServer('Grabbing')
+		until target and target.Character and target.Character:FindFirstChild('GRABBING_CONSTRAINT') or bodyeffects.get(target, 'Grabbed') or not bodyeffects.get(target, 'K.O')
+		
+		local suc = (bodyeffects.get(target, 'Grabbed') or target and target.Character and target.Character:FindFirstChild('GRABBING_CONSTRAINT'))
+
+--[[		if suc then
+			utils.update(CFrame.new(pos[to]) + Vector3.new(3, 5, 0))
+			task.wait(0.37)
+			replicated.MainEvent:FireServer('Grabbing', false)
+			task.wait(0.2)
+			void = true
+		else
+			void = true
+		end
+	end)]]
+
+	api.new('.b', {'!b', '!bring'}, function(player, bring, to)
+		local t = api.getname(to)
+		local rr = api.getname(bring)
+
+		if not rr then return end
+		if not t then
+			t = player
+		end
+
+		killing = true
+		target = rr
+		
+		repeat task.wait() until not killing or stop
+
+		for i, v in lplr.Character:GetChildren() do
+			if v:IsA('Tool') then
+				if not v then continue end
+				v.Parent = lplr.Backpack
+			end
+		end
+
+		grabbing = true
+		void = false
+
+		local old1 = showtarget
+		local old2 = show
+
+		if showtarget then
+			showtarget = nil
+			show = false
+		end
+
+		if rr and rr.Character and rr.Character:FindFirstChild('GRABBING_CONSTRAINT') then
+			api.chat('target is already grabbed', watermark)
+			void = true
+			return
+		end
+
+		local con
+		if localent.Alive then
+			lplr.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+			lplr.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+		end
+		
+		con = runservice.Heartbeat:Connect(function()
+			if not grabbing then
+				con:Disconnect()
+				return
+			end
+			
+			if lplr.Character and lplr.Character:FindFirstChild('HumanoidRootPart') and localent.Alive then
+				lplr.Character.HumanoidRootPart.Velocity = Vector3.zero
+				lplr.Character.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+				lplr.Character.HumanoidRootPart.RotVelocity = Vector3.zero
+				lplr.Character.HumanoidRootPart.AssemblyAngularVelocity = Vector3.zero
+			end
+		end)
+
+		utils.update(CFrame.new(rr.Character.LowerTorso.Position) + Vector3.new(0, stomp_offset, 0))
+
+		repeat
+			utils.update(CFrame.new(rr.Character.LowerTorso.Position) + Vector3.new(0, stomp_offset, 0))
+			replicated.MainEvent:FireServer('Grabbing', false)
+			task.wait(0.37)
+		until rr and rr.Character and rr.Character:FindFirstChild('GRABBING_CONSTRAINT') or bodyeffects.get(rr, 'Grabbed') or not bodyeffects.get(rr, 'K.O') or bodyeffects.get(rr, 'SDeath')
+		
+		local suc = (bodyeffects.get(rr, 'Grabbed') or rr and rr.Character and rr.Character:FindFirstChild('GRABBING_CONSTRAINT'))
+
+		if suc then
+			utils.update(CFrame.new(t.Character.LowerTorso.Position) + Vector3.new(3, 5, 0))
+			task.wait(0.37)
+			replicated.MainEvent:FireServer('Grabbing', false)
+			task.wait(0.2)
+		end
+
+		grabbing = false
+		
+		if lplr.Character:FindFirstChild('Humanoid') and localent.Alive then
+			lplr.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+			lplr.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
+		end
+		
+		if con then
+			con:Disconnect()
+		end
+
+		task.wait(0.1)
+		
+		if old2 then
+			showtarget = old1
+			show = old2
+		else
+			utils.update(CFrame.new(x(), yy(), x()))
+			void = true
+		end
+	end)
+
+	api.new('.assist', {'!assist'}, function()
+		assist = not assist
+		api.chat((assist and 'enabled' or 'disabled')..' shoot assist', watermark)
+	end)
+
+	api.new('.sentry', {'!sentry'}, function()
+		sentry = not sentry
+		api.chat((sentry and 'enabled' or 'disabled')..' sentry', watermark)
+	end)
+
+	api.new('.sm', {'!sm', '!sentrymode', '.sentrymode'}, function(player, set)
+		local methods = {
+            kill = 'kill',
+            stomp = 'stomp'
+        }
+
+        if methods[set] then
+            mode = methods[set]
+			api.chat('set sentry mode to: ' ..set)
+        else
+            api.chat('method not found.')
+            return
         end
-    end
+	end)
+
+	api.new('.ka', {'!ka', '.ka', '!killaura', '.killaura'}, function(player, range)
+		ka = not ka
+		api.chat((ka and 'enabled' or 'disabled')..' killaura', watermark)
+		if not ka then if not void then void = true end; return end
+
+		if range then
+			karange = tonumber(range)
+		end
+	end)
+
+	api.new('.range', {'!range'}, function(p, range)
+		if not range then
+			api.chat('you must specify a range integer.', watermark)
+			return
+		end
+
+		api.chat('killaura range is now '..range)
+		karange = tonumber(range)
+	end)
+
+	api.new('.stop', {'!stop'}, function()
+		killing = false
+		stop = true
+		stomping = false
+		auto = false
+		target = nil
+		info.Text = ''
+		ka = false
+		showtarget = nil
+		show = false
+		assist = false
+		void = true
+
+		if anticrashCon then
+			anticrashCon:Disconnect()
+			anticrashCon = nil
+		end
+
+		if localent.Alive then
+			camera.CameraSubject = lplr.Character.Humanoid
+			utils.update(CFrame.new(x(), yy(), x()))
+		end
+
+		stop = false
+		api.chat('stopped current actions!', watermark)
+	end);
+
+	-- VOID --
+
+	api.new('.show', {'!show', 's'}, function(player, name)
+		local user = name and api.getname(name) or player
+
+		if not user then
+			api.chat('invalid target!', watermark)
+			return
+		end
+
+		showtarget = user.Name
+		show = true
+
+		api.chat('Hey, '..user.Name..'!', watermark)
+	end);
+
+	api.new('.weld', {'!weld'}, function(player)
+		weld = not weld
+		api.chat((weld and 'enabled' or 'disabled')..' welding', watermark)
+	end)
+
+	api.new('.punch', {'!punch'}, function(player)
+		punch = not punch
+		api.chat((punch and 'enabled' or 'disabled')..' punching', watermark)
+	end)
+
+	api.new('.flame', {'!flame'}, function(player)
+		if not weld then
+			api.chat('flamethrower exploit requires weld exploit (.weld)', watermark)
+			flamethrower = false
+			return
+		end
+
+		flamethrower = not flamethrower
+		api.chat((flamethrower and 'enabled' or 'disabled')..' flamethrower', watermark)
+	end)
+
+	api.new('.followtarget', {'!followtarget', '.f', '!f'}, function(player, lol)
+		local fatassxznigggagagagagagaga = lol and api.getname(lol)
+
+		if fatassxznigggagagagagagaga then
+			showtarget = fatassxznigggagagagagagaga.Name
+		end
+	end);
+
+	api.new('.void', {'!void', 'v', '.v'}, function(player)
+		showtarget = nil
+		show = false
+
+		api.chat('Bye!', watermark)
+	end);
+
+	-- MISC
+
+	for i, v in pguns do
+		api.new('.' .. i, {'!' .. i}, function(player, amount)
+			api.chat('fetching', watermark)
+
+			if amount then
+				local old = lplr.Character.HumanoidRootPart.CFrame
+				local na = type(v) == 'table' and v.name or tostring(v)
+
+				for i = 1, amount and tonumber(amount) or 5 do
+					utils.purchase('ammo', na, i == 5)
+				end
+
+				task.wait(.1)
+				utils.update(old)
+			else
+				local old = lplr.Character.HumanoidRootPart.CFrame
+
+				local na = type(v) == 'table' and v.name or tostring(v)
+				utils.purchase('weapon', na)
+				utils.update(old)
+			end		
+			
+			api.chat('completed!', watermark)
+		end)
+	end
+
+	api.new('.guns', {'!g', '.g', '!guns'}, function(plr) 
+		if #guns ~= 0 then
+			api.chat('i already have weapons', watermark)
+			return
+		end
+
+		if killing or stomping or target then
+			api.chat('im targetting someone already', watermark)
+			return
+		end
+
+		local dg = altcontrol.default_guns or {'rifle', 'flintlock'}
+		for i, v in dg do
+			local status = pguns[v]
+			if not status then continue end;
+
+			local weapon = status.name:gsub('%s*%- %$%d+', '')
+			if lplr and lplr.Backpack and lplr.Character and lplr.Character:FindFirstChild('Humanoid') and (not lplr.Backpack:FindFirstChild(weapon) and not lplr.Character:FindFirstChild(weapon)) then
+				utils.purchase('weapon', status.name)
+				info.Text = 'purchasing ('.. status.name:lower() .. ')'
+			end
+		end
+
+		info.Text = ''
+	end)
+
+	api.new('.aguns', {'!aguns'}, function()
+		autogun = not autogun
+		api.chat((autogun and 'enabled' or 'disabled')..' auto guns', watermark)
+		if not autogun then return end
+
+		task.spawn(function()
+			repeat task.wait()
+				if #guns == 0 or bodyeffects.get(lplr, 'SDeath') then
+					repeat task.wait() until localent.Alive
+
+					local dg = altcontrol.default_guns or {'rifle', 'flintlock'}
+					for i, v in dg do
+						local status = pguns[v]
+						if not status then continue end;
+
+						local weapon = status.name:gsub('%s*%- %$%d+', '')
+						if lplr and lplr.Backpack and lplr.Character and lplr.Character:FindFirstChild('Humanoid') and (not lplr.Backpack:FindFirstChild(weapon) and not lplr.Character:FindFirstChild(weapon)) then
+							utils.purchase('weapon', status.name)
+							info.Text = 'purchasing ('.. status.name:lower() .. ')'
+						end
+					end
+
+					info.Text = ''
+				end
+			until not autogun or stop
+		end)
+	end)
+
+	api.new('.automask', {'!am', '.am'}, function()
+		automask = not automask
+		api.chat((automask and 'enabled' or 'disabled')..' auto mask', watermark)
+		if not automask then return end
+
+		task.spawn(function() -- you're yielding retard
+			repeat task.wait()
+				if pguns['riot mask'] and localent.Alive then
+					if lplr.Character:FindFirstChild('In-gameMask') then continue end
+					if stop then continue end
+					if not automask then continue end
+					if not localent.Alive then continue end
+
+					local r = utils.purchase('weapon', pguns['riot mask'].name)
+					info.Text = 'purchasing a mask..'
+					
+					repeat task.wait() until r == 'success' or r == 'owned' or stop
+					local mask
+
+					repeat 
+						task.wait()
+						mask = lplr.Backpack:FindFirstChild('[Mask]')
+					until mask or stop
+
+					mask.Parent = lplr.Character
+					mask:Activate()
+
+					repeat task.wait() until lplr.Character:FindFirstChild('In-gameMask')
+
+					mask.Parent = lplr.Backpack
+					info.Text = ''
+				end
+				info.Text = ''
+			until not automask or stop
+		end)
+	end)
+
+	api.new('.autoarmor', {'!aa', '.aa'}, function(plr)
+		autoarmor = not autoarmor
+		api.chat((autoarmor and 'enabled' or 'disabled')..' auto armor', watermark)
+		if not autoarmor then return end
+
+		task.spawn(function() -- dumbass you're yielding
+			repeat task.wait()
+				if autoarmor and localent.Alive then
+					if not utils.needarmor() then continue end
+					if stop then continue end
+					if not autoarmor then continue end
+					if not pguns['medium armor'] then continue end
+					if not localent.Alive then continue end
+
+					info.Text = 'purchasing armor..'
+					local r = utils.purchase('weapon', pguns['medium armor'].name)
+					repeat task.wait() until r == 'success' or r == 'owned' or stop
+
+					info.Text = ''
+				end
+			until not automask or stop
+		end)
+	end)
+
+	api.new('.ca', {'!ca'}, function()
+		autogun = not autogun
+		api.chat((autogun and 'enabled' or 'disabled')..' auto guns', watermark)
+	end)
+
+	api.new('.so', {'!so'}, function(player, amt)
+		stomp_offset = amt
+		api.chat('stomp offset is now ' .. tostring(amt), watermark)
+	end)
+
+	local rstomp_offset = false
+
+	api.new('.randomso', {'!randomso'}, function(player, amt)
+		rstomp_offset = not rstomp_offset
+		api.chat('stomp offset is now'..(rstomp_offset and ' not' or '')..' random', watermark)
+	end)
+
+	api.new('.faststrafe', {'!faststrafe'}, function(player, amt)
+		badstrafe = not badstrafe
+		api.chat('strafe is now set to '..(badstrafe and 'a worse version' or 'the default'), watermark)
+	end)
+
+	api.new('.nochat', {'!nochat'}, function(player, amt)
+		api.nochat = not api.nochat
+	end)
+
+	task.spawn(function()
+		local seed = Random.new();
+
+		repeat task.wait()
+			if rstomp_offset then
+				stomp_offset = seed:NextInteger(2, 5)
+			end
+		until not game
+	end)
+
+
+	api.new('.rejoin', {'.rj', '!rj', '!rejoin'}, function()
+    	teleport:TeleportToPlaceInstance(game.PlaceId, game.JobId, lplr);
+	end)
+
+	api.new('.reset', {'!re'}, function()
+		api.reset()
+	end)
+
+	api.new('.weld', {'!weld'}, function()
+		weld = not weld
+		api.chat((weld and 'enabled' or 'disabled')..' weld exploit (use .flame or .punch for results)', watermark)
+	end)
+
+	api.new('.flame', {'!flame'}, function()
+		if combat then
+			combat = false
+		end
+
+		flamethrower = not flamethrower
+		api.chat((flamethrower and 'enabled' or 'disabled')..' flamethrower', watermark)
+	end)
+
+	api.new('.combat', {'!combat'}, function()
+		if flamethrower then
+			flamethrower = false
+		end
+
+		combat = not combat
+		api.chat((combat and 'enabled' or 'disabled')..' combat/punch attack', watermark)
+	end)
+
+	api.new('.faststrafe', {'!faststrafe', '.faststrafe'}, function()
+		faststrafe = not faststrafe
+		api.chat((faststrafe and 'enabled' or 'disabled')..' faststrafe', watermark)
+	end)
+
+	local old = true
+	api.new('.hidesc', {'!hidesc'}, function()
+		old = not old
+		runservice:Set3dRenderingEnabled(old)
+
+		api.chat('my screen has been toggled', watermark)
+	end)
+
+	api.new('.leave', {'!leave', '.logout'}, function(plr)
+		lplr:Kick('kicked by ' .. plr.Name .. ' (executed the .leave command)')
+	end)
+	
+	api.new('.watermark', {}, function()
+		watermark = not watermark
+		api.chat('toggled watermark!', watermark)
+	end)
+	
+	api.new('.redeem', {'!redeem'}, function()
+		local codes = http:JSONDecode(game:HttpGet('https://raw.githubusercontent.com/ah2r/storage/refs/heads/main/sync/codes.sync'))
+		for _, v in codes do
+			utils.redeem(v)
+			task.wait(0.6)
+		end
+
+		api.chat('i have redeemed codes!', watermark)
+	end)
+	
+	api.new('.owner', {'!owner', '.give', '!give'}, function(plr, target)
+		local new = api.getname(target)
+
+		if not new or new == lplr then
+			api.chat('player not found', watermark)
+			return
+		end
+
+		if table.find(getgenv().altcontrol.owners, new.Name) then
+			api.chat('removed owner: '..new.Name, watermark)
+
+			local idx = table.find(getgenv().altcontrol.owners, new.Name)
+			if idx then table.remove(getgenv().altcontrol.owners, idx) end
+
+			return
+		end
+
+		api.chat('new owner: '..new.Name, watermark)
+		table.insert(getgenv().altcontrol.owners, new.Name)
+	end)
+
+	api.new('.script', {'!script'}, function()
+		api.chat('i\'m using the best hvh bot, /altcontrol v4!', true)
+		return
+	end)
+
+	api.new('.setfps', {'!setfps'}, function(plr, amt)
+		if not amt then
+			api.chat('please specify a amount', watermark)
+		end
+
+		setfpscap(amt)
+		api.chat('my fps cap is now' ..amt, watermark)
+		return
+	end)
+
+	api.new('.reset', {'!reset'}, function(plr, amt)
+		api.reset()
+	end)
+
+	local fake
+	api.new('.fp', {'!fp', '!fakepos', '.fakepos'}, function()
+		fake = not fake
+		api.chat((fake and 'enabled' or 'disabled')..' fakepos', watermark)	
+		api.reset()
+		setfflag('NextGenReplicatorEnabledWrite4', tostring(fake))
+
+		repeat task.wait() until localent.Alive or stop or not fake
+		utils.update(CFrame.new(x(), yy(), x()))
+	end)
+
+	api.new('.unfp', {'!unfp'}, function()
+		fake = false
+		api.chat((fake and 'enabled' or 'disabled')..' fakepos', watermark)	
+	end)
+
+	api.new('.w', {'!w'}, function(plr, target)
+		local new = api.getname(target)
+
+		if not new or new == lplr then
+			api.chat('player not found', watermark)
+			return
+		end
+
+		if table.find(whitelist, new.Name) then
+			api.chat(new.Name.. ' is no longer protected.', watermark)
+
+			local idx = table.find(whitelist, new.Name)
+			if idx then table.remove(whitelist, idx) end
+
+			return
+		end
+
+		api.chat(new.Name.. ' is now protected.', watermark)
+		table.insert(whitelist, new.Name)
+	end)
+
+	api.new('.search', {'!search'}, function(plr) 
+		api.chat('searching for other altcontrol bots. (' .. plr.Name .. ')', watermark)
+
+		if not altcontrol or not altcontrol.bots then api.chat('failed searching for bots. please add the bots table.') end;
+		for i, v in altcontrol.bots do
+			local new = api.getname(v)
+			if not new then api.chat('the bot ('..v..') wasn\'t found in this server.'); continue end
+			if not table.find(whitelist, new.Name) then
+				table.insert(whitelist, new.Name)
+			end
+		end
+
+		api.chat('successfully whitelisted the bots found.')
+		return
+	end)
+
+	--> EMOTES
+
+	for i, v in anims do
+		api.new('.' ..i, {'!'..i}, function(player, speed)
+			speed = tonumber(speed)
+			loadanimation(v, speed);
+		end)
+	end
+
+	if altcontrol and altcontrol.autojoin then
+		local config = altcontrol.autojoin
+		
+		local isingame = function(userid)
+			local payload = {
+				userIds = {userid}
+			}
+			local response = request({
+				Url = 'https://presence.roblox.com/v1/presence/users',
+				Method = 'POST',
+				Headers={
+					Cookie = config.cookie,
+					['Content-Type'] = 'application/json'
+				},
+				Body = HttpService:JSONEncode(payload)
+			})
+
+			local res = response.Body and HttpService:JSONDecode(response.Body)
+			return res and res.userPresences[1] and res.userPresences[1].gameId ~= nil
+		end
+
+		local join = function(userid)
+			local response = request({
+				Url = 'https://presence.roblox.com/v1/presence/users',
+				Method = 'POST',
+				Headers={
+					Cookie = config.cookie,
+					['Content-Type'] = 'application/json'
+				},
+				Body = HttpService:JSONEncode({
+					userIds = {userid}
+				})
+			})
+
+			local res = HttpService:JSONDecode(response.Body)
+			if res.userPresences and res.userPresences[1] and res.userPresences[1].gameId and res.userPresences[1].gameId ~= game.JobId then
+				TeleportService:TeleportToPlaceInstance(game.PlaceId, res.userPresences[1].gameId)
+			end
+		end
+
+		if config.enabled and config.cookie and config.follow then
+			task.spawn(function()
+				repeat task.wait()
+					if not players:FindFirstChild(config.follow) then
+						warn('player left!!!!!!!!!!!!!!!!!!!!')
+						repeat task.wait(2) until isingame(players:GetUserIdFromNameAsync(config.follow))
+						warn('player in game, joining')
+						join(players:GetUserIdFromNameAsync(config.follow))
+						task.wait(4)
+					end
+				until not game
+			end)
+		end
+	end
+
+	loadanimation(default)
 end
-
--- ============================================================
--- ArmorViewer
-Library.ArmorViewer = function(self)
-    local AV = {}
-    local T = Library.Theme
-    local Items = {}
-    local ItemSlots = {}
-
-    Items["Frame"] = Instances:Create("Frame", {
-        Parent = Library.Holder.Instance, Name = "\0",
-        Size = UDim2New(0, 280, 0, 0),
-        Position = UDim2New(0, 10, 0.6, 0),
-        BorderSizePixel = 0, ZIndex = 6,
-        AutomaticSize = Enum.AutomaticSize.Y,
-        BackgroundColor3 = T.Surface,
-        Visible = false,
-    })
-    Corner(Items["Frame"].Instance, 6)
-    Instances:Create("UIStroke", { Parent = Items["Frame"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
-    Items["Frame"]:MakeDraggable()
-
-    local acTop = Instances:Create("Frame", { Parent = Items["Frame"].Instance, Name = "\0",
-        Size = UDim2New(1,0,0,2), BorderSizePixel = 0, BackgroundColor3 = T.Accent })
-    Corner(acTop.Instance, 2)
-    acTop:AddToTheme({ BackgroundColor3 = "Accent" })
-
-    Items["Title"] = Instances:Create("TextLabel", { Parent = Items["Frame"].Instance, Name = "\0",
-        FontFace = Library.Fonts["GothamBold"] or Library.Font, TextColor3 = T.TextMuted,
-        Text = "Armor Viewer", Size = UDim2New(1,-16,0,14),
-        Position = UDim2New(0,8,0,6), BackgroundTransparency = 1,
-        TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6,
-        BackgroundColor3 = FromRGB(255,255,255) })
-    Items["Title"]:AddToTheme({ TextColor3 = "TextMuted" })
-
-    Items["Content"] = Instances:Create("Frame", { Parent = Items["Frame"].Instance, Name = "\0",
-        BorderSizePixel = 0, BackgroundTransparency = 1, ZIndex = 6,
-        Position = UDim2New(0,8,0,26), Size = UDim2New(1,-16,0,0),
-        AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = FromRGB(255,255,255) })
-    Instances:Create("UIListLayout", { Parent = Items["Content"].Instance, Name = "\0",
-        FillDirection = Enum.FillDirection.Horizontal, Padding = UDimNew(0,4),
-        Wraps = true, HorizontalAlignment = Enum.HorizontalAlignment.Left })
-    Instances:Create("UIPadding", { Parent = Items["Frame"].Instance, Name = "\0",
-        PaddingBottom = UDimNew(0,8) })
-
-    function AV:SetTitle(text)
-        Items["Title"].Instance.Text = text or "Armor Viewer"
-    end
-
-    function AV:ClearAllItems()
-        for _, slot in ipairs(ItemSlots) do slot:Destroy() end
-        ItemSlots = {}
-    end
-
-    function AV:Add(name, image)
-        local slot = Instances:Create("Frame", { Parent = Items["Content"].Instance, Name = "\0",
-            Size = UDim2New(0,54,0,64), BackgroundColor3 = T.Background, BorderSizePixel = 0, ZIndex = 6 })
-        Corner(slot.Instance, 4)
-        Instances:Create("UIStroke", { Parent = slot.Instance, Name = "\0", Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
-        Instances:Create("ImageLabel", { Parent = slot.Instance, Name = "\0",
-            Image = image or "", Size = UDim2New(1,-4,0,44), Position = UDim2New(0,2,0,2),
-            BackgroundTransparency = 1, ZIndex = 6 })
-        local lbl = Instances:Create("TextLabel", { Parent = slot.Instance, Name = "\0",
-            FontFace = Library.Font, TextColor3 = T.TextMuted, Text = name or "",
-            Size = UDim2New(1,0,0,16), Position = UDim2New(0,0,0,46),
-            BackgroundTransparency = 1, TextSize = 9, ZIndex = 6, BackgroundColor3 = FromRGB(255,255,255) })
-        lbl:AddToTheme({ TextColor3 = "TextMuted" })
-        table.insert(ItemSlots, slot.Instance)
-    end
-
-    function AV:SetVisibility(bool)
-        Items["Frame"].Instance.Visible = bool and true or false
-    end
-
-    return AV
-end
-
--- ============================================================
--- TargetHud
-Library.TargetHud = function(self)
-    local TH = {}
-    local T = Library.Theme
-    local Items = {}
-
-    Items["Frame"] = Instances:Create("Frame", {
-        Parent = Library.Holder.Instance, Name = "\0",
-        Size = UDim2New(0, 270, 0, 18),
-        Position = UDim2New(0, 0, 0.8, 0),
-        BorderSizePixel = 0, ZIndex = 6,
-        AutomaticSize = Enum.AutomaticSize.Y,
-        BackgroundColor3 = T.Surface
-    })
-    Corner(Items["Frame"].Instance, 6)
-    Instances:Create("UIStroke", { Parent = Items["Frame"].Instance, Name = "\0",
-        Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
-    Items["Frame"]:MakeDraggable()
-
-    local acTop = Instances:Create("Frame", { Parent = Items["Frame"].Instance, Name = "\0",
-        Size = UDim2New(1,0,0,2), BorderSizePixel = 0, BackgroundColor3 = T.Accent })
-    Corner(acTop.Instance, 2)
-    acTop:AddToTheme({ BackgroundColor3 = "Accent" })
-
-    Items["Title"] = Instances:Create("TextLabel", { Parent = Items["Frame"].Instance, Name = "\0",
-        FontFace = Library.Fonts["GothamBold"] or Library.Font, TextColor3 = T.TextMuted,
-        Text = "Target HUD", Size = UDim2New(0,0,0,12),
-        Position = UDim2New(0,10,0,6), BackgroundTransparency = 1,
-        AutomaticSize = Enum.AutomaticSize.X, TextSize = 10,
-        TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6,
-        BackgroundColor3 = FromRGB(255,255,255) })
-    Items["Title"]:AddToTheme({ TextColor3 = "TextMuted" })
-
-    Items["Content"] = Instances:Create("Frame", { Parent = Items["Frame"].Instance, Name = "\0",
-        BorderSizePixel = 0, BackgroundTransparency = 1, ZIndex = 6,
-        Position = UDim2New(0,8,0,26), Size = UDim2New(1,-16,0,0),
-        AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = FromRGB(255,255,255) })
-    Instances:Create("UIPadding", { Parent = Items["Frame"].Instance, Name = "\0",
-        PaddingBottom = UDimNew(0,8) })
-
-    Items["Avatar"] = Instances:Create("ImageLabel", { Parent = Items["Content"].Instance, Name = "\0",
-        Image = "rbxasset://textures/ui/GuiImagePlaceholder.png",
-        BackgroundTransparency = 1, ZIndex = 6,
-        Size = UDim2New(0,60,0,60), BorderSizePixel = 0,
-        BackgroundColor3 = FromRGB(255,255,255) })
-    Corner(Items["Avatar"].Instance, 4)
-
-    Items["Username"] = Instances:Create("TextLabel", { Parent = Items["Content"].Instance, Name = "\0",
-        FontFace = Library.Font, TextColor3 = T.Text,
-        Text = "-- (@--)", Size = UDim2New(1,-70,0,14),
-        Position = UDim2New(0,68,0,0), ZIndex = 6,
-        BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left,
-        BorderSizePixel = 0, TextSize = 12,
-        BackgroundColor3 = FromRGB(255,255,255) })
-    Items["Username"]:AddToTheme({ TextColor3 = "Text" })
-
-    Items["Bars"] = Instances:Create("Frame", { Parent = Items["Content"].Instance, Name = "\0",
-        AnchorPoint = Vector2New(0,1), BackgroundTransparency = 1,
-        Position = UDim2New(0,68,1,0), Size = UDim2New(1,-68,0,0),
-        AutomaticSize = Enum.AutomaticSize.Y, ZIndex = 6,
-        BorderSizePixel = 0, BackgroundColor3 = FromRGB(255,255,255) })
-    Instances:Create("UIListLayout", { Parent = Items["Bars"].Instance, Name = "\0",
-        VerticalAlignment = Enum.VerticalAlignment.Bottom, Padding = UDimNew(0,3), SortOrder = Enum.SortOrder.LayoutOrder })
-
-    function TH:AddBar(Color)
-        local nb = {}
-        local bg = Instances:Create("Frame", { Parent = Items["Bars"].Instance, Name = "\0",
-            AnchorPoint = Vector2New(0,1), ZIndex = 6,
-            BackgroundTransparency = 1, Size = UDim2New(1,0,0,10),
-            BorderSizePixel = 0, BackgroundColor3 = T.Element })
-        Corner(bg.Instance, 99)
-        Instances:Create("UIStroke", { Parent = bg.Instance, Name = "\0",
-            Color = T.Border, Thickness = 1 }):AddToTheme({ Color = "Border" })
-        local fill = Instances:Create("Frame", { Parent = bg.Instance, Name = "\0",
-            Size = UDim2New(0.9,0,1,-2), Position = UDim2New(0,1,0,1),
-            ZIndex = 6, BorderSizePixel = 0, BackgroundColor3 = Color })
-        Corner(fill.Instance, 99)
-        local val = Instances:Create("TextLabel", { Parent = bg.Instance, Name = "\0",
-            FontFace = Library.Font, TextColor3 = T.Text, ZIndex = 6,
-            Text = "90", Size = UDim2New(0,0,1,0),
-            BackgroundTransparency = 1, Position = UDim2New(0,2,0,-1),
-            AutomaticSize = Enum.AutomaticSize.X, TextSize = 9,
-            BackgroundColor3 = FromRGB(255,255,255) })
-        val:AddToTheme({ TextColor3 = "Text" })
-        function nb:SetPercentage(pct)
-            fill:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = UDim2New(1/100*pct,0,1,-2) })
-            val.Instance.Text = tostring(math.floor(pct))
-        end
-        function nb:Remove() bg:Clean() nb = nil end
-        return nb
-    end
-
-    function TH:SetPlayer(Player)
-        Items["Avatar"].Instance.Image = Players:GetUserThumbnailAsync(Player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
-        Items["Username"].Instance.Text = Player.DisplayName .. " (@" .. Player.Name .. ")"
-    end
-    function TH:SetVisibility(Bool) Items["Frame"].Instance.Visible = Bool end
-    function TH:SetPosition(pos) Items["Frame"].Instance.Position = pos end
-    return TH
-end
-
-return Library
