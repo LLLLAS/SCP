@@ -1,25 +1,9 @@
---[[
-    Alt Control v4 — WebSocket Edition
-    Connects to your CatPrivate server via WebSocket for remote control.
-    
-    Usage:
-        getgenv().altcontrol = {
-            owners = {'YourUsername'},
-            default_guns = {'rifle', 'flintlock'},
-            ws_url = 'wss://your-domain.com/ws',  -- or ws:// for non-SSL
-            ws_token = 'bot_xxxxxxxxxxxxxxxxxxxx',  -- token from control panel
-            -- optional:
-            whitelist = {},
-            bots = {},
-            emotes = {},
-        }
-        loadstring(...)()
-]]
+
 
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local cloneref = cloneref or function(serv) return serv end
-local entity = require('@src/entity')
+
 
 print('[AltControl WS] Loading...')
 
