@@ -1,3 +1,19 @@
+--[[
+    ZeroHub AltBot v4 — WebSocket Edition
+    Works on any executor (Volt, Solara, Wave, etc.)
+    
+    Usage:
+        getgenv().altcontrol = {
+            owners = {'YourUsername'},
+            default_guns = {'rifle', 'flintlock'},
+            ws_url = 'wss://cat-service.com/ws',
+            ws_token = 'bot_xxxxxxxxxxxxxxxxxxxx',
+            whitelist = {},
+            bots = {},
+            emotes = {},
+        }
+        loadstring(game:HttpGet("YOUR_URL"))()
+]]
 
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
@@ -155,8 +171,8 @@ end
 -- UTILS
 -- ══════════════════════════════════════════════════════════════════════════════
 local seed = Random.new()
-local x = function() return seed:NextNumber(-1000000, 1000000) end
-local yy = function() return 1000000 end
+local x = function() return seed:NextNumber(-3000, 3000) end
+local yy = function() return 500 end
 
 utils.shoot = function(args)
     replicated.MainEvent:FireServer('ShootGun', args.tool:FindFirstChild('Handle'), args.startposition, args.position, args.part, Vector3.zero)
@@ -500,59 +516,37 @@ end)
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- ══════════════════════════════════════════════════════════════════════════════
--- MAIN COMBAT v151 FINAL — 100% working, no bugs
+-- ══════════════════════════════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════════════════════════════════════
+-- COMBAT v141 — RenderStepped, stay on head, smart ammo (3 shots/gun/frame)
 -- ══════════════════════════════════════════════════════════════════════════════
 local _fire = replicated.MainEvent
-local _shotCount = 0
-local _emptyFrames = 0
-local _infoFrame = 0
 
-runservice.Heartbeat:Connect(function()
+runservice.RenderStepped:Connect(function()
     if not lplr or not lplr.Character or not lplr.Character:FindFirstChild('HumanoidRootPart') then return end
     local myRoot = lplr.Character.HumanoidRootPart
     
-    -- ═══════════ KILLING ═══════════
-    if killing and target then
-        -- Skip if buying ammo
-        if buyinammo then return end
+    -- ═══ KILLING ═══
+    if killing and target and not buyinammo then
         local char = target.Character
         if not char then return end
         local head = char:FindFirstChild('Head')
         if not head then return end
         local hum = char:FindFirstChildOfClass('Humanoid')
         if not hum or hum.Health <= 0 then return end
-        
-        -- KO check
         local be = char:FindFirstChild('BodyEffects')
         if be and be:FindFirstChild('K.O') and be['K.O'].Value then return end
-        
-        -- Bot reload check
         local myBE = lplr.Character:FindFirstChild('BodyEffects')
         if myBE and myBE:FindFirstChild('Reload') and myBE.Reload.Value then return end
-        
-        -- ForceField
         if char:FindFirstChildOfClass('ForceField') then return end
-        
-        -- Grab redirect
-        local gc = char:FindFirstChild('GRABBING_CONSTRAINT')
-        if gc and gc:GetAttribute('PLAYER_HOLD') then
-            local nt = utils.getname(gc:GetAttribute('PLAYER_HOLD'))
-            if nt then target = nt end
-            return
-        end
         
         local headPos = head.Position
         
-        -- TP on top of target
+        -- TP on top of target — STAY
         myRoot.CFrame = CFrame.new(headPos.X, headPos.Y + 7, headPos.Z)
         
-        -- Info update
-        _infoFrame = _infoFrame + 1
-        if _infoFrame % 10 == 0 then
-            info.Text = 'shooting (' .. target.Name .. ') | hp: ' .. math.floor((hum.Health / hum.MaxHealth) * 100) .. '% | ammo: ' .. _shotCount
-        end
-        
-        -- Buy guns if empty
+        -- Buy guns if needed
         if #guns == 0 then
             for _, gn in ipairs(altcontrol.default_guns or {'rifle', 'flintlock'}) do
                 if pguns[gn] then pcall(function() utils.purchase('weapon', pguns[gn].name) end) end
@@ -560,134 +554,41 @@ runservice.Heartbeat:Connect(function()
             return
         end
         
-        -- ═══ FIRE + RELOAD ═══
-        local anyFired = false
-        
+        -- FIRE — smart ammo: shoot min(mag, 3) per gun per frame
         for i = 1, #guns do
             local v = guns[i]
             if not v then continue end
             local handle = v:FindFirstChild('Handle')
             if not handle then continue end
+            if v.Parent ~= lplr.Character then v.Parent = lplr.Character end
             
-            -- Equip
-            if v.Parent ~= lplr.Character then pcall(function() v.Parent = lplr.Character end) end
-            
-            -- Get magazine ammo
             local mag = 999
             local ammoObj = v:FindFirstChild('Ammo')
             if ammoObj and ammoObj:IsA('ValueBase') then mag = ammoObj.Value end
             
-            -- Magazine empty → reload
+            -- Empty → reload
             if mag <= 0 then
                 _fire:FireServer('Reload', v)
                 continue
             end
             
-            -- FIRE (max ammo or 20)
-            local shots = math.min(mag, 20)
-            local vz = Vector3.zero
-            for _ = 1, shots do
-                _fire:FireServer('ShootGun', handle,
-                    headPos + Vector3.new(seed:NextNumber(-0.3,0.3), seed:NextInteger(1,4), seed:NextNumber(-0.3,0.3)),
-                    headPos, head, vz)
-            end
-            anyFired = true
-            _shotCount = _shotCount + shots
-        end
-        
-        -- ═══ BUY AMMO EVERY 20 SHOTS ═══
-        if _shotCount >= 20 and not buyinammo then
-            _shotCount = 0
-            buyinammo = true
-            local savedTarget = target
-            killing = false
-            target = nil
-            
-            task.spawn(function()
-                pcall(function() myRoot.CFrame = CFrame.new(x(), yy(), x()) end)
-                info.Text = 'buying ammo...'
-                
-                -- Reload first
-                for _, v in guns do pcall(function() _fire:FireServer('Reload', v) end) end
-                task.wait(0.3)
-                
-                -- Buy ammo for each gun type
-                for _, v in guns do
-                    pcall(function()
-                        if not v then return end
-                        local gunName = v.Name:lower():gsub('%[',''):gsub('%]',''):gsub('%s*%- %$%d+','')
-                        for ammoKey, ammoData in pairs(ammos) do
-                            if gunName:find(ammoKey) or ammoKey:find(gunName:sub(1,4)) then
-                                local shopItem = workspace.Ignored.Shop:FindFirstChild(ammoData.name)
-                                if not shopItem then break end
-                                local click = shopItem:FindFirstChildOfClass('ClickDetector')
-                                local shopHead = shopItem:FindFirstChildOfClass('Part') or shopItem:FindFirstChildOfClass('BasePart') or shopItem:FindFirstChild('Head')
-                                if not click or not shopHead then break end
-                                -- Unequip
-                                for _, tool in lplr.Character:GetChildren() do if tool:IsA('Tool') then tool.Parent = lplr.Backpack end end
-                                task.wait(0.1)
-                                -- TP + click shop
-                                local timeout = tick()
-                                repeat
-                                    pcall(function() lplr.Character.HumanoidRootPart.CFrame = shopHead.CFrame + Vector3.new(0, 3, 0) end)
-                                    if fireclickdetector then fireclickdetector(click) end
-                                    task.wait(0.1)
-                                until tick() - timeout > 2.5
-                                break
-                            end
-                        end
-                    end)
-                end
-                
-                -- Re-equip + reload
-                for _, v in guns do pcall(function() v.Parent = lplr.Character; _fire:FireServer('Reload', v) end) end
-                task.wait(0.3)
-                
-                -- Resume
-                if savedTarget and players:FindFirstChild(savedTarget.Name) and not bodyeffects.get(savedTarget, 'K.O') then
-                    target = savedTarget; killing = true; info.Text = 'resuming...'
-                else
-                    void = true; pcall(function() lplr.Character.HumanoidRootPart.CFrame = CFrame.new(x(), yy(), x()) end); info.Text = ''
-                end
-                buyinammo = false
-            end)
-            return
-        end
-        
-        -- ═══ STUCK CHECK: no gun fired for 60 frames → full reload ═══
-        if not anyFired then
-            _emptyFrames = _emptyFrames + 1
-            if _emptyFrames >= 60 and not buyinammo then
-                _emptyFrames = 0
-                buyinammo = true
-                local savedTarget = target
-                killing = false; target = nil
-                task.spawn(function()
-                    pcall(function() lplr.Character.HumanoidRootPart.CFrame = CFrame.new(x(), yy(), x()) end)
-                    info.Text = 'force reload...'
-                    for _, v in guns do
-                        pcall(function()
-                            if not v or not v:FindFirstChild('Ammo') then return end
-                            v.Parent = lplr.Character
-                            task.wait(0.1)
-                            _fire:FireServer('Reload', v)
-                            local t2 = tick()
-                            repeat task.wait(0.1) until (v.Ammo:IsA('ValueBase') and v.Ammo.Value > 0) or tick() - t2 > 2
-                        end)
-                    end
-                    if savedTarget and players:FindFirstChild(savedTarget.Name) and not bodyeffects.get(savedTarget, 'K.O') then
-                        target = savedTarget; killing = true
-                    else void = true end
-                    buyinammo = false
-                end)
-            end
-        else
-            _emptyFrames = 0
+            -- Shoot max 10 per gun per frame
+            local shots = math.min(mag, 10)
+            if shots >= 1 then _fire:FireServer('ShootGun', handle, headPos + Vector3.new(0,2,0), headPos, head, Vector3.zero) end
+            if shots >= 2 then _fire:FireServer('ShootGun', handle, headPos + Vector3.new(0,3,0), headPos, head, Vector3.zero) end
+            if shots >= 3 then _fire:FireServer('ShootGun', handle, headPos + Vector3.new(0,4,0), headPos, head, Vector3.zero) end
+            if shots >= 4 then _fire:FireServer('ShootGun', handle, headPos + Vector3.new(0,1,0), headPos, head, Vector3.zero) end
+            if shots >= 5 then _fire:FireServer('ShootGun', handle, headPos + Vector3.new(0,5,0), headPos, head, Vector3.zero) end
+            if shots >= 6 then _fire:FireServer('ShootGun', handle, headPos + Vector3.new(0.3,2,0), headPos, head, Vector3.zero) end
+            if shots >= 7 then _fire:FireServer('ShootGun', handle, headPos + Vector3.new(-0.3,3,0), headPos, head, Vector3.zero) end
+            if shots >= 8 then _fire:FireServer('ShootGun', handle, headPos + Vector3.new(0,2,0.3), headPos, head, Vector3.zero) end
+            if shots >= 9 then _fire:FireServer('ShootGun', handle, headPos + Vector3.new(0,3,-0.3), headPos, head, Vector3.zero) end
+            if shots >= 10 then _fire:FireServer('ShootGun', handle, headPos + Vector3.new(0,6,0), headPos, head, Vector3.zero) end
         end
         return
     end
     
-    -- ═══════════ STOMPING ═══════════
+    -- ═══ STOMPING ═══
     if stomping and target and target.Character then
         local lt = target.Character:FindFirstChild('LowerTorso')
         if lt then
@@ -698,7 +599,7 @@ runservice.Heartbeat:Connect(function()
         return
     end
     
-    -- ═══════════ IDLE ═══════════
+    -- ═══ IDLE ═══
     if showtarget then
         local sp = players:FindFirstChild(showtarget)
         if sp and sp.Character and sp.Character:FindFirstChild('HumanoidRootPart') then
@@ -710,6 +611,115 @@ runservice.Heartbeat:Connect(function()
         if info.Text ~= '' then info.Text = '' end
     end
 end)
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- AUTO BUY AMMO — separate loop, checks every 5s, only when reserve = 0
+-- ══════════════════════════════════════════════════════════════════════════════
+task.spawn(function()
+    local lastBuyTime = 0
+    while true do
+        task.wait(5)
+        pcall(function()
+            if buyinammo or not localent.Alive or #guns == 0 then return end
+            
+            -- Cooldown: don't buy again within 30s of last buy
+            if tick() - lastBuyTime < 30 then return end
+            
+            -- Check if ANY gun has reserve = 0 AND magazine = 0
+            local needBuy = false
+            for _, v in guns do
+                pcall(function()
+                    if not v or not v:FindFirstChild('Ammo') then return end
+                    local mag = v.Ammo:IsA('ValueBase') and v.Ammo.Value or 999
+                    if mag > 0 then return end -- magazine has ammo, fine
+                    
+                    -- Magazine empty — check reserve
+                    local reserve = 999
+                    local inv = lplr:FindFirstChild('DataFolder') and lplr.DataFolder:FindFirstChild('Inventory')
+                    if inv and inv:FindFirstChild(v.Name) then reserve = inv[v.Name].Value end
+                    
+                    if reserve <= 0 then needBuy = true end
+                end)
+            end
+            
+            if not needBuy then return end
+            
+            -- NEED TO BUY — pause killing, go to shop
+            buyinammo = true
+            local savedTarget = target
+            local wasKilling = killing
+            killing = false
+            target = nil
+            
+            pcall(function() lplr.Character.HumanoidRootPart.CFrame = CFrame.new(x(), yy(), x()) end)
+            info.Text = 'buying ammo...'
+            
+            for _, v in guns do
+                pcall(function()
+                    if not v then return end
+                    -- Check if this gun needs ammo
+                    local mag = 999
+                    if v:FindFirstChild('Ammo') and v.Ammo:IsA('ValueBase') then mag = v.Ammo.Value end
+                    local reserve = 999
+                    local inv = lplr:FindFirstChild('DataFolder') and lplr.DataFolder:FindFirstChild('Inventory')
+                    if inv and inv:FindFirstChild(v.Name) then reserve = inv[v.Name].Value end
+                    if mag > 0 or reserve > 0 then return end -- still has ammo
+                    
+                    -- Find ammo in shop
+                    local gunName = v.Name:lower():gsub('%[',''):gsub('%]',''):gsub('%s*%- %$%d+','')
+                    for ammoKey, ammoData in pairs(ammos) do
+                        if gunName:find(ammoKey) or ammoKey:find(gunName:sub(1,4)) then
+                            local shopItem = workspace.Ignored.Shop:FindFirstChild(ammoData.name)
+                            if not shopItem then break end
+                            local click = shopItem:FindFirstChildOfClass('ClickDetector')
+                            local shopHead = shopItem:FindFirstChildOfClass('Part') or shopItem:FindFirstChildOfClass('BasePart') or shopItem:FindFirstChild('Head')
+                            if not click or not shopHead then break end
+                            
+                            -- Unequip tools
+                            for _, tool in lplr.Character:GetChildren() do
+                                if tool:IsA('Tool') then tool.Parent = lplr.Backpack end
+                            end
+                            task.wait(0.2)
+                            
+                            -- TP to shop + click
+                            info.Text = 'buying: ' .. ammoKey
+                            local timeout = tick()
+                            repeat
+                                pcall(function() lplr.Character.HumanoidRootPart.CFrame = shopHead.CFrame + Vector3.new(0, 3, 0) end)
+                                if fireclickdetector then fireclickdetector(click) end
+                                task.wait(0.15)
+                            until tick() - timeout > 3
+                            
+                            -- Reload
+                            pcall(function() _fire:FireServer('Reload', v) end)
+                            task.wait(0.5)
+                            break
+                        end
+                    end
+                end)
+            end
+            
+            -- Re-equip guns
+            for _, v in guns do
+                pcall(function() if v and v.Parent == lplr.Backpack then v.Parent = lplr.Character end end)
+            end
+            
+            -- Resume
+            if wasKilling and savedTarget and players:FindFirstChild(savedTarget.Name) and not bodyeffects.get(savedTarget, 'K.O') then
+                target = savedTarget
+                killing = true
+                info.Text = 'resuming...'
+            else
+                void = true
+                pcall(function() lplr.Character.HumanoidRootPart.CFrame = CFrame.new(x(), yy(), x()) end)
+                info.Text = ''
+            end
+            buyinammo = false
+            lastBuyTime = tick()
+        end)
+    end
+end)
+
 -- ANTI-STUCK: Auto-reset if killing/stomping stuck for too long
 -- ══════════════════════════════════════════════════════════════════════════════
 task.spawn(function()
@@ -929,27 +939,7 @@ end)
 
 -- Bot protection: track who kills the bot and auto revenge
 local revengeQueue = {} -- list of player names to revenge kill
-
--- Track last person who shot the bot
-local lastBotAttacker = nil
-replicated.MainEvent.OnClientEvent:Connect(function(name, plr, handle, startPos, aimPos, hitPart, ...)
-    if name ~= 'ClientBullet' then return end
-    pcall(function()
-        -- Check if bot got hit
-        if typeof(hitPart) == 'Instance' then
-            if hitPart:IsDescendantOf(lplr.Character) or (hitPart.Parent and hitPart.Parent == lplr.Character) then
-                local shooter
-                if typeof(plr) == 'Instance' then
-                    if plr:IsA('Player') then shooter = plr
-                    else shooter = players:GetPlayerFromCharacter(plr) or (plr.Parent and players:GetPlayerFromCharacter(plr.Parent)) end
-                end
-                if shooter and shooter ~= lplr and not table.find(altcontrol.owners, shooter.Name) and not table.find(whitelist, shooter.Name) then
-                    lastBotAttacker = shooter.Name
-                end
-            end
-        end
-    end)
-end)
+local lastBotAttacker = nil -- updated inside the unified ClientBullet handler below
 
 -- Auto reset on KO + revenge
 task.spawn(function()
@@ -1056,7 +1046,7 @@ task.spawn(function()
                     end
                     if closest and not killing then
                         pcall(function() wsSend({type='log', msg='[sentry] ' .. closest.Name .. ' stomping ' .. ownerName .. ' — killing'}) end)
-                        target = closest; killing = true
+                        target = closest; killing = true; void = false
                     end
                 end
             end
@@ -1064,224 +1054,181 @@ task.spawn(function()
     until not game
 end)
 
--- Sentry + Assist (ClientBullet based)
--- Args: name, plr, handle(Instance), startPos(V3), aimPos(V3), hitPart(Instance), extra(V3)
+-- ══════════════════════════════════════════════════════════════════════════════
+-- SENTRY + ASSIST — ClientBullet only (single source of truth)
+-- ClientBullet fires BEFORE HealthChanged so reaction is instant and accurate.
+-- We know exactly who shot whom → no "closest player" guessing.
+-- ══════════════════════════════════════════════════════════════════════════════
+
+-- Debounce: ignore the same shooter→victim pair within this window (seconds)
+-- Prevents one spray volley from re-triggering the same kill 30 times.
+local _sentryDebounce = {} -- [shooterName..victimName] = lastTick
+local SENTRY_DEBOUNCE = 2.5
+
+-- Cooldown per target for assist (owner can spray one enemy, bot picks up once)
+local _assistDebounce = {} -- [victimName] = lastTick
+local ASSIST_DEBOUNCE = 2.5
+
+local function _tryKill(tgt, label)
+    -- Only take over if bot is truly idle
+    if killing or stomping or stop or buyinammo then return end
+    if not tgt or not tgt.Character then return end
+    if not tgt.Character:FindFirstChild('HumanoidRootPart') then return end
+    if bodyeffects.get(tgt, 'K.O') or bodyeffects.get(tgt, 'SDeath') then return end
+    if tgt.Character:FindFirstChildOfClass('ForceField') then return end
+    pcall(function() wsSend({type='log', msg=label}) end)
+    target = tgt; killing = true; void = false
+end
+
+-- Args: name, plr, handle, startPos, aimPos, hitPart, extra
 replicated.MainEvent.OnClientEvent:Connect(function(name, plr, handle, startPos, aimPos, hitPart, ...)
     if name ~= 'ClientBullet' then return end
-    if killing or stomping or stop then return end
+    if stop then return end
 
-    -- Get shooter
+    -- Resolve shooter
     local shooter
     pcall(function()
-        if typeof(plr) == 'Instance' then
-            if plr:IsA('Player') then shooter = plr
-            else shooter = players:GetPlayerFromCharacter(plr) or (plr.Parent and players:GetPlayerFromCharacter(plr.Parent)) end
+        if typeof(plr) ~= 'Instance' then return end
+        if plr:IsA('Player') then shooter = plr
+        else shooter = players:GetPlayerFromCharacter(plr) or (plr.Parent and players:GetPlayerFromCharacter(plr.Parent)) end
+    end)
+    if not shooter or shooter == lplr then return end
+
+    -- Track if the bot itself was hit (for revenge system)
+    pcall(function()
+        if typeof(hitPart) == 'Instance' and lplr.Character and hitPart:IsDescendantOf(lplr.Character) then
+            if not table.find(altcontrol.owners, shooter.Name) and not table.find(whitelist, shooter.Name) then
+                lastBotAttacker = shooter.Name
+            end
         end
     end)
-    if not shooter then return end
 
-    -- Get victim from hitPart (any Instance, not just BasePart)
-    local victim = nil
+    -- Resolve victim from hitPart
+    local victim
     pcall(function()
-        if typeof(hitPart) == 'Instance' then
-            for _, v in players:GetPlayers() do
-                if v.Character and (hitPart:IsDescendantOf(v.Character) or hitPart.Parent == v.Character) then victim = v; break end
-            end
+        if typeof(hitPart) ~= 'Instance' then return end
+        for _, v in players:GetPlayers() do
+            if v.Character and hitPart:IsDescendantOf(v.Character) then victim = v; break end
         end
     end)
     if not victim then return end
 
-    -- ASSIST: owner shoots someone -> bot kills that person
-    if assist and not killing and table.find(altcontrol.owners, shooter.Name) and shooter.Name ~= lplr.Name then
-        if victim.Name ~= lplr.Name and not table.find(altcontrol.owners, victim.Name) and not table.find(whitelist, victim.Name) then
-            if not bodyeffects.get(victim, 'K.O') and not bodyeffects.get(victim, 'SDeath') and not (victim.Character and victim.Character:FindFirstChild('ForceField')) then
-                pcall(function() wsSend({type='log', msg='[assist] ' .. shooter.Name .. ' shot ' .. victim.Name .. ' — helping'}) end)
-                target = victim; killing = true
+    -- ── SENTRY: someone shot an owner ──────────────────────────────────────
+    if sentry and not killing and not stomping then
+        local victimIsOwner = table.find(altcontrol.owners, victim.Name)
+        local shooterIsOwner = table.find(altcontrol.owners, shooter.Name)
+        local shooterIsWl = table.find(whitelist, shooter.Name)
+
+        if victimIsOwner and not shooterIsOwner and not shooterIsWl then
+            local key = shooter.Name .. victim.Name
+            local now = tick()
+            if not _sentryDebounce[key] or (now - _sentryDebounce[key]) > SENTRY_DEBOUNCE then
+                _sentryDebounce[key] = now
+                _tryKill(shooter, '[sentry] ' .. shooter.Name .. ' shot ' .. victim.Name .. ' — retaliating')
             end
         end
     end
 
-    -- SENTRY: someone shoots an owner -> bot kills the shooter
-    if sentry and not killing then
-        if table.find(altcontrol.owners, victim.Name) and not table.find(altcontrol.owners, shooter.Name) and shooter.Name ~= lplr.Name and not table.find(whitelist, shooter.Name) then
-            pcall(function() wsSend({type='log', msg='[sentry] ' .. shooter.Name .. ' shot ' .. victim.Name .. ' — retaliating'}) end)
-            killing = true; target = shooter
+    -- ── ASSIST: owner shot an enemy ────────────────────────────────────────
+    if assist and not killing and not stomping then
+        local shooterIsOwner = table.find(altcontrol.owners, shooter.Name)
+        local victimIsOwner = table.find(altcontrol.owners, victim.Name)
+        local victimIsWl = table.find(whitelist, victim.Name)
+        local victimIsLplr = victim == lplr
+
+        if shooterIsOwner and not victimIsOwner and not victimIsWl and not victimIsLplr then
+            local now = tick()
+            if not _assistDebounce[victim.Name] or (now - _assistDebounce[victim.Name]) > ASSIST_DEBOUNCE then
+                _assistDebounce[victim.Name] = now
+                _tryKill(victim, '[assist] ' .. shooter.Name .. ' shot ' .. victim.Name .. ' — helping')
+            end
         end
     end
 end)
 
--- ══════════════════════════════════════════════════════════════════════════════
--- ULTRA-FAST SENTRY + ASSIST — Event-driven, zero polling, instant reaction
--- ══════════════════════════════════════════════════════════════════════════════
-
--- Track all player HP changes via events (not polling)
-local _sentryConns = {}
-local _enemyTracker = {} -- enemy -> {lastHP, lastPos, conn}
-
-local function cleanupPlayer(name)
-    if _enemyTracker[name] then
-        pcall(function() if _enemyTracker[name].conn then _enemyTracker[name].conn:Disconnect() end end)
-        _enemyTracker[name] = nil
-    end
-    if _sentryConns[name] then
-        pcall(function() _sentryConns[name]:Disconnect() end)
-        _sentryConns[name] = nil
-    end
-end
-
--- Setup sentry on owner/protected player — HealthChanged = instant
-local function setupOwnerSentry(pName)
-    local p = players:FindFirstChild(pName)
-    if not p then return end
-    if not p.Character then return end
-    local hum = p.Character:FindFirstChildOfClass('Humanoid')
-    if not hum then return end
-    
-    -- Check if existing connection is still valid
-    if _sentryConns[pName] and _sentryConns[pName].Connected then return end
-    
-    -- Disconnect old if exists
-    if _sentryConns[pName] then
-        pcall(function() _sentryConns[pName]:Disconnect() end)
-        _sentryConns[pName] = nil
-    end
-    
-    local lastHP = hum.Health
-    
-    _sentryConns[pName] = hum.HealthChanged:Connect(function(newHP)
-        if not sentry or stop then lastHP = newHP return end
-        if newHP >= lastHP then lastHP = newHP return end
-        
-        -- Owner took damage!
-        pcall(function() wsSend({type='log', msg='[sentry] ' .. pName .. ' HP: ' .. math.floor(newHP) .. ' (was ' .. math.floor(lastHP) .. ')'}) end)
-        
-        local root = p.Character and p.Character:FindFirstChild('HumanoidRootPart')
-        if not root then lastHP = newHP return end
-        
-        local closest, closestDist = nil, 50
-        local rootPos = root.Position
-        for _, v in players:GetPlayers() do
-            if v == lplr or v.Name == pName then continue end
-            if table.find(altcontrol.owners, v.Name) or table.find(whitelist, v.Name) then continue end
-            if protectTarget and v.Name == protectTarget then continue end
-            local vc = v.Character
-            if not vc then continue end
-            local vr = vc:FindFirstChild('HumanoidRootPart')
-            if not vr then continue end
-            local vbe = vc:FindFirstChild('BodyEffects')
-            if vbe and vbe:FindFirstChild('K.O') and vbe['K.O'].Value then continue end
-            local d = (rootPos - vr.Position).Magnitude
-            if d < closestDist then closest = v; closestDist = d end
+-- ── Cleanup debounce tables on player leave (memory hygiene) ───────────────
+players.PlayerRemoving:Connect(function(p)
+    _sentryDebounce[p.Name .. p.Name] = nil -- edge case
+    _assistDebounce[p.Name] = nil
+    for k in pairs(_sentryDebounce) do
+        if k:sub(1, #p.Name) == p.Name or k:sub(-#p.Name) == p.Name then
+            _sentryDebounce[k] = nil
         end
-        if closest then
-            target = closest; killing = true; void = false
-            pcall(function() wsSend({type='log', msg='[sentry] ' .. closest.Name .. ' hit ' .. pName .. ' | ' .. math.floor(closestDist) .. 'st'}) end)
-        end
-        lastHP = newHP
-    end)
-    
-    pcall(function() wsSend({type='log', msg='[sentry] Tracking ' .. pName}) end)
-    
-    -- Also reconnect on respawn
-    p.CharacterAdded:Connect(function()
-        _sentryConns[pName] = nil -- force reconnect next cycle
+    end
+end)
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- MELEE ASSIST — Heartbeat HP-delta (covers punch, knife, stomp damage)
+-- ClientBullet only fires for guns. For melee we detect HP drop + owner nearby.
+-- PUNCH_RANGE = max studs owner can be from victim to count as "owner hit"
+-- ══════════════════════════════════════════════════════════════════════════════
+local PUNCH_RANGE = 10
+local _meleeHP = {}
+
+-- Seed initial HP
+task.spawn(function()
+    task.wait(1)
+    for _, v in ipairs(players:GetPlayers()) do
+        if v == lplr or table.find(altcontrol.owners, v.Name) or table.find(whitelist, v.Name) then continue end
+        pcall(function()
+            if v.Character and v.Character:FindFirstChildOfClass('Humanoid') then
+                _meleeHP[v.Name] = v.Character.Humanoid.Health
+            end
+        end)
+    end
+end)
+
+local function _seedMeleeHP(p)
+    p.CharacterAdded:Connect(function(char)
+        _meleeHP[p.Name] = nil
+        task.wait(1)
+        pcall(function() _meleeHP[p.Name] = char:FindFirstChildOfClass('Humanoid') and char.Humanoid.Health or nil end)
     end)
 end
+for _, p in ipairs(players:GetPlayers()) do _seedMeleeHP(p) end
+players.PlayerAdded:Connect(_seedMeleeHP)
+players.PlayerRemoving:Connect(function(p) _meleeHP[p.Name] = nil end)
 
--- Setup enemy tracking — detect who is shooting near owners (for assist)
-local function setupEnemyTrack(enemy)
-    if enemy == lplr then return end
-    if table.find(altcontrol.owners, enemy.Name) then return end
-    if table.find(whitelist, enemy.Name) then return end
-    if not enemy.Character then return end
-    local hum = enemy.Character:FindFirstChildOfClass('Humanoid')
-    if not hum then return end
-    
-    -- Check if existing connection is still valid
-    if _enemyTracker[enemy.Name] and _enemyTracker[enemy.Name].conn and _enemyTracker[enemy.Name].conn.Connected then return end
-    
-    -- Clean old
-    if _enemyTracker[enemy.Name] and _enemyTracker[enemy.Name].conn then
-        pcall(function() _enemyTracker[enemy.Name].conn:Disconnect() end)
-    end
-    
-    local lastHP = hum.Health
-    
-    local conn = hum.HealthChanged:Connect(function(newHP)
-        if not assist or stop then lastHP = newHP return end
-        if newHP >= lastHP then lastHP = newHP return end
-        local vc = enemy.Character
-        if not vc then lastHP = newHP return end
-        local vr = vc:FindFirstChild('HumanoidRootPart')
-        if not vr then lastHP = newHP return end
-        local vbe = vc:FindFirstChild('BodyEffects')
-        if vbe and vbe:FindFirstChild('K.O') and vbe['K.O'].Value then lastHP = newHP return end
-        
-        -- Check if any owner is near
-        for _, ownerName in ipairs(altcontrol.owners or {}) do
-            local owner = players:FindFirstChild(ownerName)
-            if owner and owner.Character and owner.Character:FindFirstChild('HumanoidRootPart') then
-                if (owner.Character.HumanoidRootPart.Position - vr.Position).Magnitude < 50 then
-                    target = enemy; killing = true; void = false
-                    pcall(function() wsSend({type='log', msg='[assist] ' .. enemy.Name .. ' near ' .. ownerName}) end)
-                    break
+runservice.Heartbeat:Connect(function()
+    if not assist or killing or stomping or stop then return end
+    pcall(function()
+        for _, enemy in ipairs(players:GetPlayers()) do
+            if enemy == lplr then continue end
+            if table.find(altcontrol.owners, enemy.Name) then continue end
+            if table.find(whitelist, enemy.Name) then continue end
+            if not enemy.Character then continue end
+            local hum = enemy.Character:FindFirstChildOfClass('Humanoid')
+            if not hum or hum.Health <= 0 then continue end
+            local be = enemy.Character:FindFirstChild('BodyEffects')
+            if be and be:FindFirstChild('K.O') and be['K.O'].Value then continue end
+
+            local currentHP = hum.Health
+            local lastHP = _meleeHP[enemy.Name]
+            if not lastHP then _meleeHP[enemy.Name] = currentHP; continue end
+
+            if currentHP < lastHP then
+                local er = enemy.Character:FindFirstChild('HumanoidRootPart')
+                if er then
+                    for _, ownerName in ipairs(altcontrol.owners) do
+                        local owner = players:FindFirstChild(ownerName)
+                        if not owner or not owner.Character then continue end
+                        local or2 = owner.Character:FindFirstChild('HumanoidRootPart')
+                        if not or2 then continue end
+                        if (er.Position - or2.Position).Magnitude <= PUNCH_RANGE then
+                            local now = tick()
+                            if not _assistDebounce[enemy.Name] or (now - _assistDebounce[enemy.Name]) > ASSIST_DEBOUNCE then
+                                _assistDebounce[enemy.Name] = now
+                                _tryKill(enemy, '[assist-melee] ' .. ownerName .. ' hit ' .. enemy.Name .. ' — helping')
+                            end
+                            break
+                        end
+                    end
                 end
             end
+            _meleeHP[enemy.Name] = currentHP
         end
-        lastHP = newHP
     end)
-    
-    _enemyTracker[enemy.Name] = {conn = conn}
-    
-    enemy.CharacterAdded:Connect(function()
-        _enemyTracker[enemy.Name] = nil -- force reconnect
-    end)
-end
-
--- Setup tracking for all current players
-for _, p in ipairs(players:GetPlayers()) do
-    setupEnemyTrack(p)
-end
-
--- Auto-setup for new players
-players.PlayerAdded:Connect(function(p)
-    task.delay(1, function() setupEnemyTrack(p) end)
-end)
-players.PlayerRemoving:Connect(function(p)
-    cleanupPlayer(p.Name)
-end)
-
--- Keep sentry connections alive + refresh
-task.spawn(function()
-    task.wait(2)
-    
-    while true do
-        task.wait(0.5)
-        if sentry then
-            for _, ownerName in ipairs(altcontrol.owners or {}) do
-                setupOwnerSentry(ownerName)
-            end
-            if protectTarget then setupOwnerSentry(protectTarget) end
-        end
-        
-        if assist then
-            for _, p in ipairs(players:GetPlayers()) do
-                if not _enemyTracker[p.Name] then setupEnemyTrack(p) end
-            end
-        end
-        
-        -- Cleanup dead connections
-        for name, conn in pairs(_sentryConns) do
-            if conn and not conn.Connected then
-                _sentryConns[name] = nil
-            end
-        end
-        for name, data in pairs(_enemyTracker) do
-            if data and data.conn and not data.conn.Connected then
-                _enemyTracker[name] = nil
-            end
-        end
-    end
 end)
 
 -- Kill Queue Processor
@@ -1380,7 +1327,7 @@ local function handleCommand(cmd, args)
     if cmd == 'kill' then
         local user = utils.getname(targetName)
         if not user then wsSend({type='log', msg='Target not found: ' .. targetName}); return end
-        killing = true; target = user; wsSend({type='log', msg='Killing ' .. user.Name})
+        killing = true; target = user; void = false; wsSend({type='log', msg='Killing ' .. user.Name})
         task.spawn(function()
             repeat task.wait() until not killing
             stats.kills = stats.kills + 1
@@ -1389,7 +1336,7 @@ local function handleCommand(cmd, args)
     elseif cmd == 'stomp' then
         local user = utils.getname(targetName)
         if not user then wsSend({type='log', msg='Target not found'}); return end
-        killing = true; target = user; wsSend({type='log', msg='Kill+Stomp ' .. user.Name})
+        killing = true; target = user; void = false; wsSend({type='log', msg='Kill+Stomp ' .. user.Name})
         task.spawn(function()
             repeat task.wait() until not killing
             stats.kills = stats.kills + 1
@@ -1429,24 +1376,44 @@ local function handleCommand(cmd, args)
     elseif cmd == 'sentry' then 
         sentry = not sentry
         wsSend({type='log', msg=(sentry and 'ON' or 'OFF') .. ' sentry'})
-        -- Force immediate setup
         if sentry then
             for _, ownerName in ipairs(altcontrol.owners or {}) do
-                _sentryConns[ownerName] = nil -- force reconnect
+                -- Debug: check if owner exists
+                local ownerPlayer = players:FindFirstChild(ownerName)
+                if not ownerPlayer then
+                    wsSend({type='log', msg='[sentry] ERROR: ' .. ownerName .. ' not in server!'})
+                    continue
+                end
+                if not ownerPlayer.Character then
+                    wsSend({type='log', msg='[sentry] ERROR: ' .. ownerName .. ' has no character!'})
+                    continue
+                end
+                local ownerHum = ownerPlayer.Character:FindFirstChildOfClass('Humanoid')
+                if not ownerHum then
+                    wsSend({type='log', msg='[sentry] ERROR: ' .. ownerName .. ' has no humanoid!'})
+                    continue
+                end
+                _sentryConns[ownerName] = nil
                 setupOwnerSentry(ownerName)
+                -- Verify connection
+                if _sentryConns[ownerName] then
+                    wsSend({type='log', msg='[sentry] OK: tracking ' .. ownerName .. ' HP:' .. math.floor(ownerHum.Health)})
+                else
+                    wsSend({type='log', msg='[sentry] FAIL: could not connect to ' .. ownerName})
+                end
             end
-            wsSend({type='log', msg='[sentry] Setup done for: ' .. table.concat(altcontrol.owners, ', ')})
         end
     elseif cmd == 'assist' then 
         assist = not assist
         wsSend({type='log', msg=(assist and 'ON' or 'OFF') .. ' assist'})
-        -- Force immediate setup
         if assist then
+            local count = 0
             for _, p in ipairs(players:GetPlayers()) do
-                _enemyTracker[p.Name] = nil -- force reconnect
+                _enemyTracker[p.Name] = nil
                 setupEnemyTrack(p)
+                if _enemyTracker[p.Name] then count = count + 1 end
             end
-            wsSend({type='log', msg='[assist] Tracking ' .. #players:GetPlayers() .. ' players'})
+            wsSend({type='log', msg='[assist] Tracking ' .. count .. '/' .. #players:GetPlayers() .. ' players'})
         end
     elseif cmd == 'protect' then
         local user = utils.getname(targetName)
