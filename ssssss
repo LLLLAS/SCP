@@ -308,7 +308,7 @@ Library.CreateColorpicker = function(self, Data)
     local btn = I("TextButton"); btn.Parent = Data.Parent; btn.Name = "\0"
     btn.Size = U2(0,btnSz,0,btnSz); btn.BackgroundColor3 = RGB(64,208,128)
     btn.AutoButtonColor = false; btn.BorderSizePixel = 0; btn.Text = ""
-    Corner(btn, 3); Stroke(btn, T.Border, 1)
+    Corner(btn, 3)
 
     local cpW = IsMobile and math.min(GetScreenSize().X-20,290) or 238
     local cpH = IsMobile and 300 or 260
