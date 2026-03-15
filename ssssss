@@ -1281,10 +1281,7 @@ Library.Sections.Dropdown = function(self, Data)
     listFrame.BackgroundColor3 = T.Surface2; listFrame.BorderSizePixel = 0
     listFrame.Position = U2(0,0,0,16+btnH+2); listFrame.Size = U2(1,0,0,0)
     listFrame.Visible = false; listFrame.AutomaticSize = Enum.AutomaticSize.Y
-    listFrame.ClipsDescendants = true
-    Corner(listFrame, 4)
-    local listStroke = Stroke(listFrame, T.Border, 1)
-    listStroke.Enabled = false
+    listFrame.BackgroundTransparency = 1
     Pad(listFrame, 4, 4, 4, 4)
     List(listFrame, Enum.FillDirection.Vertical, 2)
 
@@ -1313,7 +1310,7 @@ Library.Sections.Dropdown = function(self, Data)
     function DD:SetOpen(bool)
         DD.IsOpen = bool
         listFrame.Visible = bool
-        listStroke.Enabled = bool
+        listFrame.BackgroundTransparency = bool and 0 or 1
         arrowLbl.Text = bool and "▴" or "▾"
         if bool then
             for _,v in Library.OpenFrames do if v~=DD then v:SetOpen(false) end end
