@@ -1241,20 +1241,24 @@ end
 Library.Sections.Dropdown = function(self, Data)
     Data = Data or {}
     local DD = { Window=self.Window, Page=self.Page, Section=self, Name=Data.Name or "Dropdown", Flag=Data.Flag or Library:NextFlag(), Items=Data.Items or Data.items or {}, Default=Data.Default or nil, MaxSize=Data.MaxSize or (IsMobile and 120 or 80), Callback=Data.Callback or function() end, Multi=Data.Multi or false, Options={}, Value=nil, IsOpen=false }
-    local containerH = IsMobile and 40 or 32; local btnH = IsMobile and 24 or 18
+    local btnH = IsMobile and 24 or 18
 
-    local container = I("Frame"); container.Parent = DD.Section.Items.Content; container.Name = "\0"
-    container.BackgroundTransparency = 1; container.Size = U2(1,0,0,containerH); container.BorderSizePixel = 0; container.ZIndex = 2
+    -- wrapper grows when open
+    local wrapper = I("Frame"); wrapper.Parent = DD.Section.Items.Content; wrapper.Name = "\0"
+    wrapper.BackgroundTransparency = 1; wrapper.Size = U2(1,0,0,0)
+    wrapper.BorderSizePixel = 0; wrapper.AutomaticSize = Enum.AutomaticSize.Y
+    wrapper.ClipsDescendants = false
 
-    local nameLbl = I("TextLabel"); nameLbl.Parent = container; nameLbl.Name = "\0"
+    local nameLbl = I("TextLabel"); nameLbl.Parent = wrapper; nameLbl.Name = "\0"
     nameLbl.FontFace = Library.Font; nameLbl.TextColor3 = T.TextMuted; nameLbl.Text = DD.Name
-    nameLbl.BackgroundTransparency = 1; nameLbl.Size = U2(0,0,0,13); nameLbl.AutomaticSize = Enum.AutomaticSize.X
+    nameLbl.BackgroundTransparency = 1; nameLbl.Size = U2(1,0,0,13)
     nameLbl.BorderSizePixel = 0; nameLbl.TextSize = IsMobile and 12 or 11
+    nameLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-    local ddBtn = I("TextButton"); ddBtn.Parent = container; ddBtn.Name = "\0"
+    local ddBtn = I("TextButton"); ddBtn.Parent = wrapper; ddBtn.Name = "\0"
     ddBtn.Text = ""; ddBtn.AutoButtonColor = false
-    ddBtn.AnchorPoint = V2(0,1); ddBtn.Position = U2(0,0,1,0)
-    ddBtn.Size = U2(1,0,0,btnH); ddBtn.BorderSizePixel = 0; ddBtn.BackgroundColor3 = T.Surface3
+    ddBtn.Position = U2(0,0,0,16); ddBtn.Size = U2(1,0,0,btnH)
+    ddBtn.BorderSizePixel = 0; ddBtn.BackgroundColor3 = T.Surface3
     Corner(ddBtn, 4)
 
     local selLbl = I("TextLabel"); selLbl.Parent = ddBtn; selLbl.Name = "\0"
@@ -1268,52 +1272,23 @@ Library.Sections.Dropdown = function(self, Data)
     arrowLbl.AnchorPoint = V2(1,0.5); arrowLbl.Size = U2(0,14,0,11); arrowLbl.BackgroundTransparency = 1
     arrowLbl.Position = U2(1,-4,0.5,0); arrowLbl.BorderSizePixel = 0; arrowLbl.TextSize = 11
 
-    -- optHolder เป็น Frame ธรรมดา ไม่ใช่ TextButton
-    local optHolder = I("Frame"); optHolder.Parent = Library.UnusedHolder; optHolder.Name = "\0"
-    optHolder.Visible = false; optHolder.Size = U2(0,100,0,100)
-    optHolder.BorderSizePixel = 0; optHolder.BackgroundColor3 = T.Surface; optHolder.ZIndex = 10
-    Corner(optHolder, 5); Stroke(optHolder, T.Border, 1)
-
-    local searchH = IsMobile and 20 or 14
-    local srchBox = I("TextBox"); srchBox.Parent = optHolder; srchBox.Name = "\0"
-    srchBox.FontFace = Library.Font; srchBox.TextColor3 = T.Text; srchBox.TextTransparency = 0.4
-    srchBox.Text = ""; srchBox.Size = U2(1,-8,0,searchH); srchBox.Position = U2(0,4,0,5)
-    srchBox.BackgroundTransparency = 1; srchBox.BorderSizePixel = 0; srchBox.ZIndex = 11
-    srchBox.PlaceholderColor3 = T.TextMuted; srchBox.PlaceholderText = "Search..."
-    srchBox.TextXAlignment = Enum.TextXAlignment.Left; srchBox.TextSize = IsMobile and 12 or 10
-
-    local sepY = IsMobile and 28 or 22
-    local srchSep = I("Frame"); srchSep.Parent = optHolder; srchSep.Name = "\0"
-    srchSep.Position = U2(0,4,0,sepY); srchSep.Size = U2(1,-8,0,1)
-    srchSep.BackgroundColor3 = T.Border; srchSep.BorderSizePixel = 0; srchSep.ZIndex = 11
-
-    local holderY = IsMobile and 34 or 26
-    local scroll = I("ScrollingFrame"); scroll.Parent = optHolder; scroll.Name = "\0"
-    scroll.Active = true; scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    scroll.BorderSizePixel = 0; scroll.CanvasSize = U2(0,0,0,0)
-    scroll.ScrollBarImageColor3 = T.BorderLight; scroll.ScrollBarThickness = IsMobile and 3 or 2
-    scroll.Size = U2(1,-4,1,-holderY); scroll.BackgroundTransparency = 1
-    scroll.Position = U2(0,0,0,holderY); scroll.ZIndex = 11
-    Pad(scroll,4,4,6,8); List(scroll, Enum.FillDirection.Vertical, IsMobile and 4 or 3)
+    -- inline list frame directly under button
+    local listFrame = I("Frame"); listFrame.Parent = wrapper; listFrame.Name = "\0"
+    listFrame.BackgroundColor3 = T.Surface2; listFrame.BorderSizePixel = 0
+    listFrame.Position = U2(0,0,0,16+btnH+2); listFrame.Size = U2(1,0,0,0)
+    listFrame.Visible = false; listFrame.AutomaticSize = Enum.AutomaticSize.Y
+    listFrame.ClipsDescendants = true
+    Corner(listFrame, 4); Stroke(listFrame, T.Border, 1)
+    Pad(listFrame, 4, 4, 4, 4)
+    List(listFrame, Enum.FillDirection.Vertical, 2)
 
     if not IsMobile then
         ddBtn.MouseEnter:Connect(function() tw(ddBtn,{BackgroundColor3=Library:GetLighterColor(T.Surface3,1.5)}) end)
         ddBtn.MouseLeave:Connect(function() tw(ddBtn,{BackgroundColor3=T.Surface3}) end)
     end
 
-    local function updatePos()
-        local bx = ddBtn.AbsolutePosition.X
-        local by = ddBtn.AbsolutePosition.Y + ddBtn.AbsoluteSize.Y
-        local hw = ddBtn.AbsoluteSize.X
-        local hh = DD.MaxSize
-        local sc = GetScreenSize()
-        local posY = by + 4
-        if posY + hh > sc.Y - 10 then posY = ddBtn.AbsolutePosition.Y - hh - 4 end
-        optHolder.Position = U2(0, bx, 0, posY)
-        optHolder.Size = U2(0, hw, 0, hh)
-    end
-
     function DD:Get() return DD.Value end
+
     function DD:Set(opt)
         if DD.Multi then
             if type(opt)~="table" then return end
@@ -1331,64 +1306,60 @@ Library.Sections.Dropdown = function(self, Data)
 
     function DD:SetOpen(bool)
         DD.IsOpen = bool
+        listFrame.Visible = bool
+        arrowLbl.Text = bool and "▴" or "▾"
         if bool then
-            optHolder.Parent = Library.Holder
-            optHolder.Visible = true
-            task.defer(updatePos)
             for _,v in Library.OpenFrames do if v~=DD then v:SetOpen(false) end end
-            Library.OpenFrames[DD] = DD; arrowLbl.Text = "▴"
+            Library.OpenFrames[DD] = DD
         else
             Library.OpenFrames[DD] = nil
-            optHolder.Visible = false
-            optHolder.Parent = Library.UnusedHolder
-            arrowLbl.Text = "▾"
         end
     end
 
     function DD:Add(opt)
         local first = (next(DD.Options)==nil)
-        local optH = IsMobile and 24 or 17
-        local ob = I("TextButton"); ob.Parent = scroll; ob.Name = "\0"
+        local optH = IsMobile and 24 or 18
+        local ob = I("TextButton"); ob.Parent = listFrame; ob.Name = "\0"
         ob.Text=""; ob.AutoButtonColor=false; ob.BackgroundTransparency=1
-        ob.Size=U2(1,0,0,optH); ob.BorderSizePixel=0; ob.BackgroundColor3=T.Surface3; ob.ZIndex=12
+        ob.Size=U2(1,0,0,optH); ob.BorderSizePixel=0; ob.BackgroundColor3=T.Surface3
         Corner(ob,3)
-        local liner = I("Frame"); liner.Parent = ob; liner.Name = "\0"
+        local liner = I("Frame"); liner.Parent=ob; liner.Name="\0"
         liner.BackgroundTransparency=1; liner.Size=U2(0,2,0.55,0)
         liner.AnchorPoint=V2(0,0.5); liner.Position=U2(0,3,0.5,0)
-        liner.BackgroundColor3=T.Accent; liner.BorderSizePixel=0; liner.ZIndex=13
+        liner.BackgroundColor3=T.Accent; liner.BorderSizePixel=0
         Corner(liner,2)
-        local txt = I("TextLabel"); txt.Parent = ob; txt.Name = "\0"
+        local txt = I("TextLabel"); txt.Parent=ob; txt.Name="\0"
         txt.FontFace=Library.Font; txt.TextColor3=T.TextMuted; txt.Text=opt
-        txt.Size=U2(1,-12,0,11); txt.AnchorPoint=V2(0,0.5); txt.BackgroundTransparency=1
-        txt.Position=U2(0,10,0.5,0); txt.AutomaticSize=Enum.AutomaticSize.X
-        txt.BorderSizePixel=0; txt.TextSize=IsMobile and 12 or 10; txt.ZIndex=13
+        txt.Size=U2(1,-12,0,optH); txt.AnchorPoint=V2(0,0.5)
+        txt.BackgroundTransparency=1; txt.Position=U2(0,10,0.5,0)
+        txt.BorderSizePixel=0; txt.TextSize=IsMobile and 12 or 10
+        txt.TextXAlignment=Enum.TextXAlignment.Left
+
         local od = { Button=ob, Selected=false, Name=opt, Liner=liner, Text=txt, IsFirst=first }
         function od:Toggle(s)
             if s=="Active" then
-                liner.BackgroundTransparency=0; txt.TextColor3=T.Accent; txt.TextTransparency=0
+                liner.BackgroundTransparency=0
+                txt.TextColor3=T.Accent; txt.TextTransparency=0
                 ob.BackgroundTransparency=0
             else
-                liner.BackgroundTransparency=1; txt.TextColor3=T.TextMuted; txt.TextTransparency=0.4
+                liner.BackgroundTransparency=1
+                txt.TextColor3=T.TextMuted; txt.TextTransparency=0.3
                 ob.BackgroundTransparency=1
             end
         end
-        function od:Set()
+
+        ob.MouseButton1Click:Connect(function()
             if not DD.Multi then
-                local wasSelected = od.Selected
                 for _,v in DD.Options do v.Selected=false; v:Toggle("Inactive") end
-                if not wasSelected then
-                    od.Selected=true; od:Toggle("Active")
-                    DD.Value=od.Name; Library.Flags[DD.Flag]=od.Name
-                    selLbl.Text=od.Name
-                else
-                    DD.Value=nil; Library.Flags[DD.Flag]=nil
-                    selLbl.Text="-"
-                end
+                od.Selected=true; od:Toggle("Active")
+                DD.Value=od.Name; Library.Flags[DD.Flag]=od.Name
+                selLbl.Text=od.Name
                 DD:SetOpen(false)
             else
                 od.Selected = not od.Selected
                 local idx = table.find(DD.Value or {}, od.Name)
-                if idx then table.remove(DD.Value,idx); od:Toggle("Inactive")
+                if idx then
+                    table.remove(DD.Value, idx); od:Toggle("Inactive")
                 else
                     DD.Value = DD.Value or {}
                     table.insert(DD.Value, od.Name); od:Toggle("Active")
@@ -1397,10 +1368,11 @@ Library.Sections.Dropdown = function(self, Data)
                 selLbl.Text = #(DD.Value or {})>0 and table.concat(DD.Value,", ") or "-"
             end
             if DD.Callback then Library:SafeCall(DD.Callback, DD.Value) end
-        end
-        ob.MouseButton1Click:Connect(function() od:Set() end)
+        end)
+
         DD.Options[od.Name] = od; return od
     end
+
     function DD:Remove(opt) local o=DD.Options[opt]; if o then o.Button:Destroy(); DD.Options[opt]=nil end end
     function DD:Refresh(list) for _,v in DD.Options do DD:Remove(v.Name) end; for _,v in list do DD:Add(v) end end
 
@@ -1408,36 +1380,12 @@ Library.Sections.Dropdown = function(self, Data)
 
     ddBtn.MouseButton1Click:Connect(function() DD:SetOpen(not DD.IsOpen) end)
 
-    Library:Connect(UserInputService.InputBegan, function(inp)
-        if not DD.IsOpen then return end
-        if inp.UserInputType ~= Enum.UserInputType.MouseButton1 and inp.UserInputType ~= Enum.UserInputType.Touch then return end
-        local mp = Library:GetCursorPos()
-        local ap = optHolder.AbsolutePosition; local as = optHolder.AbsoluteSize
-        local overHolder = mp.X>=ap.X and mp.X<=ap.X+as.X and mp.Y>=ap.Y and mp.Y<=ap.Y+as.Y
-        local bap = ddBtn.AbsolutePosition; local bas = ddBtn.AbsoluteSize
-        local overBtn = mp.X>=bap.X and mp.X<=bap.X+bas.X and mp.Y>=bap.Y and mp.Y<=bap.Y+bas.Y
-        if not overHolder and not overBtn then DD:SetOpen(false) end
-    end)
-
-    local ssRS
-    srchBox.Focused:Connect(function()
-        ssRS = RunService.RenderStepped:Connect(function()
-            for _,v in DD.Options do
-                if srchBox.Text~="" then
-                    v.Button.Visible = string.find(string.lower(v.Name), Library:EscapePattern(string.lower(srchBox.Text))) and true or false
-                else v.Button.Visible=true end
-            end
-        end)
-    end)
-    srchBox.FocusLost:Connect(function() if ssRS then ssRS:Disconnect(); ssRS=nil end end)
-
     Library.SetFlags[DD.Flag] = function(v) DD:Set(v) end
     if DD.Default then DD:Set(DD.Default)
     else for _,v in DD.Options do if v.IsFirst then DD:Set(v.Name); break end end end
     return DD
 end
 
--- ─── Label ────────────────────────────────────────────────────────────────────
 Library.Sections.Label = function(self, name)
     local Lbl = { Window=self.Window, Page=self.Page, Section=self, Name=name or "Label" }
     local row = I("Frame"); row.Parent = Lbl.Section.Items.Content; row.Name = "\0"
