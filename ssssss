@@ -1267,14 +1267,9 @@ Library.Sections.Dropdown = function(self, Data)
 
     local selLbl = I("TextLabel"); selLbl.Parent = ddBtn; selLbl.Name = "\0"
     selLbl.FontFace = Library.Font; selLbl.TextColor3 = T.TextMuted; selLbl.Text = "-"
-    selLbl.AnchorPoint = V2(0,0.5); selLbl.Size = U2(1,-20,0,11); selLbl.BackgroundTransparency = 1
+    selLbl.AnchorPoint = V2(0,0.5); selLbl.Size = U2(1,-8,0,btnH); selLbl.BackgroundTransparency = 1
     selLbl.TextXAlignment = Enum.TextXAlignment.Left; selLbl.Position = U2(0,8,0.5,0)
     selLbl.BorderSizePixel = 0; selLbl.TextSize = IsMobile and 12 or 10
-
-    local arrowLbl = I("TextLabel"); arrowLbl.Parent = ddBtn; arrowLbl.Name = "\0"
-    arrowLbl.FontFace = Library.Font; arrowLbl.TextColor3 = T.TextMuted; arrowLbl.Text = "▾"
-    arrowLbl.AnchorPoint = V2(1,0.5); arrowLbl.Size = U2(0,14,0,11); arrowLbl.BackgroundTransparency = 1
-    arrowLbl.Position = U2(1,-4,0.5,0); arrowLbl.BorderSizePixel = 0; arrowLbl.TextSize = 11
 
     -- inline list frame directly under button
     local listFrame = I("Frame"); listFrame.Parent = wrapper; listFrame.Name = "\0"
@@ -1311,7 +1306,6 @@ Library.Sections.Dropdown = function(self, Data)
         DD.IsOpen = bool
         listFrame.Visible = bool
         listFrame.BackgroundTransparency = bool and 0 or 1
-        arrowLbl.Text = bool and "▴" or "▾"
         if bool then
             for _,v in Library.OpenFrames do if v~=DD then v:SetOpen(false) end end
             Library.OpenFrames[DD] = DD
