@@ -390,8 +390,8 @@ Library.CreateColorpicker = function(self, Data)
 
     -- context menu
     local ctxMenu = I("Frame"); ctxMenu.Parent = Library.UnusedHolder; ctxMenu.Name = "\0"
-    ctxMenu.Visible = false; ctxMenu.Size = U2(0,IsMobile and 110 or 80,0,0)
-    ctxMenu.BackgroundColor3 = T.Surface; ctxMenu.BorderSizePixel = 0; ctxMenu.AutomaticSize = Enum.AutomaticSize.Y
+    ctxMenu.Visible = false; ctxMenu.Size = U2(0,0,0,0)
+    ctxMenu.BackgroundColor3 = T.Surface; ctxMenu.BorderSizePixel = 0; ctxMenu.AutomaticSize = Enum.AutomaticSize.None
     Corner(ctxMenu, 5); Stroke(ctxMenu, T.Border, 1)
     List(ctxMenu, Enum.FillDirection.Vertical, 1)
     Pad(ctxMenu, 4, 4, 4, 4)
@@ -442,6 +442,8 @@ Library.CreateColorpicker = function(self, Data)
     function CP:SetOpen2(bool)
         CP.IsOpen2 = bool
         if bool then
+            ctxMenu.Size = U2(0,IsMobile and 110 or 80,0,0)
+            ctxMenu.AutomaticSize = Enum.AutomaticSize.Y
             ctxMenu.Visible = true; ctxMenu.Parent = Library.Holder
             rs2 = RunService.RenderStepped:Connect(function()
                 ctxMenu.Position = U2(0, btn.AbsolutePosition.X+btn.AbsoluteSize.X+4, 0, btn.AbsolutePosition.Y)
@@ -1280,7 +1282,9 @@ Library.Sections.Dropdown = function(self, Data)
     listFrame.Position = U2(0,0,0,16+btnH+2); listFrame.Size = U2(1,0,0,0)
     listFrame.Visible = false; listFrame.AutomaticSize = Enum.AutomaticSize.Y
     listFrame.ClipsDescendants = true
-    Corner(listFrame, 4); Stroke(listFrame, T.Border, 1)
+    Corner(listFrame, 4)
+    local listStroke = Stroke(listFrame, T.Border, 1)
+    listStroke.Enabled = false
     Pad(listFrame, 4, 4, 4, 4)
     List(listFrame, Enum.FillDirection.Vertical, 2)
 
@@ -1309,6 +1313,7 @@ Library.Sections.Dropdown = function(self, Data)
     function DD:SetOpen(bool)
         DD.IsOpen = bool
         listFrame.Visible = bool
+        listStroke.Enabled = bool
         arrowLbl.Text = bool and "▴" or "▾"
         if bool then
             for _,v in Library.OpenFrames do if v~=DD then v:SetOpen(false) end end
