@@ -314,7 +314,7 @@ Library.CreateColorpicker = function(self, Data)
     local cpH = IsMobile and 300 or 260
 
     local win = I("Frame"); win.Parent = Library.UnusedHolder; win.Name = "\0"
-    win.Visible = false; win.Size = U2(0,cpW,0,cpH)
+    win.Visible = false; win.Size = U2(0,0,0,0)
     win.BackgroundColor3 = T.Surface; win.BorderSizePixel = 0
     Corner(win, 6); Stroke(win, T.Border, 1)
 
@@ -421,6 +421,7 @@ Library.CreateColorpicker = function(self, Data)
     function CP:SetOpen(bool)
         CP.IsOpen = bool
         if bool then
+            win.Size = U2(0,cpW,0,cpH)
             win.Visible = true; win.Parent = Library.Holder
             rs1 = RunService.RenderStepped:Connect(function()
                 if IsMobile then
@@ -545,7 +546,7 @@ Library.CreateKeybind = function(self, Data)
 
     local kbWin = I("Frame"); kbWin.Parent = Library.UnusedHolder; kbWin.Name = "\0"
     kbWin.Visible = false; kbWin.ZIndex = 5
-    kbWin.Size = U2(0,IsMobile and 120 or 90,0,IsMobile and 90 or 72)
+    kbWin.Size = U2(0,0,0,0)
     kbWin.BackgroundColor3 = T.Surface; kbWin.BorderSizePixel = 0
     Corner(kbWin, 5); Stroke(kbWin, T.Border, 1); Pad(kbWin,4,4,4,4)
     List(kbWin, Enum.FillDirection.Vertical, 2)
@@ -574,6 +575,7 @@ Library.CreateKeybind = function(self, Data)
     function KB:SetOpen(bool)
         KB.IsOpen = bool
         if bool then
+            kbWin.Size = U2(0,IsMobile and 120 or 90,0,IsMobile and 90 or 72)
             kbWin.Visible = true; kbWin.Parent = Library.Holder
             kbRS = RunService.RenderStepped:Connect(function()
                 if IsMobile then
