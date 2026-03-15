@@ -1067,6 +1067,7 @@ Library.Sections.Toggle = function(self, Data)
     local row = I("TextButton"); row.Parent = Toggle.Section.Items.Content; row.Name = "\0"
     row.Text = ""; row.AutoButtonColor = false; row.BackgroundTransparency = 1
     row.Size = U2(1,0,0,rowH); row.BorderSizePixel = 0
+    row.ClipsDescendants = true
 
     local rowLbl = I("TextLabel"); rowLbl.Parent = row; rowLbl.Name = "\0"
     rowLbl.FontFace = Library.Font; rowLbl.TextColor3 = T.TextMuted; rowLbl.Text = Toggle.Name
