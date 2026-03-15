@@ -1269,7 +1269,7 @@ Library.Sections.Dropdown = function(self, Data)
     arrowLbl.Position = U2(1,-4,0.5,0); arrowLbl.BorderSizePixel = 0; arrowLbl.TextSize = 11
 
     -- optHolder เป็น Frame ธรรมดา ไม่ใช่ TextButton
-    local optHolder = I("Frame"); optHolder.Parent = Library.Holder; optHolder.Name = "\0"
+    local optHolder = I("Frame"); optHolder.Parent = Library.UnusedHolder; optHolder.Name = "\0"
     optHolder.Visible = false; optHolder.Size = U2(0,100,0,100)
     optHolder.BorderSizePixel = 0; optHolder.BackgroundColor3 = T.Surface; optHolder.ZIndex = 10
     Corner(optHolder, 5); Stroke(optHolder, T.Border, 1)
@@ -1332,13 +1332,15 @@ Library.Sections.Dropdown = function(self, Data)
     function DD:SetOpen(bool)
         DD.IsOpen = bool
         if bool then
-            updatePos()
+            optHolder.Parent = Library.Holder
             optHolder.Visible = true
+            task.defer(updatePos)
             for _,v in Library.OpenFrames do if v~=DD then v:SetOpen(false) end end
             Library.OpenFrames[DD] = DD; arrowLbl.Text = "▴"
         else
             Library.OpenFrames[DD] = nil
             optHolder.Visible = false
+            optHolder.Parent = Library.UnusedHolder
             arrowLbl.Text = "▾"
         end
     end
