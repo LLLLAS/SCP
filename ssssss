@@ -194,6 +194,7 @@ Library.GetCursorPos = function(self)
     return V2(Mouse.X, Mouse.Y)
 end
 Library.IsOverFrame = function(self, frame)
+    if not frame.Visible then return false end
     local mp = Library:GetCursorPos()
     local ap = frame.AbsolutePosition; local as = frame.AbsoluteSize
     return mp.X >= ap.X and mp.X <= ap.X+as.X and mp.Y >= ap.Y and mp.Y <= ap.Y+as.Y
@@ -515,9 +516,11 @@ Library.CreateColorpicker = function(self, Data)
     end)
     Library:Connect(UserInputService.InputBegan, function(inp)
         if not isSI(inp) then return end
-        if not CP.IsOpen then return end
-        if Library:IsOverFrame(win) or Library:IsOverFrame(ctxMenu) then return end
-        CP:SetOpen(false); CP:SetOpen2(false)
+        task.defer(function()
+            if not CP.IsOpen then return end
+            if Library:IsOverFrame(win) or Library:IsOverFrame(ctxMenu) then return end
+            CP:SetOpen(false); CP:SetOpen2(false)
+        end)
     end)
 
     if Data.Default then CP:Set(Data.Default, Data.Alpha or 0) end
@@ -644,7 +647,9 @@ Library.CreateKeybind = function(self, Data)
             end
         end
         if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
-            if KB.IsOpen and not Library:IsOverFrame(kbWin) then KB:SetOpen(false) end
+            task.defer(function()
+                if KB.IsOpen and not Library:IsOverFrame(kbWin) then KB:SetOpen(false) end
+            end)
         end
     end)
     Library:Connect(UserInputService.InputEnded, function(inp)
@@ -1080,7 +1085,8 @@ Library.Sections.Toggle = function(self, Data)
     local pillTrack = I("Frame"); pillTrack.Parent = sub; pillTrack.Name = "\0"
     pillTrack.Size = U2(0,pillW,0,pillH); pillTrack.BackgroundColor3 = T.Surface3
     pillTrack.BorderSizePixel = 0; pillTrack.LayoutOrder = 999
-    Corner(pillTrack, 99); Stroke(pillTrack, T.Border, 1)
+    Corner(pillTrack, 99)
+    local pillStroke = Stroke(pillTrack, T.Border, 1)
 
     -- pill thumb
     local thumb = I("Frame"); thumb.Parent = pillTrack; thumb.Name = "\0"
@@ -1099,11 +1105,11 @@ Library.Sections.Toggle = function(self, Data)
     function Toggle:Set(v)
         Toggle.Value = v; Library.Flags[Toggle.Flag] = v
         if v then
-            tw(pillTrack,{BackgroundColor3=T.AccentDim}); Stroke(pillTrack, T.Accent, 1)
+            tw(pillTrack,{BackgroundColor3=T.AccentDim}); tw(pillStroke,{Color=T.Accent})
             tw(thumb,{Position=U2(1,-(thumbSz+2),0.5,0),BackgroundColor3=T.Accent})
             tw(rowLbl,{TextColor3=T.Text})
         else
-            tw(pillTrack,{BackgroundColor3=T.Surface3}); Stroke(pillTrack, T.Border, 1)
+            tw(pillTrack,{BackgroundColor3=T.Surface3}); tw(pillStroke,{Color=T.Border})
             tw(thumb,{Position=U2(0,2,0.5,0),BackgroundColor3=T.TextMuted})
             tw(rowLbl,{TextColor3=T.TextMuted})
         end
@@ -1249,7 +1255,7 @@ Library.Sections.Dropdown = function(self, Data)
     ddBtn.Text = ""; ddBtn.AutoButtonColor = false
     ddBtn.AnchorPoint = V2(0,1); ddBtn.Position = U2(0,0,1,0)
     ddBtn.Size = U2(1,0,0,btnH); ddBtn.BorderSizePixel = 0; ddBtn.BackgroundColor3 = T.Surface3
-    Corner(ddBtn, 4); Stroke(ddBtn, T.Border, 1)
+    Corner(ddBtn, 4)
 
     local selLbl = I("TextLabel"); selLbl.Parent = ddBtn; selLbl.Name = "\0"
     selLbl.FontFace = Library.Font; selLbl.TextColor3 = T.TextMuted; selLbl.Text = "-"
@@ -1262,7 +1268,7 @@ Library.Sections.Dropdown = function(self, Data)
     arrowLbl.AnchorPoint = V2(1,0.5); arrowLbl.Size = U2(0,14,0,11); arrowLbl.BackgroundTransparency = 1
     arrowLbl.Position = U2(1,-4,0.5,0); arrowLbl.BorderSizePixel = 0; arrowLbl.TextSize = 11
 
-    local optHolder = I("TextButton"); optHolder.Parent = Library.Holder; optHolder.Name = "\0"
+    local optHolder = I("TextButton"); optHolder.Parent = Library.UnusedHolder; optHolder.Name = "\0"
     optHolder.Text = ""; optHolder.AutoButtonColor = false; optHolder.Visible = false
     optHolder.Size = U2(0,100,0,100); optHolder.BorderSizePixel = 0; optHolder.BackgroundColor3 = T.Surface
     Corner(optHolder, 5); Stroke(optHolder, T.Border, 1)
@@ -1327,7 +1333,7 @@ Library.Sections.Dropdown = function(self, Data)
             Library.OpenFrames[DD] = DD; arrowLbl.Text="▴"
         else
             if ddRS then ddRS:Disconnect(); ddRS=nil end
-            Library.OpenFrames[DD]=nil; optHolder.Visible=false; optHolder.Parent=Library.Holder
+            Library.OpenFrames[DD]=nil; optHolder.Visible=false; optHolder.Parent=Library.UnusedHolder
             arrowLbl.Text="▾"
         end
     end
@@ -1384,10 +1390,18 @@ Library.Sections.Dropdown = function(self, Data)
     function DD:Refresh(list) for _,v in DD.Options do DD:Remove(v.Name) end; for _,v in list do DD:Add(v) end end
 
     for _, v in DD.Items do DD:Add(v) end
-    ddBtn.MouseButton1Down:Connect(function() DD:SetOpen(not DD.IsOpen) end)
+
+    local justOpened = false
+    ddBtn.MouseButton1Down:Connect(function()
+        justOpened = true
+        DD:SetOpen(not DD.IsOpen)
+        task.defer(function() justOpened = false end)
+    end)
     Library:Connect(UserInputService.InputBegan, function(inp)
         if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
-            if DD.IsOpen and not Library:IsOverFrame(optHolder) then DD:SetOpen(false) end
+            task.defer(function()
+                if DD.IsOpen and not Library:IsOverFrame(optHolder) then DD:SetOpen(false) end
+            end)
         end
     end)
     local ssRS
