@@ -1,25 +1,4 @@
---[[
-╔══════════════════════════════════════════════════════════════════╗
-║  FlowLib v3.0  ·  premium dark UI  ·  Gamesense/Neverlose style ║
-║  Deep black  ·  Crimson accent  ·  Shadow layers  ·  Smooth anim║
-╚══════════════════════════════════════════════════════════════════╝
-    API (ZeroHub v3 compatible):
-        local Lib    = loadstring(game:HttpGet("URL"))()
-        local Window = Lib:Window({ Name = "script" })
-        local Page   = Window:Page({ Name = "Combat" })
-        local Sec    = Page:Section({ Name = "Aimbot", Side = 1 })
-        local tog    = Sec:Toggle({ Name = "Silent Aim", Default = false, Callback = fn })
-        local cp     = tog:Colorpicker({ Default = Color3.fromRGB(200,30,40) })
-        local kb     = tog:Keybind({ Default = Enum.KeyCode.E, Mode = "Toggle" })
-        Sec:Slider({ Name = "FOV", Min=1, Max=360, Default=90, Suffix="°", Callback=fn })
-        Sec:Dropdown({ Name = "Part", Items={"Head","HRP"}, Default="Head", Callback=fn })
-        Sec:Button({ Name = "Fire", Callback = fn })
-        Sec:Textbox({ Name = "Tag", Placeholder="...", Callback=fn })
-        local lbl = Sec:Label("Status"); lbl:SetText("active")
-        Lib:Notification("Loaded!", 3)
-        Lib:Watermark("script v1")
-        Lib:KeybindList()
-]]
+-- FlowLib v3.0 by zerohub.fun
 
 -- FlowLib v3.0 helper bootstrap
 local function _crn(p,r) local c=Instance.new('UICorner');c.CornerRadius=UDim.new(0,r or 4);c.Parent=p;return c end
@@ -30,9 +9,9 @@ local function _hl(p,sp,ha,va) local l=Instance.new('UIListLayout');l.FillDirect
 
 
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Services & locals
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 local Players = game:GetService("Players")
 local Http    = game:GetService("HttpService")
 local UIS     = game:GetService("UserInputService")
@@ -46,7 +25,7 @@ local LP    = Players.LocalPlayer
 local Cam   = workspace.CurrentCamera
 local Mouse = LP:GetMouse()
 
--- ── shorthand ─────────────────────────────────────────────────────
+-- --  shorthand 
 local V2, U2, UD   = Vector2.new, UDim2.new, UDim.new
 local FR, FH, FX   = Color3.fromRGB, Color3.fromHSV, Color3.fromHex
 local NS, NSK      = NumberSequence.new, NumberSequenceKeypoint.new
@@ -58,9 +37,9 @@ local tins, tfind, trem, tconcat, tclone, tunpack =
 local fmt, gsub, sfind, slen = string.format, string.gsub, string.find, string.len
 local INew = Instance.new
 
--- ══════════════════════════════════════════════════════════════════
---  Theme  –  deep black · crimson glow
--- ══════════════════════════════════════════════════════════════════
+-- -- 
+-- --  Theme    deep black  crimson glow
+-- -- 
 local T = {
     -- backgrounds
     Bg0         = FR(  3,  2,  4),   -- deepest black
@@ -74,7 +53,7 @@ local T = {
     Sidebar     = FR(  5,  4,  7),
     SidebarLine = FR( 20, 16, 28),
 
-    -- accent  (crimson → bright red)
+-- -- accent  (crimson  bright red)
     Accent      = FR(205, 35, 45),
     AccentHi    = FR(255, 62, 72),
     AccentSoft  = FR(155, 22, 30),
@@ -107,9 +86,9 @@ local T = {
     Shadow      = FR(  0,   0,   0),
 }
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Library core
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 local Lib = {
     Theme      = T,
     MenuKeybind= tostring(Enum.KeyCode.RightControl),
@@ -139,7 +118,7 @@ Lib.Fonts.M = safeFont("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeig
 Lib.Fonts.B = safeFont("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
 Lib.Font    = Lib.Fonts.R
 
--- ── Screen GUIs ───────────────────────────────────────────────────
+-- --  Screen GUIs 
 function mkSG(p)
     local g = INew("ScreenGui")
     for k,v in p do g[k]=v end
@@ -160,9 +139,9 @@ nfList.VerticalAlignment=Enum.VerticalAlignment.Bottom
 nfList.Padding=UD(0,4)
 Lib.NotifHolder = nfHolder
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Primitive helpers
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function _crn(p,r)
     local c = INew("UICorner"); c.CornerRadius = UD(0, r or 4); c.Parent = p; return c
 end
@@ -203,7 +182,7 @@ function gradTrans(p, t0, t1, rot)
     g.Rotation = rot or 0; g.Parent = p; return g
 end
 
--- ── Tween shorthand ───────────────────────────────────────────────
+-- --  Tween shorthand 
 function tw(obj, goal, t, s, d)
     TS:Create(obj,
         TweenInfo.new(t or Lib.TweenTime, s or Enum.EasingStyle.Quart, d or Enum.EasingDirection.Out),
@@ -213,11 +192,11 @@ function twSpring(obj, goal)
     tw(obj, goal, Lib.TweenSpring, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 end
 
--- ── Shadow helper (ImageLabel drop shadow) ────────────────────────
+-- --  Shadow helper (ImageLabel drop shadow) 
 -- shadow: safe no-op (Rect.new not supported on all executors)
 function mkShadow(parent, size, offset, trans) return nil end
 
--- ── Draggable ─────────────────────────────────────────────────────
+-- --  Draggable 
 function makeDraggable(frame, handle)
     handle = handle or frame
     local drag, ds, sp = false, nil, nil
@@ -242,9 +221,9 @@ function makeDraggable(frame, handle)
     end)
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Lib methods
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib:SafeCall(fn, ...)
     local ok, e = pcall(fn, ...)
     if not ok then warn("[FlowLib] " .. tostring(e)) end
@@ -269,7 +248,7 @@ function Lib:Unload()
     pcall(function() self.UnusedHolder:Destroy() end)
 end
 
--- ── Window size ───────────────────────────────────────────────────
+-- --  Window size 
 function winSize()
     if not IsMobile then return 740, 490 end
     local s = Cam.ViewportSize
@@ -277,9 +256,9 @@ function winSize()
            math.round(clamp(s.Y-40, 340, 490))
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Notification
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib:Notification(text, dur, sub_text)
     dur = dur or 3
     local W = 260; local H = sub_text and 48 or 36
@@ -347,9 +326,9 @@ function Lib:Notification(text, dur, sub_text)
     end)
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Watermark
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib:Watermark(text)
     local WM = {}
     local f = INew("Frame"); f.Parent = Lib.Holder
@@ -379,9 +358,9 @@ function Lib:Watermark(text)
     WM:SetText(text); return WM
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  KeybindList
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib:KeybindList()
     local KL = {}; Lib.KeyList = KL
     local f = INew("Frame"); f.Parent = Lib.Holder
@@ -431,9 +410,9 @@ function Lib:KeybindList()
     return KL
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Colorpicker
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib:CreateColorpicker(Data)
     local CP = {Hue=0, Sat=0, Val=0, Alpha=0, IsOpen=false,
                 Color=FR(0,0,0), HexValue="000000", Flag=Data.Flag}
@@ -579,16 +558,16 @@ function Lib:CreateColorpicker(Data)
     return CP
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Keybind
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib:CreateKeybind(Data)
     local KB = {Key="", Toggled=false, Mode="Toggle", Flag=Data.Flag, Picking=false, Value="", IsOpen=false}
     local kH = IsMobile and 19 or 14
 
     local kBtn = INew("TextButton"); kBtn.Parent = Data.Parent
     kBtn.Size = U2(0, 0, 0, kH); kBtn.AutomaticSize = Enum.AutomaticSize.X
-    kBtn.Text = "[ — ]"; kBtn.AutoButtonColor = false
+    kBtn.Text = "[  ]"; kBtn.AutoButtonColor = false
     kBtn.FontFace = Lib.Fonts.R; kBtn.TextSize = IsMobile and 11 or 10
     kBtn.TextColor3 = T.TextSub; kBtn.BackgroundColor3 = T.Bg4; kBtn.BorderSizePixel = 0
     _crn(kBtn,3); _stk(kBtn, T.Border, 1); _pad(kBtn,0,0,5,5)
@@ -684,7 +663,7 @@ function Lib:CreateKeybind(Data)
     end)
     kBtn.MouseButton2Down:Connect(function() KB:SetOpen(not KB.IsOpen) end)
     UIS.InputBegan:Connect(function(i)
-        if KB.Value ~= "" and KB.Value ~= "—" then
+        if KB.Value ~= "" and KB.Value ~= "" then
             if tostring(i.KeyCode) == KB.Key or tostring(i.UserInputType) == KB.Key then
                 if KB.Mode=="Toggle" then KB:Press()
                 elseif KB.Mode=="Hold" then KB:Press(true)
@@ -703,16 +682,16 @@ function Lib:CreateKeybind(Data)
     return KB
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Window
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib:Window(Data)
     Data = Data or {}
     local W = {Name=Data.Name or "flow", Pages={}, Items={}, IsOpen=true}
     local WW, WH = winSize()
     local SBW = IsMobile and 88 or 108; local TPH = IsMobile and 38 or 30
 
-    -- ── main container ──
+-- --  main container 
     local main = INew("Frame"); main.Parent = Lib.Holder
     main.AnchorPoint = V2(0.5, 0.5); main.Position = U2(0.5, 0, 0.5, 0)
     main.Size = U2(0, WW, 0, WH); main.BackgroundColor3 = T.Bg1; main.BorderSizePixel = 0
@@ -722,7 +701,7 @@ function Lib:Window(Data)
     -- deep shadow
     mkShadow(main, 60, 12, 0.35)
 
-    -- ── topbar ──
+-- --  topbar 
     local top = INew("Frame"); top.Parent = main
     top.Size = U2(1, 0, 0, TPH); top.BackgroundColor3 = T.TopBar; top.BorderSizePixel = 0; _crn(top,8)
     -- cover bottom corners
@@ -735,7 +714,7 @@ function Lib:Window(Data)
     topSep.Size = U2(1,0,0,1); topSep.Position = U2(0,0,1,-1)
     topSep.BackgroundColor3 = T.TopBarLine; topSep.BorderSizePixel = 0
 
-    -- subtle gradient on topbar (left darker → right slightly lighter)
+-- -- subtle gradient on topbar (left darker  right slightly lighter)
     local topGrad = INew("Frame"); topGrad.Parent = top
     topGrad.Size = U2(1,0,1,0); topGrad.BackgroundTransparency = 0.85
     topGrad.BackgroundColor3 = T.Accent; topGrad.BorderSizePixel = 0; _crn(topGrad,8)
@@ -763,7 +742,7 @@ function Lib:Window(Data)
     versionLbl.FontFace = Lib.Fonts.R; versionLbl.TextSize = 10
     versionLbl.TextColor3 = T.TextDim
 
-    -- ── sidebar ──
+-- --  sidebar 
     local sb = INew("Frame"); sb.Parent = main
     sb.Position = U2(0, 0, 0, TPH); sb.Size = U2(0, SBW, 1, -TPH)
     sb.BackgroundColor3 = T.Sidebar; sb.BorderSizePixel = 0; _crn(sb,8)
@@ -782,7 +761,7 @@ function Lib:Window(Data)
     nav.Size = U2(1, -8, 1, -16); nav.AutomaticSize = Enum.AutomaticSize.Y
     nav.BorderSizePixel = 0; _vl(nav,2)
 
-    -- ── content area ──
+-- --  content area 
     local cont = INew("Frame"); cont.Parent = main
     cont.Position = U2(0, SBW, 0, TPH)
     cont.Size = U2(1, -SBW, 1, -TPH)
@@ -817,7 +796,7 @@ function Lib:Window(Data)
         if tostring(i.KeyCode) == Lib.MenuKeybind then if not deb then W:SetOpen(not W.IsOpen) end end
     end)
 
-    -- ── mobile hamburger button (draggable) ───────────────────────
+-- --  mobile hamburger button (draggable) 
     if IsMobile then
         local hamSize = 44
 
@@ -880,9 +859,9 @@ function Lib:Window(Data)
     return setmetatable(W, Lib)
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Page
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib:Page(Data)
     Data = Data or {}
     local P = {Window=self, Name=Data.Name or "Page",
@@ -981,9 +960,9 @@ function Lib:Page(Data)
     return setmetatable(P, Lib.Pages)
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Section
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib.Pages:Section(Data)
     Data = Data or {}
     local S = {Window=self.Window, Page=self,
@@ -1035,9 +1014,9 @@ function Lib.Pages:Section(Data)
     return setmetatable(S, Lib.Sections)
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Toggle
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib.Sections:Toggle(Data)
     Data = Data or {}
     local TG = {Window=self.Window, Page=self.Page, Section=self,
@@ -1129,9 +1108,9 @@ function Lib.Sections:Toggle(Data)
     return TG
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Button
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib.Sections:Button(Data)
     Data = Data or {}
     local B = {Window=self.Window, Page=self.Page, Section=self,
@@ -1170,9 +1149,9 @@ function Lib.Sections:Button(Data)
     return B
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Slider
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib.Sections:Slider(Data)
     Data = Data or {}
     local SL = {Window=self.Window, Page=self.Page, Section=self,
@@ -1255,9 +1234,9 @@ function Lib.Sections:Slider(Data)
     return SL
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Dropdown
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib.Sections:Dropdown(Data)
     Data = Data or {}
     local DD = {Window=self.Window, Page=self.Page, Section=self,
@@ -1285,7 +1264,7 @@ function Lib.Sections:Dropdown(Data)
     local selLbl = INew("TextLabel"); selLbl.Parent = selBtn
     selLbl.AnchorPoint = V2(0,0.5); selLbl.Position = U2(0,7,0.5,0)
     selLbl.Size = U2(1,-22,0,bH); selLbl.BackgroundTransparency = 1
-    selLbl.Text = "—"; selLbl.FontFace = Lib.Fonts.R
+    selLbl.Text = ""; selLbl.FontFace = Lib.Fonts.R
     selLbl.TextSize = IsMobile and 11 or 10; selLbl.TextColor3 = T.TextSub
     selLbl.TextXAlignment = Enum.TextXAlignment.Left
 
@@ -1293,7 +1272,7 @@ function Lib.Sections:Dropdown(Data)
     local arrow = INew("TextLabel"); arrow.Parent = selBtn
     arrow.AnchorPoint = V2(1,0.5); arrow.Position = U2(1,-6,0.5,0)
     arrow.Size = U2(0,10,0,10); arrow.BackgroundTransparency = 1
-    arrow.Text = "▾"; arrow.FontFace = Lib.Fonts.R; arrow.TextSize = 11
+    arrow.Text = ""; arrow.FontFace = Lib.Fonts.R; arrow.TextSize = 11
     arrow.TextColor3 = T.TextDim
 
     -- list frame (inline expand)
@@ -1324,7 +1303,7 @@ function Lib.Sections:Dropdown(Data)
             if type(opt) ~= "table" then return end
             DD.Value = opt; Lib.Flags[DD.Flag] = opt
             for _, v in opt do local od = DD.Options[v]; if od then od:Toggle("Active") end end
-            selLbl.Text = #opt > 0 and tconcat(opt, ", ") or "—"
+            selLbl.Text = #opt > 0 and tconcat(opt, ", ") or ""
         else
             if not DD.Options[opt] then return end
             DD.Value = opt; Lib.Flags[DD.Flag] = opt
@@ -1378,7 +1357,7 @@ function Lib.Sections:Dropdown(Data)
                 if idx then trem(DD.Value, idx); od:Toggle("Inactive")
                 else DD.Value = DD.Value or {}; tins(DD.Value, opt); od:Toggle("Active") end
                 Lib.Flags[DD.Flag] = DD.Value
-                selLbl.Text = #(DD.Value or {}) > 0 and tconcat(DD.Value, ", ") or "—"
+                selLbl.Text = #(DD.Value or {}) > 0 and tconcat(DD.Value, ", ") or ""
             end
             Lib:SafeCall(DD.Callback, DD.Value)
         end)
@@ -1395,9 +1374,9 @@ function Lib.Sections:Dropdown(Data)
     return DD
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Label
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib.Sections:Label(text)
     local L = {Window=self.Window, Page=self.Page, Section=self, Name=text or ""}
     local row = INew("Frame"); row.Parent = L.Section.Items.content
@@ -1432,9 +1411,9 @@ function Lib.Sections:Label(text)
     return L
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Textbox
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib.Sections:Textbox(Data)
     Data = Data or {}
     local TX = {Window=self.Window, Page=self.Page, Section=self,
@@ -1482,9 +1461,9 @@ function Lib.Sections:Textbox(Data)
     return TX
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Theming system
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib:ChangeTheme(key, color)
     T[key] = color
     for _, item in self.ThemeItems do
@@ -1507,9 +1486,9 @@ function Lib:AddToTheme(inst, props)
     tins(self.ThemeItems, td); self.ThemeMap[inst] = td
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Config system
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 local Http2 = game:GetService("HttpService")
 function Lib:GetConfig()
     local cfg = {}
@@ -1563,9 +1542,9 @@ function Lib:ListConfigs(folder)
     return list
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  ModeratorList
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib:ModeratorList()
     local ML = {}; local mods = {}
     local f = INew("Frame"); f.Parent = Lib.Holder
@@ -1635,9 +1614,9 @@ function Lib:ModeratorList()
     return ML
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Search bar (inject into sidebar)
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib:AddSearch(Window)
     local nav = Window.Items.nav
     local sb = nav.Parent  -- sidebar frame
@@ -1649,7 +1628,7 @@ function Lib:AddSearch(Window)
 
     local searchIcon = INew("TextLabel"); searchIcon.Parent = searchWrap
     searchIcon.Size = U2(0, 14, 1, 0); searchIcon.BackgroundTransparency = 1
-    searchIcon.Text = "⌕"; searchIcon.FontFace = Lib.Fonts.R
+    searchIcon.Text = ""; searchIcon.FontFace = Lib.Fonts.R
     searchIcon.TextSize = 13; searchIcon.TextColor3 = T.TextDim
     searchIcon.Position = U2(0, 3, 0, 0)
 
@@ -1696,9 +1675,9 @@ function Lib:AddSearch(Window)
     return searchBox
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Settings page
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib:CreateSettingsPage(Window, KBL, WM, ML)
     local cols = IsMobile and 1 or 2
     local SP = Window:Page({Name="Settings", Columns=cols})
@@ -1776,9 +1755,9 @@ function Lib:CreateSettingsPage(Window, KBL, WM, ML)
     return SP
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Enhanced KeybindList (override existing)
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib:KeybindList()
     local KL = {}; Lib.KeyList = KL
     local f = INew("Frame"); f.Parent = Lib.Holder
@@ -1836,9 +1815,9 @@ function Lib:KeybindList()
 end
 
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Spring animation system
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 local Springs = {}
 
 local function createSpring(mass, force, damping, speed)
@@ -1949,9 +1928,9 @@ function Lib:Ripple(parent, x, y)
     game:GetService(Debris):AddItem(rip, 0.5)
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Separator element
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib.Sections:Separator(label)
     local row = INew(Frame); row.Parent = self.Items.content
     row.Size = U2(1, 0, 0, IsMobile and 18 or 14)
@@ -1977,9 +1956,9 @@ function Lib.Sections:Separator(label)
     return row
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Toggle group (radio buttons - only one can be on)
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib.Sections:ToggleGroup(items, default, callback)
     local group = {}; local current = default
     for _, item in items do
@@ -2001,9 +1980,9 @@ function Lib.Sections:ToggleGroup(items, default, callback)
 end
 
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Tooltip system
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 local tooltipFrame, tooltipText
 local function ensureTooltip()
     if tooltipFrame then return end
@@ -2037,9 +2016,9 @@ function Lib:AttachTooltip(frame, text)
     end)
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Progress bar element
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib.Sections:ProgressBar(Data)
     Data = Data or {}
     local PB = {Window=self.Window, Page=self.Page, Section=self,
@@ -2085,9 +2064,9 @@ function Lib.Sections:ProgressBar(Data)
     return PB
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Color tag label  (name + colored badge)
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib.Sections:ColorTag(Data)
     Data = Data or {}
     local row = INew('Frame'); row.Parent = self.Items.content
@@ -2122,9 +2101,9 @@ function Lib.Sections:ColorTag(Data)
     return CT
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Input validator helpers
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 function Lib:IsValidHex(str)
     str = str:gsub('#','')
     return #str == 6 and str:match('^%x+$') ~= nil
@@ -2144,9 +2123,9 @@ function Lib:ColorToHex(color)
         math.floor(color.B*255))
 end
 
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 --  Version info
--- ══════════════════════════════════════════════════════════════════
+-- -- 
 Lib.Version = 'FlowLib v3.0'
 Lib.Author  = 'zerohub.fun'
 Lib.Build   = '2025.03'
