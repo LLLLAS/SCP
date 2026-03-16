@@ -119,9 +119,15 @@ Lib.Sections.__index = Lib.Sections
 Lib.Pages.__index    = Lib.Pages
 
 -- fonts
-Lib.Fonts.R = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
-Lib.Fonts.M = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)
-Lib.Fonts.B = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+local function safeFont(family, weight)
+    local ok, f = pcall(function()
+        return Font.new(family, weight)
+    end)
+    return ok and f or Font.fromEnum(Enum.Font.GothamSsm)
+end
+Lib.Fonts.R = safeFont("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
+Lib.Fonts.M = safeFont("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)
+Lib.Fonts.B = safeFont("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
 Lib.Font    = Lib.Fonts.R
 
 -- ── Screen GUIs ───────────────────────────────────────────────────
@@ -381,7 +387,7 @@ function Lib:KeybindList()
     hdr.Size = U2(0, 0, 0, 12); hdr.AutomaticSize = Enum.AutomaticSize.X
     hdr.BackgroundTransparency = 1; hdr.Text = "KEYBINDS"
     hdr.FontFace = Lib.Fonts.B; hdr.TextSize = 9; hdr.TextColor3 = T.Accent
-    hdr.TextXAlignment = Enum.TextXAlignment.Left; hdr.LetterSpacing = 2
+    hdr.TextXAlignment = Enum.TextXAlignment.Left
 
     local sep = INew("Frame"); sep.Parent = f
     sep.Size = U2(1, 0, 0, 1); sep.Position = U2(0, 0, 0, 16)
