@@ -760,7 +760,9 @@ function Lib:Page(Data)
         end
     end)
 
-    if #P.Window.Pages==0 then P:Turn(true) end
+    if #P.Window.Pages==0 then
+        task.defer(function() P:Turn(true) end)
+    end
     table.insert(P.Window.Pages,P)
     return setmetatable(P,Lib.Pages)
 end
