@@ -98,7 +98,6 @@ local Lib = {
     TweenSpring= 0.18,
     Pages = {}, Sections = {}, Connections = {}, Threads = {},
     OpenFrames = {}, ThemeItems = {}, ThemeMap = {},
-print("[zh_dbg] checkpoint 100")
     _cc = 0, _fc = 0,
     Holder = nil, UnusedHolder = nil, NotifHolder = nil,
     Fonts = {}, IsMobile = IsMobile,
@@ -199,7 +198,6 @@ function mkShadow(parent, size, offset, trans) return nil end
 
 -- --  Draggable 
 function makeDraggable(frame, handle)
-print("[zh_dbg] checkpoint 200")
     handle = handle or frame
     local drag, ds, sp = false, nil, nil
     handle.InputBegan:Connect(function(i)
@@ -300,7 +298,6 @@ function Lib:Notification(text, dur, sub_text)
         tw(subLbl, {TextTransparency = 0})
     end
 
-print("[zh_dbg] checkpoint 300")
     -- animate in
     f.BackgroundTransparency = 1; titleLbl.TextTransparency = 1; bar.BackgroundTransparency = 1
     tw(f, {BackgroundTransparency = 0})
@@ -401,7 +398,6 @@ function Lib:KeybindList()
         dot.BorderSizePixel = 0; _crn(dot,99)
 
         local lbl = INew("TextLabel"); lbl.Parent = row
-print("[zh_dbg] checkpoint 400")
         lbl.Position = U2(0, 8, 0, 0); lbl.Size = U2(0, 0, 1, 0)
         lbl.AutomaticSize = Enum.AutomaticSize.X; lbl.BackgroundTransparency = 1
         lbl.FontFace = Lib.Fonts.R; lbl.TextSize = 10
@@ -502,7 +498,6 @@ function Lib:CreateColorpicker(Data)
             task.wait(Lib.TweenTime + 0.05); deb = false
             win.Visible = CP.IsOpen
             if not CP.IsOpen then win.Size = U2(0,0,0,0); win.Parent = Lib.UnusedHolder end
-print("[zh_dbg] checkpoint 500")
         end)
     end
 
@@ -603,7 +598,6 @@ function Lib:CreateKeybind(Data)
     local kdeb = false; local kRS
     function KB:SetOpen(bool)
         if kdeb then return end; KB.IsOpen = bool; kdeb = true
-print("[zh_dbg] checkpoint 600")
         if bool then
             kWin.Size = U2(0, IsMobile and 108 or 85, 0, IsMobile and 80 or 65)
             kWin.Visible = true; kWin.Parent = Lib.Holder
@@ -704,7 +698,6 @@ function Lib:Window(Data)
     _crn(main,8)
     -- outer glow border (very subtle red)
     _stk(main, T.Border, 1)
-print("[zh_dbg] checkpoint 700")
     -- deep shadow
     mkShadow(main, 60, 12, 0.35)
 
@@ -805,7 +798,6 @@ print("[zh_dbg] checkpoint 700")
 
 -- --  mobile hamburger button (draggable) 
     if IsMobile then
-print("[zh_dbg] checkpoint 800")
         local hamSize = 44
 
         local hambg = INew("Frame"); hambg.Parent = Lib.Holder
@@ -906,7 +898,6 @@ function Lib:Page(Data)
     lbl.AnchorPoint = V2(0, 0.5); lbl.Position = U2(0, 16, 0.5, 0)
     lbl.Size = U2(0, 0, 0, 0); lbl.AutomaticSize = Enum.AutomaticSize.XY
     lbl.BackgroundTransparency = 1; lbl.Text = P.Name
-print("[zh_dbg] checkpoint 900")
     lbl.FontFace = Lib.Fonts.M; lbl.TextSize = IsMobile and 11 or 10
     lbl.TextColor3 = T.TextSub; lbl.TextXAlignment = Enum.TextXAlignment.Left
 
@@ -1007,7 +998,6 @@ function Lib.Pages:Section(Data)
     hl.BackgroundTransparency = 1; hl.Text = S.Name
     hl.FontFace = Lib.Fonts.B; hl.TextSize = IsMobile and 11 or 10
     hl.TextColor3 = T.Text; hl.TextXAlignment = Enum.TextXAlignment.Left
-print("[zh_dbg] checkpoint 1000")
 
     -- separator
     local sep = INew("Frame"); sep.Parent = box
@@ -1208,7 +1198,6 @@ function Lib.Sections:Slider(Data)
     -- thumb indicator on track
     local thumb2 = INew("Frame"); thumb2.Parent = track
     thumb2.Size = U2(0, tH+2, 0, tH+2); thumb2.AnchorPoint = V2(0.5, 0.5)
-print("[zh_dbg] checkpoint 1200")
     thumb2.Position = U2(0.5, 0, 0.5, 0); thumb2.BackgroundColor3 = T.AccentHi
     thumb2.BorderSizePixel = 0; _crn(thumb2,99); _stk(thumb2, T.AccentGlow, 1.5).Transparency=0.4
 
@@ -1509,7 +1498,6 @@ function Lib:GetConfig()
         elseif type(val) == "table" and val.Color then
             cfg[flag] = {Color="#"..val.HexValue, Alpha=val.Alpha}
         else
-print("[zh_dbg] checkpoint 1500")
             cfg[flag] = val
         end
     end
@@ -1810,7 +1798,6 @@ function Lib:KeybindList()
         dot.Size = U2(0, 3, 0, 3); dot.AnchorPoint = V2(0, 0.5)
         dot.Position = U2(0, 0, 0.5, 0); dot.BackgroundColor3 = T.Accent
         dot.BorderSizePixel = 0; _crn(dot,99)
-print("[zh_dbg] checkpoint 1800")
 
         local lbl = INew("TextLabel"); lbl.Parent = row
         lbl.Position = U2(0, 8, 0, 0); lbl.Size = U2(0, 0, 1, 0)
@@ -2011,7 +1998,6 @@ local function ensureTooltip()
     tooltipText.TextColor3 = T.TextSub; tooltipText.ZIndex = 21
 end
 
-print("[zh_dbg] checkpoint 2000")
 function Lib:AttachTooltip(frame, text)
     if IsMobile then return end
     ensureTooltip()
