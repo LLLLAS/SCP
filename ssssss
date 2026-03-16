@@ -1,3 +1,25 @@
+--[[
+╔══════════════════════════════════════════════════════════════════╗
+║  FlowLib v3.0  ·  premium dark UI  ·  Gamesense/Neverlose style ║
+║  Deep black  ·  Crimson accent  ·  Shadow layers  ·  Smooth anim║
+╚══════════════════════════════════════════════════════════════════╝
+    API (ZeroHub v3 compatible):
+        local Lib    = loadstring(game:HttpGet("URL"))()
+        local Window = Lib:Window({ Name = "script" })
+        local Page   = Window:Page({ Name = "Combat" })
+        local Sec    = Page:Section({ Name = "Aimbot", Side = 1 })
+        local tog    = Sec:Toggle({ Name = "Silent Aim", Default = false, Callback = fn })
+        local cp     = tog:Colorpicker({ Default = Color3.fromRGB(200,30,40) })
+        local kb     = tog:Keybind({ Default = Enum.KeyCode.E, Mode = "Toggle" })
+        Sec:Slider({ Name = "FOV", Min=1, Max=360, Default=90, Suffix="°", Callback=fn })
+        Sec:Dropdown({ Name = "Part", Items={"Head","HRP"}, Default="Head", Callback=fn })
+        Sec:Button({ Name = "Fire", Callback = fn })
+        Sec:Textbox({ Name = "Tag", Placeholder="...", Callback=fn })
+        local lbl = Sec:Label("Status"); lbl:SetText("active")
+        Lib:Notification("Loaded!", 3)
+        Lib:Watermark("script v1")
+        Lib:KeybindList()
+]]
 
 -- ══════════════════════════════════════════════════════════════════
 --  Services & locals
