@@ -41,15 +41,6 @@ local function twSine(o,g,t) tw(o,g,t or 0.2,Enum.EasingStyle.Sine,Enum.EasingDi
 local function twElastic(o,g,t) tw(o,g,t or 0.4,Enum.EasingStyle.Elastic,Enum.EasingDirection.Out) end
 local function twBounce(o,g,t) tw(o,g,t or 0.3,Enum.EasingStyle.Bounce,Enum.EasingDirection.Out) end
 
--- spring physics for drag
-local function makeSpring(stiffness,damping)
-    return {pos=0,vel=0,target=0,stiffness=stiffness or 200,damping=damping or 20}
-end
-local function stepSpring(sp,dt)
-    local f=(sp.target-sp.pos)*sp.stiffness - sp.vel*sp.damping
-    sp.vel=sp.vel+f*dt; sp.pos=sp.pos+sp.vel*dt; return sp.pos
-end
-
 -- scale bounce on click
 local function bounceClick(frame)
     local os=frame.Size
