@@ -797,14 +797,79 @@ function Lib:Window(Data)
             main.Visible = true; main.Size = U2(0, 0, 0, 0); main.BackgroundTransparency = 1
             tw(main, {Size=U2(0,WW,0,WH), BackgroundTransparency=0}, 0.22, Enum.EasingStyle.Back)
             task.delay(0.24, function() main.Size=U2(0,WW,0,WH); main.BackgroundTransparency=0; deb=false end)
+            -- hide hamburger when GUI open
+            if W._hambtn then tw(W._hambtn, {BackgroundTransparency=1, ImageTransparency=1}) end
         else
             tw(main, {Size=U2(0,0,0,0), BackgroundTransparency=1}, 0.16, Enum.EasingStyle.Quart)
-            task.delay(0.18, function() main.Visible=false; main.Size=U2(0,WW,0,WH); main.BackgroundTransparency=0; deb=false end)
+            task.delay(0.18, function()
+                main.Visible=false; main.Size=U2(0,WW,0,WH); main.BackgroundTransparency=0; deb=false
+                -- show hamburger when GUI closed
+                if W._hambtn then tw(W._hambtn, {BackgroundTransparency=0, ImageTransparency=0}) end
+            end)
         end
     end
+
+    -- keyboard toggle (desktop)
     UIS.InputBegan:Connect(function(i)
         if tostring(i.KeyCode) == Lib.MenuKeybind then if not deb then W:SetOpen(not W.IsOpen) end end
     end)
+
+    -- ── mobile hamburger button (draggable) ───────────────────────
+    if IsMobile then
+        local hamSize = 44
+
+        local hambg = INew("Frame"); hambg.Parent = Lib.Holder
+        hambg.Size = U2(0, hamSize, 0, hamSize)
+        hambg.Position = U2(0, 10, 1, -(hamSize + 80))
+        hambg.BackgroundColor3 = T.Bg2
+        hambg.BorderSizePixel = 0; hambg.ZIndex = 10
+        crn(hambg, 10); stk(hambg, T.Accent, 1)
+
+        -- three lines icon
+        for li = 1, 3 do
+            local line = INew("Frame"); line.Parent = hambg
+            line.Size = U2(0, 20, 0, 2)
+            line.AnchorPoint = V2(0.5, 0.5)
+            line.Position = U2(0.5, 0, 0, 10 + (li-1) * 9)
+            line.BackgroundColor3 = T.Accent
+            line.BorderSizePixel = 0; crn(line, 2)
+        end
+
+        -- red dot accent corner
+        local rdot = INew("Frame"); rdot.Parent = hambg
+        rdot.Size = U2(0, 7, 0, 7)
+        rdot.AnchorPoint = V2(1, 0); rdot.Position = U2(1, 1, 0, -1)
+        rdot.BackgroundColor3 = T.AccentHi; rdot.BorderSizePixel = 0; crn(rdot, 99)
+
+        -- tap to toggle
+        local tapBtn = INew("TextButton"); tapBtn.Parent = hambg
+        tapBtn.Size = U2(1, 0, 1, 0); tapBtn.BackgroundTransparency = 1
+        tapBtn.Text = ""; tapBtn.ZIndex = 11; tapBtn.BorderSizePixel = 0
+        tapBtn.MouseButton1Click:Connect(function()
+            W:SetOpen(not W.IsOpen)
+        end)
+
+        -- draggable
+        local hdrag, hds, hsp = false, nil, nil
+        hambg.InputBegan:Connect(function(i)
+            if i.UserInputType ~= Enum.UserInputType.Touch then return end
+            hdrag = true; hds = i.Position; hsp = hambg.Position
+        end)
+        UIS.InputChanged:Connect(function(i)
+            if not hdrag then return end
+            if i.UserInputType ~= Enum.UserInputType.Touch then return end
+            local d = i.Position - hds
+            local sc = Cam.ViewportSize
+            local nx = clamp(hsp.X.Offset + d.X, 0, sc.X - hamSize)
+            local ny = clamp(hsp.Y.Offset + d.Y, 0, sc.Y - hamSize)
+            hambg.Position = U2(0, nx, 0, ny)
+        end)
+        UIS.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then hdrag = false end
+        end)
+
+        W._hambtn = hambg
+    end
 
     task.wait()
     local ap = main.AbsolutePosition
@@ -858,19 +923,18 @@ function Lib:Page(Data)
     local pf = INew("Frame"); pf.Parent = Lib.UnusedHolder
     pf.BackgroundTransparency = 1; pf.Visible = false
     pf.Size = U2(1, 0, 1, 0); pf.BorderSizePixel = 0
-    local pll = INew("UIListLayout"); pll.Parent = pf
-    pll.FillDirection = Enum.FillDirection.Horizontal
-    pll.HorizontalFlex = Enum.UIFlexAlignment.Fill
-    pll.VerticalFlex = Enum.UIFlexAlignment.Fill
-    pll.SortOrder = Enum.SortOrder.LayoutOrder
 
+    -- manual column sizing (no UIFlexAlignment - not supported by most executors)
+    local colW = 1 / P.Columns
     for i = 1, P.Columns do
         local col = INew("ScrollingFrame"); col.Parent = pf
         col.BackgroundTransparency = 1; col.BorderSizePixel = 0
         col.ScrollBarThickness = IsMobile and 3 or 2
         col.ScrollBarImageColor3 = T.Border
         col.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        col.CanvasSize = U2(0, 0, 0, 0); col.Size = U2(0, 100, 0, 100)
+        col.CanvasSize = U2(0, 0, 0, 0)
+        col.Size = U2(colW, 0, 1, 0)
+        col.Position = U2(colW * (i - 1), 0, 0, 0)
         col.ElasticBehavior = IsMobile and Enum.ElasticBehavior.Always or Enum.ElasticBehavior.WhenScrollable
         local pv = IsMobile and 8 or 6
         pad(col, pv, pv+2, pv, pv); vlist(col, IsMobile and 9 or 7)
@@ -1414,5 +1478,674 @@ function Lib.Sections:Textbox(Data)
     Lib.SetFlags[TX.Flag] = function(v) TX:Set(v) end
     return TX
 end
+
+-- ══════════════════════════════════════════════════════════════════
+--  Theming system
+-- ══════════════════════════════════════════════════════════════════
+function Lib:ChangeTheme(key, color)
+    T[key] = color
+    for _, item in self.ThemeItems do
+        for prop, val in item.Properties do
+            if type(val) == "string" and val == key then
+                pcall(function() item.Item[prop] = color end)
+            elseif type(val) == "function" then
+                pcall(function() item.Item[prop] = val() end)
+            end
+        end
+    end
+end
+function Lib:AddToTheme(inst, props)
+    inst = inst.Instance or inst
+    local td = {Item=inst, Properties=props}
+    for p, v in props do
+        if type(v) == "string" then pcall(function() inst[p] = T[v] end)
+        elseif type(v) == "function" then pcall(function() inst[p] = v() end) end
+    end
+    tins(self.ThemeItems, td); self.ThemeMap[inst] = td
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--  Config system
+-- ══════════════════════════════════════════════════════════════════
+local Http2 = game:GetService("HttpService")
+function Lib:GetConfig()
+    local cfg = {}
+    for flag, val in self.Flags do
+        if type(val) == "table" and val.Key then
+            cfg[flag] = {Key=tostring(val.Key), Mode=val.Mode, Toggled=val.Toggled}
+        elseif type(val) == "table" and val.Color then
+            cfg[flag] = {Color="#"..val.HexValue, Alpha=val.Alpha}
+        else
+            cfg[flag] = val
+        end
+    end
+    return Http2:JSONEncode(cfg)
+end
+function Lib:LoadConfig(data)
+    local ok, d = pcall(function() return Http2:JSONDecode(data) end)
+    if not ok then return false end
+    for flag, val in d do
+        local fn = self.SetFlags[flag]
+        if not fn then continue end
+        if type(val) == "table" and val.Key then fn(val)
+        elseif type(val) == "table" and val.Color then fn(val.Color, val.Alpha)
+        else fn(val) end
+    end
+    return true
+end
+function Lib:SaveConfig(name, folder)
+    folder = folder or "FlowLib"
+    if not isfolder(folder) then makefolder(folder) end
+    writefile(folder.."/"..name..".json", self:GetConfig())
+end
+function Lib:LoadConfigFile(name, folder)
+    folder = folder or "FlowLib"
+    local path = folder.."/"..name..".json"
+    if not isfile(path) then return false end
+    return self:LoadConfig(readfile(path))
+end
+function Lib:DeleteConfig(name, folder)
+    folder = folder or "FlowLib"
+    local path = folder.."/"..name..".json"
+    if isfile(path) then delfile(path) end
+end
+function Lib:ListConfigs(folder)
+    folder = folder or "FlowLib"
+    if not isfolder(folder) then return {} end
+    local list = {}
+    for _, f in listfiles(folder) do
+        local n = f:match("([^/\\]+)%.json$")
+        if n then tins(list, n) end
+    end
+    return list
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--  ModeratorList
+-- ══════════════════════════════════════════════════════════════════
+function Lib:ModeratorList()
+    local ML = {}; local mods = {}
+    local f = INew("Frame"); f.Parent = Lib.Holder
+    f.AnchorPoint = V2(1, 0.5); f.Position = U2(1, -14, 0.5, 0)
+    f.Size = U2(0, 200, 0, 0); f.AutomaticSize = Enum.AutomaticSize.Y
+    f.BackgroundColor3 = T.Bg2; f.BorderSizePixel = 0
+    crn(f, 6); stk(f, T.Border, 1)
+    mkShadow(f, 22, 4, 0.55); pad(f, 8, 8, 10, 10)
+    makeDraggable(f)
+
+    -- red top line
+    local topLine = INew("Frame"); topLine.Parent = f
+    topLine.Size = U2(1, 0, 0, 1); topLine.BackgroundColor3 = T.Accent
+    topLine.BorderSizePixel = 0
+
+    local title = INew("TextLabel"); title.Parent = f
+    title.Size = U2(0, 0, 0, 12); title.AutomaticSize = Enum.AutomaticSize.X
+    title.BackgroundTransparency = 1; title.Text = "MODERATORS"
+    title.FontFace = Lib.Fonts.B; title.TextSize = 9
+    title.TextColor3 = T.Accent; title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Position = U2(0, 0, 0, 4)
+
+    local sep = INew("Frame"); sep.Parent = f
+    sep.Size = U2(1, 0, 0, 1); sep.Position = U2(0, 0, 0, 20)
+    sep.BackgroundColor3 = T.Border; sep.BorderSizePixel = 0
+
+    local cont = INew("Frame"); cont.Parent = f
+    cont.Position = U2(0, 0, 0, 25); cont.BackgroundTransparency = 1
+    cont.AutomaticSize = Enum.AutomaticSize.XY; cont.BorderSizePixel = 0
+    vlist(cont, 4)
+
+    function ML:SetVisibility(b) f.Visible = b end
+    function ML:add_mod(username, role)
+        if mods[username] then ML:remove_mod(username) end
+        role = role or "Moderator"
+        local row = INew("Frame"); row.Parent = cont
+        row.Size = U2(1, 0, 0, 15); row.BackgroundTransparency = 1; row.BorderSizePixel = 0
+
+        local dot = INew("Frame"); dot.Parent = row
+        dot.Size = U2(0, 4, 0, 4); dot.AnchorPoint = V2(0, 0.5)
+        dot.Position = U2(0, 0, 0.5, 0); dot.BackgroundColor3 = T.Accent
+        dot.BorderSizePixel = 0; crn(dot, 99)
+
+        local namelbl = INew("TextLabel"); namelbl.Parent = row
+        namelbl.Position = U2(0, 9, 0, 0); namelbl.Size = U2(0.6, 0, 1, 0)
+        namelbl.BackgroundTransparency = 1; namelbl.Text = username
+        namelbl.FontFace = Lib.Fonts.M; namelbl.TextSize = 11
+        namelbl.TextColor3 = T.Text; namelbl.TextXAlignment = Enum.TextXAlignment.Left
+
+        local rolelbl = INew("TextLabel"); rolelbl.Parent = row
+        rolelbl.AnchorPoint = V2(1, 0.5); rolelbl.Position = U2(1, 0, 0.5, 0)
+        rolelbl.Size = U2(0, 0, 0, 11); rolelbl.AutomaticSize = Enum.AutomaticSize.X
+        rolelbl.BackgroundTransparency = 1; rolelbl.Text = role
+        rolelbl.FontFace = Lib.Fonts.R; rolelbl.TextSize = 10
+        rolelbl.TextColor3 = T.TextSub; rolelbl.TextXAlignment = Enum.TextXAlignment.Right
+
+        local md = {Frame=row, Username=username, Role=role}
+        function md:SetRole(r) role=r; rolelbl.Text=r end
+        mods[username] = md; return md
+    end
+    function ML:remove_mod(username)
+        if mods[username] then mods[username].Frame:Destroy(); mods[username]=nil end
+    end
+    function ML:Get()
+        local t={}; for u,d in mods do tins(t,{username=u,role=d.Role}) end; return t
+    end
+    return ML
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--  Search bar (inject into sidebar)
+-- ══════════════════════════════════════════════════════════════════
+function Lib:AddSearch(Window)
+    local nav = Window.Items.nav
+    local sb = nav.Parent  -- sidebar frame
+
+    local searchWrap = INew("Frame"); searchWrap.Parent = sb
+    searchWrap.AnchorPoint = V2(0, 1); searchWrap.Position = U2(0, 5, 1, -8)
+    searchWrap.Size = U2(1, -10, 0, 22); searchWrap.BackgroundColor3 = T.Bg3
+    searchWrap.BorderSizePixel = 0; crn(searchWrap, 4); stk(searchWrap, T.Border, 1)
+
+    local searchIcon = INew("TextLabel"); searchIcon.Parent = searchWrap
+    searchIcon.Size = U2(0, 14, 1, 0); searchIcon.BackgroundTransparency = 1
+    searchIcon.Text = "⌕"; searchIcon.FontFace = Lib.Fonts.R
+    searchIcon.TextSize = 13; searchIcon.TextColor3 = T.TextDim
+    searchIcon.Position = U2(0, 3, 0, 0)
+
+    local searchBox = INew("TextBox"); searchBox.Parent = searchWrap
+    searchBox.Position = U2(0, 18, 0, 0); searchBox.Size = U2(1, -20, 1, 0)
+    searchBox.BackgroundTransparency = 1; searchBox.Text = ""
+    searchBox.FontFace = Lib.Fonts.R; searchBox.TextSize = 10
+    searchBox.TextColor3 = T.TextSub; searchBox.PlaceholderColor3 = T.TextDim
+    searchBox.PlaceholderText = "search..."; searchBox.ClearTextOnFocus = false
+    searchBox.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- filter sections by name
+    searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+        local query = searchBox.Text:lower()
+        if query == "" then
+            -- show all pages normally
+            for _, page in Window.Pages do
+                page.Items.page.Visible = page.Active
+            end
+            return
+        end
+        -- show sections that match
+        for _, page in Window.Pages do
+            local hasMatch = false
+            for _, col in page.ColumnsData do
+                for _, sec in col:GetChildren() do
+                    if sec:IsA("Frame") then
+                        local hdr = sec:FindFirstChildOfClass("Frame")
+                        local lbl = hdr and hdr:FindFirstChildOfClass("TextLabel")
+                        if lbl then
+                            local match = lbl.Text:lower():find(query, 1, true)
+                            sec.Visible = match ~= nil
+                            if match then hasMatch = true end
+                        end
+                    end
+                end
+            end
+            if hasMatch then
+                page.Items.page.Visible = true
+                page.Items.page.Parent = Window.Items.content
+            end
+        end
+    end)
+    return searchBox
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--  Settings page
+-- ══════════════════════════════════════════════════════════════════
+function Lib:CreateSettingsPage(Window, KBL, WM, ML)
+    local cols = IsMobile and 1 or 2
+    local SP = Window:Page({Name="Settings", Columns=cols})
+    local s1 = 1; local s2 = IsMobile and 1 or 2
+
+    -- General settings
+    local SS = SP:Section({Name="General", Side=s1})
+    SS:Button({Name="Unload", Callback=function() self:Unload() end})
+    SS:Toggle({Name="Watermark", Flag="_wm", Default=true, Callback=function(v)
+        if WM then WM:SetVisibility(v) end
+    end})
+    SS:Toggle({Name="Keybind List", Flag="_kbl", Default=true, Callback=function(v)
+        if KBL then KBL:SetVisibility(v) end
+    end})
+    SS:Toggle({Name="Moderator List", Flag="_ml", Default=true, Callback=function(v)
+        if ML then ML:SetVisibility(v) end
+    end})
+    SS:Slider({Name="Tween Speed", Flag="_tw", Min=0.05, Max=0.5, Default=0.14, Decimals=0.01, Suffix="s",
+        Callback=function(v) self.TweenTime=v end})
+    SS:Dropdown({Name="Tween Style", Flag="_ts", Items={"Quart","Back","Bounce","Elastic","Linear","Sine","Cubic"},
+        Default="Quart", Callback=function(v)
+            local ok, style = pcall(function() return Enum.EasingStyle[v] end)
+            if ok then self.TweenStyle=style end
+        end})
+
+    -- Theming
+    local TS = SP:Section({Name="Theme", Side=s1})
+    local themeKeys = {"Accent","AccentHi","Text","TextSub","Bg1","Bg2","Bg3","Sidebar","Border"}
+    for _, k in themeKeys do
+        local lbl = TS:Label(k)
+        lbl:Colorpicker({Flag="_theme_"..k, Default=T[k], Callback=function(col)
+            self:ChangeTheme(k, col)
+        end})
+    end
+
+    -- Config
+    local CS = SP:Section({Name="Configs", Side=s2})
+    local configFolder = "FlowLib"
+    local selectedConfig = ""
+
+    local configNameBox = CS:Textbox({Name="Config Name", Placeholder="name...", Callback=function(v)
+        selectedConfig = v
+    end})
+
+    local configDrop = CS:Dropdown({Name="Saved Configs", Flag="_cfgdrop",
+        Items=self:ListConfigs(configFolder), Default=nil,
+        Callback=function(v) selectedConfig=v; configNameBox:Set(v) end})
+
+    CS:Button({Name="Refresh", Callback=function()
+        configDrop:Refresh(self:ListConfigs(configFolder))
+        self:Notification("Refreshed", 2)
+    end})
+    CS:Button({Name="Save", Callback=function()
+        if selectedConfig ~= "" then
+            self:SaveConfig(selectedConfig, configFolder)
+            self:Notification("Saved: "..selectedConfig, 3)
+            configDrop:Refresh(self:ListConfigs(configFolder))
+        else self:Notification("Enter a config name", 2) end
+    end})
+    CS:Button({Name="Load", Callback=function()
+        if selectedConfig ~= "" then
+            if self:LoadConfigFile(selectedConfig, configFolder) then
+                self:Notification("Loaded: "..selectedConfig, 3)
+            else self:Notification("Config not found", 2) end
+        end
+    end})
+    CS:Button({Name="Delete", Callback=function()
+        if selectedConfig ~= "" then
+            self:DeleteConfig(selectedConfig, configFolder)
+            self:Notification("Deleted: "..selectedConfig, 3)
+            configDrop:Refresh(self:ListConfigs(configFolder))
+        end
+    end})
+
+    return SP
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--  Enhanced KeybindList (override existing)
+-- ══════════════════════════════════════════════════════════════════
+function Lib:KeybindList()
+    local KL = {}; Lib.KeyList = KL
+    local f = INew("Frame"); f.Parent = Lib.Holder
+    f.AnchorPoint = V2(0, 0.5); f.Position = U2(0, 10, 0.5, 0)
+    f.BackgroundColor3 = T.Bg2; f.BorderSizePixel = 0
+    f.AutomaticSize = Enum.AutomaticSize.XY
+    crn(f, 6); stk(f, T.Border, 1)
+    mkShadow(f, 24, 4, 0.55); pad(f, 8, 8, 10, 10)
+
+    -- red top accent
+    local topLine = INew("Frame"); topLine.Parent = f
+    topLine.Size = U2(1, 0, 0, 1); topLine.BackgroundColor3 = T.Accent
+    topLine.BorderSizePixel = 0
+
+    local title = INew("TextLabel"); title.Parent = f
+    title.Size = U2(0, 0, 0, 12); title.AutomaticSize = Enum.AutomaticSize.X
+    title.BackgroundTransparency = 1; title.Text = "KEYBINDS"
+    title.FontFace = Lib.Fonts.B; title.TextSize = 9
+    title.TextColor3 = T.Accent; title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Position = U2(0, 0, 0, 4)
+
+    local sep = INew("Frame"); sep.Parent = f
+    sep.Size = U2(1, 0, 0, 1); sep.Position = U2(0, 0, 0, 20)
+    sep.BackgroundColor3 = T.Border; sep.BorderSizePixel = 0
+
+    local cont = INew("Frame"); cont.Parent = f
+    cont.Position = U2(0, 0, 0, 25); cont.BackgroundTransparency = 1
+    cont.AutomaticSize = Enum.AutomaticSize.XY; cont.BorderSizePixel = 0
+    vlist(cont, 3)
+
+    function KL:SetVisibility(b) f.Visible = b end
+    function KL:Add(name, key)
+        local row = INew("Frame"); row.Parent = cont
+        row.Size = U2(0, 0, 0, 13); row.AutomaticSize = Enum.AutomaticSize.X
+        row.BackgroundTransparency = 1; row.BorderSizePixel = 0
+
+        local dot = INew("Frame"); dot.Parent = row
+        dot.Size = U2(0, 3, 0, 3); dot.AnchorPoint = V2(0, 0.5)
+        dot.Position = U2(0, 0, 0.5, 0); dot.BackgroundColor3 = T.Accent
+        dot.BorderSizePixel = 0; crn(dot, 99)
+
+        local lbl = INew("TextLabel"); lbl.Parent = row
+        lbl.Position = U2(0, 8, 0, 0); lbl.Size = U2(0, 0, 1, 0)
+        lbl.AutomaticSize = Enum.AutomaticSize.X; lbl.BackgroundTransparency = 1
+        lbl.FontFace = Lib.Fonts.R; lbl.TextSize = 10
+        lbl.TextColor3 = T.TextSub; lbl.Text = name .. "  [" .. key .. "]"
+        function lbl:SetText(n, k) lbl.Text = n .. "  [" .. k .. "]" end
+        function lbl:SetStatus(b)
+            row.Visible = b
+            tw(dot, {BackgroundColor3 = b and T.Accent or T.TextDim})
+        end
+        return lbl
+    end
+    return KL
+end
+
+
+-- ══════════════════════════════════════════════════════════════════
+--  Spring animation system
+-- ══════════════════════════════════════════════════════════════════
+local Springs = {}
+
+local function createSpring(mass, force, damping, speed)
+    return {
+        mass=mass or 1, force=force or 50,
+        damping=damping or 10, speed=speed or 4,
+        pos=0, vel=0, target=0,
+    }
+end
+
+local function stepSpring(spring, dt)
+    local tension  = spring.force
+    local damping  = spring.damping
+    local accel    = (tension * (spring.target - spring.pos) - damping * spring.vel) / spring.mass
+    spring.vel = spring.vel + accel * dt
+    spring.pos = spring.pos + spring.vel * dt
+    return spring.pos
+end
+
+-- Animate a numeric property with spring physics
+function Lib:SpringTween(obj, prop, target, mass, force, damping)
+    local spring = createSpring(mass or 1, force or 60, damping or 12)
+    spring.pos = obj[prop]; spring.target = target
+    local conn
+    conn = RS.Heartbeat:Connect(function(dt)
+        local val = stepSpring(spring, dt * 4)
+        pcall(function() obj[prop] = val end)
+        if math.abs(spring.target - spring.pos) < 0.001 and math.abs(spring.vel) < 0.001 then
+            pcall(function() obj[prop] = target end)
+            conn:Disconnect()
+        end
+    end)
+    return conn
+end
+
+-- Bounce scale animation (for button press feedback)
+function Lib:BounceScale(frame, intensity)
+    intensity = intensity or 0.06
+    local orig = frame.Size
+    local sx = orig.X.Scale; local sy = orig.Y.Scale
+    local ox = orig.X.Offset; local oy = orig.Y.Offset
+    -- shrink
+    tw(frame, {Size=U2(sx*(1-intensity), ox, sy*(1-intensity), oy)}, 0.08, Enum.EasingStyle.Quart)
+    task.delay(0.09, function()
+        -- overshoot
+        tw(frame, {Size=U2(sx*(1+intensity*0.5), ox, sy*(1+intensity*0.5), oy)}, 0.1, Enum.EasingStyle.Back)
+        task.delay(0.12, function()
+            -- settle
+            tw(frame, {Size=orig}, 0.1, Enum.EasingStyle.Quart)
+        end)
+    end)
+end
+
+-- Slide in from direction animation
+function Lib:SlideIn(frame, direction, distance, duration)
+    direction = direction or right  -- right, left, up, down
+    distance  = distance or 30
+    duration  = duration or 0.2
+    local origPos = frame.Position
+    local startPos
+    if direction == right then
+        startPos = U2(origPos.X.Scale, origPos.X.Offset + distance, origPos.Y.Scale, origPos.Y.Offset)
+    elseif direction == left then
+        startPos = U2(origPos.X.Scale, origPos.X.Offset - distance, origPos.Y.Scale, origPos.Y.Offset)
+    elseif direction == down then
+        startPos = U2(origPos.X.Scale, origPos.X.Offset, origPos.Y.Scale, origPos.Y.Offset + distance)
+    else
+        startPos = U2(origPos.X.Scale, origPos.X.Offset, origPos.Y.Scale, origPos.Y.Offset - distance)
+    end
+    frame.Position = startPos
+    tw(frame, {Position=origPos}, duration, Enum.EasingStyle.Back)
+end
+
+-- Pulse glow on a UIStroke
+function Lib:PulseGlow(stroke, col1, col2, duration)
+    col1 = col1 or T.Accent; col2 = col2 or T.AccentHi
+    duration = duration or 0.6
+    local running = true
+    task.spawn(function()
+        while running do
+            tw(stroke, {Color=col2}, duration*0.5)
+            task.wait(duration*0.5)
+            tw(stroke, {Color=col1}, duration*0.5)
+            task.wait(duration*0.5)
+        end
+    end)
+    return function() running=false; stroke.Color=col1 end  -- stop fn
+end
+
+-- Fade in with upward drift
+function Lib:FadeInDrift(frame, distance, duration)
+    distance = distance or 8; duration = duration or 0.2
+    local op = frame.Position
+    frame.Position = U2(op.X.Scale, op.X.Offset, op.Y.Scale, op.Y.Offset + distance)
+    frame.BackgroundTransparency = 1
+    tw(frame, {Position=op, BackgroundTransparency=0}, duration, Enum.EasingStyle.Quart)
+end
+
+-- Ripple effect on click (draws expanding circle)
+function Lib:Ripple(parent, x, y)
+    local rip = INew(Frame); rip.Parent = parent
+    rip.AnchorPoint = V2(0.5, 0.5); rip.Position = U2(0, x, 0, y)
+    rip.Size = U2(0, 0, 0, 0); rip.BackgroundColor3 = T.Accent
+    rip.BackgroundTransparency = 0.6; rip.BorderSizePixel = 0
+    rip.ZIndex = (parent.ZIndex or 1) + 5; crn(rip, 99)
+    local sz = math.max(parent.AbsoluteSize.X, parent.AbsoluteSize.Y) * 2
+    tw(rip, {Size=U2(0,sz,0,sz), BackgroundTransparency=1}, 0.4, Enum.EasingStyle.Quart)
+    game:GetService(Debris):AddItem(rip, 0.5)
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--  Separator element
+-- ══════════════════════════════════════════════════════════════════
+function Lib.Sections:Separator(label)
+    local row = INew(Frame); row.Parent = self.Items.content
+    row.Size = U2(1, 0, 0, IsMobile and 18 or 14)
+    row.BackgroundTransparency = 1; row.BorderSizePixel = 0
+
+    local line1 = INew(Frame); line1.Parent = row
+    line1.Size = U2(0.35, 0, 0, 1); line1.AnchorPoint = V2(0, 0.5)
+    line1.Position = U2(0, 0, 0.5, 0); line1.BackgroundColor3 = T.Border; line1.BorderSizePixel = 0
+
+    if label and label ~=  then
+        local lbl = INew(TextLabel); lbl.Parent = row
+        lbl.AnchorPoint = V2(0.5, 0.5); lbl.Position = U2(0.5, 0, 0.5, 0)
+        lbl.Size = U2(0, 0, 0, 10); lbl.AutomaticSize = Enum.AutomaticSize.X
+        lbl.BackgroundTransparency = 1; lbl.Text = label
+        lbl.FontFace = Lib.Fonts.R; lbl.TextSize = 9
+        lbl.TextColor3 = T.TextFaint
+        local line2 = INew(Frame); line2.Parent = row
+        line2.Size = U2(0.35, 0, 0, 1); line2.AnchorPoint = V2(1, 0.5)
+        line2.Position = U2(1, 0, 0.5, 0); line2.BackgroundColor3 = T.Border; line2.BorderSizePixel = 0
+    else
+        line1.Size = U2(1, 0, 0, 1)
+    end
+    return row
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--  Toggle group (radio buttons - only one can be on)
+-- ══════════════════════════════════════════════════════════════════
+function Lib.Sections:ToggleGroup(items, default, callback)
+    local group = {}; local current = default
+    for _, item in items do
+        local tog = self:Toggle({Name=item, Default=(item==default), Callback=function(v)
+            if v then
+                current = item
+                for k, t in group do
+                    if k ~= item then t:Set(false) end
+                end
+                if callback then callback(item) end
+            else
+                -- prevent turning off without another selection
+                if current == item then group[item]:Set(true) end
+            end
+        end})
+        group[item] = tog
+    end
+    return group
+end
+
+
+-- ══════════════════════════════════════════════════════════════════
+--  Tooltip system
+-- ══════════════════════════════════════════════════════════════════
+local tooltipFrame, tooltipText
+local function ensureTooltip()
+    if tooltipFrame then return end
+    tooltipFrame = INew('Frame'); tooltipFrame.Parent = Lib.Holder
+    tooltipFrame.Size = U2(0,0,0,20); tooltipFrame.AutomaticSize = Enum.AutomaticSize.X
+    tooltipFrame.BackgroundColor3 = T.Bg4; tooltipFrame.BorderSizePixel = 0
+    tooltipFrame.Visible = false; tooltipFrame.ZIndex = 20; crn(tooltipFrame, 4)
+    stk(tooltipFrame, T.Border, 1); pad(tooltipFrame, 0, 0, 7, 7)
+    tooltipText = INew('TextLabel'); tooltipText.Parent = tooltipFrame
+    tooltipText.Size = U2(0,0,1,0); tooltipText.AutomaticSize = Enum.AutomaticSize.X
+    tooltipText.BackgroundTransparency = 1; tooltipText.Text = ''
+    tooltipText.FontFace = Lib.Fonts.R; tooltipText.TextSize = 10
+    tooltipText.TextColor3 = T.TextSub; tooltipText.ZIndex = 21
+end
+
+function Lib:AttachTooltip(frame, text)
+    if IsMobile then return end
+    ensureTooltip()
+    frame = frame.Instance or frame
+    frame.MouseEnter:Connect(function()
+        tooltipText.Text = text
+        tooltipFrame.Visible = true
+    end)
+    frame.MouseLeave:Connect(function()
+        tooltipFrame.Visible = false
+    end)
+    RS.RenderStepped:Connect(function()
+        if not tooltipFrame.Visible then return end
+        local mp = Lib:MousePos()
+        tooltipFrame.Position = U2(0, mp.X + 12, 0, mp.Y - 24)
+    end)
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--  Progress bar element
+-- ══════════════════════════════════════════════════════════════════
+function Lib.Sections:ProgressBar(Data)
+    Data = Data or {}
+    local PB = {Window=self.Window, Page=self.Page, Section=self,
+                Name=Data.Name or Progress, Value=Data.Default or 0,
+                Max=Data.Max or 100, Color=Data.Color or T.Accent}
+    local pH = IsMobile and 9 or 7
+
+    local wrap = INew('Frame'); wrap.Parent = PB.Section.Items.content
+    wrap.Size = U2(1,0,0, IsMobile and 28 or 22); wrap.BackgroundTransparency=1; wrap.BorderSizePixel=0
+
+    local nl = INew('TextLabel'); nl.Parent = wrap
+    nl.Size = U2(0,0,0,11); nl.AutomaticSize=Enum.AutomaticSize.X
+    nl.BackgroundTransparency=1; nl.Text=PB.Name
+    nl.FontFace=Lib.Fonts.R; nl.TextSize=IsMobile and 11 or 10; nl.TextColor3=T.TextSub
+    nl.TextXAlignment=Enum.TextXAlignment.Left
+
+    local valLbl = INew('TextLabel'); valLbl.Parent=wrap
+    valLbl.AnchorPoint=V2(1,0); valLbl.Position=U2(1,0,0,0)
+    valLbl.Size=U2(0,0,0,11); valLbl.AutomaticSize=Enum.AutomaticSize.X
+    valLbl.BackgroundTransparency=1; valLbl.Text='0%'
+    valLbl.FontFace=Lib.Fonts.M; valLbl.TextSize=IsMobile and 11 or 10
+    valLbl.TextColor3=T.Accent; valLbl.TextXAlignment=Enum.TextXAlignment.Right
+
+    local track = INew('Frame'); track.Parent=wrap
+    track.AnchorPoint=V2(0,1); track.Position=U2(0,0,1,0)
+    track.Size=U2(1,0,0,pH); track.BackgroundColor3=T.Bg4; track.BorderSizePixel=0
+    crn(track,99); stk(track,T.Border,1)
+
+    local fill = INew('Frame'); fill.Parent=track
+    fill.Position=U2(0,1,0,1); fill.Size=U2(0,-2,1,-2)
+    fill.BackgroundColor3=PB.Color; fill.BorderSizePixel=0; crn(fill,99)
+    stk(fill, T.AccentSoft, 1).Transparency = 0.5
+
+    function PB:Set(v)
+        PB.Value = clamp(v, 0, PB.Max)
+        local pct = PB.Value / PB.Max
+        tw(fill, {Size=U2(pct,-2,1,-2)}, 0.12)
+        valLbl.Text = fmt('%d%%', math.floor(pct*100))
+        fill.Visible = PB.Value > 0
+    end
+    function PB:SetColor(col) PB.Color=col; tw(fill,{BackgroundColor3=col}) end
+    PB:Set(PB.Value)
+    return PB
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--  Color tag label  (name + colored badge)
+-- ══════════════════════════════════════════════════════════════════
+function Lib.Sections:ColorTag(Data)
+    Data = Data or {}
+    local row = INew('Frame'); row.Parent = self.Items.content
+    row.Size = U2(1,0,0, IsMobile and 20 or 16); row.BackgroundTransparency=1; row.BorderSizePixel=0
+
+    local badge = INew('Frame'); badge.Parent=row
+    badge.Size=U2(0, IsMobile and 10 or 8, 0, IsMobile and 10 or 8)
+    badge.AnchorPoint=V2(0,0.5); badge.Position=U2(0,0,0.5,0)
+    badge.BackgroundColor3 = Data.Color or T.Accent; badge.BorderSizePixel=0; crn(badge,99)
+
+    local lbl = INew('TextLabel'); lbl.Parent=row
+    lbl.Position=U2(0, IsMobile and 15 or 12, 0, 0)
+    lbl.Size=U2(1,-14,1,0); lbl.BackgroundTransparency=1
+    lbl.Text=Data.Name or ''; lbl.FontFace=Lib.Fonts.R
+    lbl.TextSize=IsMobile and 11 or 10; lbl.TextColor3=T.TextSub
+    lbl.TextXAlignment=Enum.TextXAlignment.Left
+
+    local valLbl = INew('TextLabel'); valLbl.Parent=row
+    valLbl.AnchorPoint=V2(1,0.5); valLbl.Position=U2(1,0,0.5,0)
+    valLbl.Size=U2(0,0,0,10); valLbl.AutomaticSize=Enum.AutomaticSize.X
+    valLbl.BackgroundTransparency=1; valLbl.Text=Data.Value or ''
+    valLbl.FontFace=Lib.Fonts.M; valLbl.TextSize=IsMobile and 11 or 10
+    valLbl.TextColor3=Data.Color or T.Accent
+
+    local CT = {}
+    function CT:Set(name, value, color)
+        if name  then lbl.Text=tostring(name) end
+        if value then valLbl.Text=tostring(value) end
+        if color then badge.BackgroundColor3=color; valLbl.TextColor3=color end
+    end
+    function CT:SetVisibility(b) row.Visible=b end
+    return CT
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--  Input validator helpers
+-- ══════════════════════════════════════════════════════════════════
+function Lib:IsValidHex(str)
+    str = str:gsub('#','')
+    return #str == 6 and str:match('^%x+$') ~= nil
+end
+function Lib:HexToColor(hex)
+    hex = hex:gsub('#','')
+    if not self:IsValidHex(hex) then return FR(255,255,255) end
+    local r = tonumber(hex:sub(1,2),16)/255
+    local g = tonumber(hex:sub(3,4),16)/255
+    local b = tonumber(hex:sub(5,6),16)/255
+    return FR(r*255, g*255, b*255)
+end
+function Lib:ColorToHex(color)
+    return fmt('%02X%02X%02X',
+        math.floor(color.R*255),
+        math.floor(color.G*255),
+        math.floor(color.B*255))
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--  Version info
+-- ══════════════════════════════════════════════════════════════════
+Lib.Version = 'FlowLib v3.0'
+Lib.Author  = 'zerohub.fun'
+Lib.Build   = '2025.03'
 
 return Lib
