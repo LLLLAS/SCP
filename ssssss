@@ -1,197 +1,160 @@
--- FlowLib v3.0 by zerohub.fun
-
-
-
-
--- -- 
---  Services & locals
--- -- 
+-- FlowLib v4.0 - zerohub.fun - Potassium compatible
 local Players = game:GetService("Players")
-local Http    = game:GetService("HttpService")
-local UIS     = game:GetService("UserInputService")
-local RS      = game:GetService("RunService")
-local TS      = game:GetService("TweenService")
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("RunService")
+local TS = game:GetService("TweenService")
+local Http = game:GetService("HttpService")
 
-local IsMobile = pcall(function() return UIS.TouchEnabled end) and UIS.TouchEnabled and not UIS.KeyboardEnabled or false
-local gethui = (typeof(gethui)=="function" and gethui) or function() return game:GetService("CoreGui") end
+local LP = Players.LocalPlayer
+local Cam = workspace.CurrentCamera
 
-local LP    = Players.LocalPlayer
-local Cam   = workspace.CurrentCamera
-local Mouse = LP:GetMouse()
+local IsMobile = UIS.TouchEnabled and not UIS.KeyboardEnabled
 
--- --  shorthand 
-local V2, U2, UD   = Vector2.new, UDim2.new, UDim.new
-local FR, FH, FX   = Color3.fromRGB, Color3.fromHSV, Color3.fromHex
-local NS, NSK      = NumberSequence.new, NumberSequenceKeypoint.new
-local CS, CSK      = ColorSequence.new, ColorSequenceKeypoint.new
-local clamp, floor = math.clamp, math.floor
-local sin, pi      = math.sin, math.pi
-local tins, tfind, trem, tconcat, tclone, tunpack =
-    table.insert, table.find, table.remove, table.concat, table.clone, table.unpack
-local fmt, gsub, sfind, slen = string.format, string.gsub, string.find, string.len
-local INew = Instance.new
-
--- -- 
--- --  Theme    deep black  crimson glow
--- -- 
-local T = {
-    -- backgrounds
-    Bg0         = FR(  3,  2,  4),   -- deepest black
-    Bg1         = FR(  6,  5,  8),   -- main bg
-    Bg2         = FR( 10,  9, 13),   -- surface
-    Bg3         = FR( 14, 13, 18),   -- raised surface
-    Bg4         = FR( 19, 17, 24),   -- input / track
-    Bg5         = FR( 25, 22, 32),   -- hover
-
-    -- sidebar
-    Sidebar     = FR(  5,  4,  7),
-    SidebarLine = FR( 20, 16, 28),
-
--- -- accent  (crimson  bright red)
-    Accent      = FR(205, 35, 45),
-    AccentHi    = FR(255, 62, 72),
-    AccentSoft  = FR(155, 22, 30),
-    AccentDim   = FR( 48,  8, 12),
-    AccentFaint = FR( 20,  4,  7),
-    AccentGlow  = FR(220, 40, 52),   -- for glow strokes
-
-    -- text
-    Text        = FR(240, 235, 242),
-    TextSub     = FR(140, 132, 150),
-    TextDim     = FR( 62,  57,  72),
-    TextFaint   = FR( 30,  26,  36),
-
-    -- borders
-    Border      = FR( 26,  22,  34),
-    BorderHi    = FR( 44,  38,  56),
-    BorderGlow  = FR(145,  26,  36),
-
-    -- topbar
-    TopBar      = FR(  8,   7,  11),
-    TopBarLine  = FR( 18,  15,  24),
-
-    -- pill toggle
-    Pill        = FR( 23,  20,  30),
-    PillBorder  = FR( 36,  30,  48),
-    PillOn      = FR( 48,   8,  14),
-    PillOnBrd   = FR(160,  25,  35),
-
-    -- shadow color (for ImageLabel shadows)
-    Shadow      = FR(  0,   0,   0),
-}
-
--- -- 
---  Library core
--- -- 
-local Lib = {
-    Theme      = T,
-    MenuKeybind= tostring(Enum.KeyCode.RightControl),
-    Flags      = {}, SetFlags = {},
-    TweenTime  = 0.14,
-    TweenFast  = 0.08,
-    TweenSpring= 0.18,
-    Pages = {}, Sections = {}, Connections = {}, Threads = {},
-    OpenFrames = {}, ThemeItems = {}, ThemeMap = {},
-    _cc = 0, _fc = 0,
-    Holder = nil, UnusedHolder = nil, NotifHolder = nil,
-    Fonts = {}, IsMobile = IsMobile,
-}
-Lib.__index          = Lib
-Lib.Sections.__index = Lib.Sections
-Lib.Pages.__index    = Lib.Pages
-
--- fonts
-function safeFont(family, weight)
-    local ok, f = pcall(function()
-        return Font.new(family, weight)
-    end)
-    return ok and f or Font.fromEnum(Enum.Font.GothamSsm)
+local function gethui2()
+    if typeof(gethui) == "function" then return gethui() end
+    return game:GetService("CoreGui")
 end
-Lib.Fonts.R = safeFont("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
-Lib.Fonts.M = safeFont("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)
-Lib.Fonts.B = safeFont("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
-Lib.Font    = Lib.Fonts.R
 
--- --  Screen GUIs 
-function mkSG(p)
-    local g = INew("ScreenGui")
-    for k,v in p do g[k]=v end
-    return g
+-- helpers
+local function INew(cls) return Instance.new(cls) end
+local function V2(x,y) return Vector2.new(x,y) end
+local function U2(xs,xo,ys,yo) return UDim2.new(xs,xo,ys,yo) end
+local function UD(s,o) return UDim.new(s,o) end
+local function FR(r,g,b) return Color3.fromRGB(r,g,b) end
+local function FH(h,s,v) return Color3.fromHSV(h,s,v) end
+
+local function crn(p,r)
+    local c = INew("UICorner")
+    c.CornerRadius = UD(0, r or 4)
+    c.Parent = p
+    return c
 end
-Lib.Holder       = mkSG{Parent=gethui(),Name="\0",ZIndexBehavior=Enum.ZIndexBehavior.Global,DisplayOrder=4,IgnoreGuiInset=true,ResetOnSpawn=false}
-Lib.UnusedHolder = mkSG{Parent=gethui(),Name="\0",ZIndexBehavior=Enum.ZIndexBehavior.Global,Enabled=false,ResetOnSpawn=false}
 
--- notif holder
-local nfHolder = INew("Frame"); nfHolder.Parent=Lib.Holder
-nfHolder.AnchorPoint=V2(1,1); nfHolder.BackgroundTransparency=1
-nfHolder.Position=U2(1,-14,1,-14); nfHolder.Size=U2(0,0,1,0)
-nfHolder.AutomaticSize=Enum.AutomaticSize.X
-local nfList = INew("UIListLayout"); nfList.Parent=nfHolder
-nfList.SortOrder=Enum.SortOrder.LayoutOrder
-nfList.HorizontalAlignment=Enum.HorizontalAlignment.Right
-nfList.VerticalAlignment=Enum.VerticalAlignment.Bottom
-nfList.Padding=UD(0,4)
-Lib.NotifHolder = nfHolder
-
--- -- 
---  Primitive helpers
--- -- 
-function _crn(p,r)
-    local c = INew("UICorner"); c.CornerRadius = UD(0, r or 4); c.Parent = p; return c
-end
-function _stk(p, col, t, li)
+local function stk(p,col,t)
     local s = INew("UIStroke")
-    s.Color = col or T.Border; s.Thickness = t or 1
-    if li then s.LineJoinMode = li end
-    s.Parent = p; return s
+    s.Color = col or FR(28,22,34)
+    s.Thickness = t or 1
+    s.Parent = p
+    return s
 end
-function _pad(p,t,b,l,r)
+
+local function pad(p,pt,pb,pl,pr)
     local pd = INew("UIPadding")
-    pd.PaddingTop    = UD(0, t or 0)
-    pd.PaddingBottom = UD(0, b or 0)
-    pd.PaddingLeft   = UD(0, l or 0)
-    pd.PaddingRight  = UD(0, r or 0)
+    pd.PaddingTop = UD(0,pt or 0)
+    pd.PaddingBottom = UD(0,pb or 0)
+    pd.PaddingLeft = UD(0,pl or 0)
+    pd.PaddingRight = UD(0,pr or 0)
     pd.Parent = p
 end
-function _vl(p,sp)
-    local l = INew("UIListLayout"); l.FillDirection = Enum.FillDirection.Vertical
-    l.Padding = UD(0, sp or 0); l.SortOrder = Enum.SortOrder.LayoutOrder
-    l.Parent = p; return l
+
+local function vlist(p,sp)
+    local l = INew("UIListLayout")
+    l.FillDirection = Enum.FillDirection.Vertical
+    l.Padding = UD(0, sp or 0)
+    l.SortOrder = Enum.SortOrder.LayoutOrder
+    l.Parent = p
+    return l
 end
-function _hl(p,sp,ha,va)
-    local l = INew("UIListLayout"); l.FillDirection = Enum.FillDirection.Horizontal
+
+local function hlist(p,sp,ha,va)
+    local l = INew("UIListLayout")
+    l.FillDirection = Enum.FillDirection.Horizontal
     l.Padding = UD(0, sp or 0)
     l.HorizontalAlignment = ha or Enum.HorizontalAlignment.Left
-    l.VerticalAlignment   = va or Enum.VerticalAlignment.Center
+    l.VerticalAlignment = va or Enum.VerticalAlignment.Center
     l.SortOrder = Enum.SortOrder.LayoutOrder
-    l.Parent = p; return l
-end
-function grad(p, c0, c1, rot)
-    local g = INew("UIGradient"); g.Color = CS{CSK(0, c0), CSK(1, c1)}
-    g.Rotation = rot or 0; g.Parent = p; return g
-end
-function gradTrans(p, t0, t1, rot)
-    local g = INew("UIGradient")
-    g.Transparency = NS{NSK(0, t0), NSK(1, t1)}
-    g.Rotation = rot or 0; g.Parent = p; return g
+    l.Parent = p
+    return l
 end
 
--- --  Tween shorthand 
-function tw(obj, goal, t, s, d)
-    TS:Create(obj,
-        TweenInfo.new(t or Lib.TweenTime, s or Enum.EasingStyle.Quart, d or Enum.EasingDirection.Out),
-        goal):Play()
-end
-function twSpring(obj, goal)
-    tw(obj, goal, Lib.TweenSpring, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local function tw(obj, goal, t, s, d)
+    local ok = pcall(function()
+        TS:Create(obj, TweenInfo.new(
+            t or 0.14,
+            s or Enum.EasingStyle.Quart,
+            d or Enum.EasingDirection.Out
+        ), goal):Play()
+    end)
 end
 
--- --  Shadow helper (ImageLabel drop shadow) 
--- shadow: safe no-op (Rect.new not supported on all executors)
-function mkShadow(parent, size, offset, trans) return nil end
+-- theme
+local T = {
+    Bg1         = FR(6,5,8),
+    Bg2         = FR(10,9,13),
+    Bg3         = FR(14,12,18),
+    Bg4         = FR(20,18,26),
+    Bg5         = FR(25,22,32),
+    Sidebar     = FR(5,4,7),
+    Accent      = FR(205,35,45),
+    AccentHi    = FR(255,62,72),
+    AccentSoft  = FR(155,22,30),
+    AccentDim   = FR(48,8,12),
+    AccentFaint = FR(20,4,7),
+    Text        = FR(238,232,240),
+    TextSub     = FR(138,130,145),
+    TextDim     = FR(60,55,68),
+    Border      = FR(26,22,34),
+    BorderHi    = FR(44,38,56),
+    TopBar      = FR(8,7,11),
+    Pill        = FR(23,20,30),
+    PillBorder  = FR(36,30,48),
+}
 
--- --  Draggable 
-function makeDraggable(frame, handle)
+-- font
+local Font_R, Font_M, Font_B
+pcall(function()
+    Font_R = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
+    Font_M = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)
+    Font_B = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+end)
+if not Font_R then
+    Font_R = Font.fromEnum(Enum.Font.Gotham)
+    Font_M = Font.fromEnum(Enum.Font.GothamMedium)
+    Font_B = Font.fromEnum(Enum.Font.GothamBold)
+end
+
+-- screen guis
+local Holder, UnusedHolder, NotifHolder
+
+pcall(function()
+    Holder = INew("ScreenGui")
+    Holder.Name = "zh_ui"
+    Holder.ZIndexBehavior = Enum.ZIndexBehavior.Global
+    Holder.DisplayOrder = 4
+    Holder.ResetOnSpawn = false
+    pcall(function() Holder.IgnoreGuiInset = true end)
+    Holder.Parent = gethui2()
+end)
+
+pcall(function()
+    UnusedHolder = INew("ScreenGui")
+    UnusedHolder.Name = "zh_unused"
+    UnusedHolder.Enabled = false
+    UnusedHolder.ResetOnSpawn = false
+    UnusedHolder.Parent = gethui2()
+end)
+
+if not Holder then return nil end
+if not UnusedHolder then return nil end
+
+-- notif holder
+NotifHolder = INew("Frame")
+NotifHolder.Name = "notifs"
+NotifHolder.Parent = Holder
+NotifHolder.AnchorPoint = V2(1,1)
+NotifHolder.BackgroundTransparency = 1
+NotifHolder.Position = U2(1,-14,1,-14)
+NotifHolder.Size = U2(0,0,1,0)
+NotifHolder.AutomaticSize = Enum.AutomaticSize.X
+local nl = INew("UIListLayout")
+nl.Parent = NotifHolder
+nl.SortOrder = Enum.SortOrder.LayoutOrder
+nl.HorizontalAlignment = Enum.HorizontalAlignment.Right
+nl.VerticalAlignment = Enum.VerticalAlignment.Bottom
+nl.Padding = UD(0,4)
+
+-- drag
+local function makeDraggable(frame, handle)
     handle = handle or frame
     local drag, ds, sp = false, nil, nil
     handle.InputBegan:Connect(function(i)
@@ -205,9 +168,9 @@ function makeDraggable(frame, handle)
         and i.UserInputType ~= Enum.UserInputType.Touch then return end
         local d = i.Position - ds
         local ps = frame.Parent.AbsoluteSize
-        local nx = clamp(sp.X.Offset + d.X, 0, ps.X - frame.AbsoluteSize.X)
-        local ny = clamp(sp.Y.Offset + d.Y, 0, ps.Y - frame.AbsoluteSize.Y)
-        tw(frame, {Position = U2(0, nx, 0, ny)}, 0.06)
+        local nx = math.clamp(sp.X.Offset+d.X, 0, ps.X-frame.AbsoluteSize.X)
+        local ny = math.clamp(sp.Y.Offset+d.Y, 0, ps.Y-frame.AbsoluteSize.Y)
+        frame.Position = U2(0,nx,0,ny)
     end)
     UIS.InputEnded:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1
@@ -215,450 +178,390 @@ function makeDraggable(frame, handle)
     end)
 end
 
--- -- 
---  Lib methods
--- -- 
+-- lib
+local Lib = {}
+Lib.Flags = {}
+Lib.SetFlags = {}
+Lib.Pages = {}
+Lib.Sections = {}
+Lib.OpenFrames = {}
+Lib.MenuKeybind = tostring(Enum.KeyCode.RightControl)
+Lib.TweenTime = 0.14
+Lib._fc = 0
+Lib.__index = Lib
+Lib.Sections.__index = Lib.Sections
+Lib.Pages.__index = Lib.Pages
+
+function Lib:_flag()
+    self._fc = self._fc + 1
+    return "f" .. self._fc .. "_" .. Http:GenerateGUID(false)
+end
 function Lib:SafeCall(fn, ...)
     local ok, e = pcall(fn, ...)
-    if not ok then warn("[FlowLib] " .. tostring(e)) end
+    if not ok then warn("[zh] " .. tostring(e)) end
     return ok
 end
-function Lib:Round(n, f) local m = 1/(f or 1); return floor(n*m)/m end
-function Lib:Lighter(c, x) local h,s,v = c:ToHSV(); return FH(h, s, clamp(v*x, 0, 1)) end
-function Lib:_flag()
-    self._fc += 1
-    return fmt("fl_%d_%s", self._fc, Http:GenerateGUID(false))
-end
-function Lib:MousePos() return V2(Mouse.X, Mouse.Y) end
-function Lib:Over(f)
-    f = (type(f) == "table" and f.Instance) or f
-    local mp = self:MousePos()
-    return mp.X >= f.AbsolutePosition.X and mp.X <= f.AbsolutePosition.X + f.AbsoluteSize.X
-       and mp.Y >= f.AbsolutePosition.Y and mp.Y <= f.AbsolutePosition.Y + f.AbsoluteSize.Y
-end
-function Lib:Unload()
-    for _, c in self.Connections do pcall(function() c:Disconnect() end) end
-    pcall(function() self.Holder:Destroy() end)
-    pcall(function() self.UnusedHolder:Destroy() end)
-end
+function Lib:Round(n,f) local m=1/(f or 1); return math.floor(n*m)/m end
 
--- --  Window size 
-function winSize()
-    if not IsMobile then return 740, 490 end
-    local s = Cam.ViewportSize
-    return math.round(clamp(s.X-10, 320, 640)),
-           math.round(clamp(s.Y-40, 340, 490))
-end
-
--- -- 
---  Notification
--- -- 
-function Lib:Notification(text, dur, sub_text)
+-- Notification
+function Lib:Notification(text, dur, sub)
     dur = dur or 3
-    local W = 260; local H = sub_text and 48 or 36
+    local W = 250; local H = sub and 46 or 34
+    local f = INew("Frame"); f.Parent = NotifHolder
+    f.Size = U2(0,W,0,H); f.BackgroundColor3 = T.Bg2; f.BorderSizePixel = 0
+    crn(f,5); stk(f,T.Border,1)
 
-    local f = INew("Frame"); f.Parent = Lib.NotifHolder
-    f.Size = U2(0, W, 0, H); f.BackgroundColor3 = T.Bg2; f.BorderSizePixel = 0
-    _crn(f,6); _stk(f, T.Border, 1)
-    mkShadow(f, 30, 6, 0.48)
-
-    -- left crimson bar with glow
     local bar = INew("Frame"); bar.Parent = f
-    bar.Size = U2(0, 3, 1, -8); bar.AnchorPoint = V2(0, 0.5)
-    bar.Position = U2(0, 6, 0.5, 0); bar.BackgroundColor3 = T.Accent
-    bar.BorderSizePixel = 0; _crn(bar,2)
-    _stk(bar, T.AccentGlow, 1.5).Transparency = 0.4
+    bar.Size = U2(0,2,1,-8); bar.AnchorPoint = V2(0,0.5)
+    bar.Position = U2(0,6,0.5,0); bar.BackgroundColor3 = T.Accent
+    bar.BorderSizePixel = 0; crn(bar,2)
 
-    -- top red accent line
     local topLine = INew("Frame"); topLine.Parent = f
-    topLine.Size = U2(1, 0, 0, 1); topLine.BackgroundColor3 = T.Accent
+    topLine.Size = U2(1,0,0,1); topLine.BackgroundColor3 = T.Accent
     topLine.BorderSizePixel = 0
-    gradTrans(topLine, 0, 1, 0)
 
-    local titleLbl = INew("TextLabel"); titleLbl.Parent = f
-    titleLbl.Position = U2(0, 16, 0, sub_text and 8 or 0)
-    titleLbl.Size = U2(1, -20, 0, sub_text and 16 or H)
-    titleLbl.BackgroundTransparency = 1; titleLbl.Text = text
-    titleLbl.FontFace = Lib.Fonts.M; titleLbl.TextSize = 12
-    titleLbl.TextColor3 = T.Text; titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    local tl = INew("TextLabel"); tl.Parent = f
+    tl.Position = U2(0,16,0, sub and 6 or 0)
+    tl.Size = U2(1,-20,0, sub and 16 or H)
+    tl.BackgroundTransparency = 1; tl.Text = text
+    tl.FontFace = Font_M; tl.TextSize = 12
+    tl.TextColor3 = T.Text; tl.TextXAlignment = Enum.TextXAlignment.Left
 
-    if sub_text then
-        local subLbl = INew("TextLabel"); subLbl.Parent = f
-        subLbl.Position = U2(0, 16, 0, 26); subLbl.Size = U2(1, -20, 0, 14)
-        subLbl.BackgroundTransparency = 1; subLbl.Text = sub_text
-        subLbl.FontFace = Lib.Fonts.R; subLbl.TextSize = 10
-        subLbl.TextColor3 = T.TextSub; subLbl.TextXAlignment = Enum.TextXAlignment.Left
-        subLbl.TextTransparency = 1
-        tw(subLbl, {TextTransparency = 0})
+    if sub then
+        local sl = INew("TextLabel"); sl.Parent = f
+        sl.Position = U2(0,16,0,24); sl.Size = U2(1,-20,0,14)
+        sl.BackgroundTransparency = 1; sl.Text = sub
+        sl.FontFace = Font_R; sl.TextSize = 10
+        sl.TextColor3 = T.TextSub; sl.TextXAlignment = Enum.TextXAlignment.Left
     end
 
-    -- animate in
-    f.BackgroundTransparency = 1; titleLbl.TextTransparency = 1; bar.BackgroundTransparency = 1
-    tw(f, {BackgroundTransparency = 0})
-    tw(titleLbl, {TextTransparency = 0})
-    tw(bar, {BackgroundTransparency = 0})
-
-    -- progress bar
     local prog = INew("Frame"); prog.Parent = f
-    prog.AnchorPoint = V2(0, 1); prog.Position = U2(0, 0, 1, 0)
-    prog.Size = U2(1, 0, 0, 2); prog.BackgroundColor3 = T.Accent; prog.BorderSizePixel = 0
-    gradTrans(prog, 0, 0.4, 0)
+    prog.AnchorPoint = V2(0,1); prog.Position = U2(0,0,1,0)
+    prog.Size = U2(1,0,0,2); prog.BackgroundColor3 = T.Accent; prog.BorderSizePixel = 0
+
     task.spawn(function()
-        local start = tick()
-        while tick() - start < dur do
-            local pct = 1 - (tick() - start) / dur
-            prog.Size = U2(pct, 0, 0, 2)
+        local s = tick()
+        while tick()-s < dur do
+            local pct = 1-(tick()-s)/dur
+            prog.Size = U2(pct,0,0,2)
             task.wait(0.016)
         end
-        prog.Size = U2(0, 0, 0, 2)
+        prog.Size = U2(0,0,0,2)
     end)
 
     task.delay(dur, function()
-        tw(f, {BackgroundTransparency = 1}); tw(titleLbl, {TextTransparency = 1})
-        tw(bar, {BackgroundTransparency = 1})
-        task.wait(Lib.TweenTime + 0.1); f:Destroy()
+        tw(f,{BackgroundTransparency=1})
+        tw(tl,{TextTransparency=1})
+        tw(bar,{BackgroundTransparency=1})
+        task.wait(0.15); f:Destroy()
     end)
 end
 
--- -- 
---  Watermark
--- -- 
+-- Watermark
 function Lib:Watermark(text)
     local WM = {}
-    local f = INew("Frame"); f.Parent = Lib.Holder
-    f.AnchorPoint = V2(0.5, 0); f.Position = U2(0.5, 0, 0, 10)
-    f.Size = U2(0, 200, 0, 22); f.BackgroundColor3 = T.Bg2; f.BorderSizePixel = 0; f.ZIndex = 5
-    _crn(f,4); _stk(f, T.Border, 1)
-    mkShadow(f, 20, 3, 0.6)
+    local f = INew("Frame"); f.Parent = Holder
+    f.AnchorPoint = V2(0.5,0); f.Position = U2(0.5,0,0,10)
+    f.Size = U2(0,180,0,22); f.BackgroundColor3 = T.Bg2
+    f.BorderSizePixel = 0; f.ZIndex = 5
+    crn(f,4); stk(f,T.Border,1)
 
-    local acLine = INew("Frame"); acLine.Parent = f
-    acLine.Size = U2(0, 2, 0.44, 0); acLine.AnchorPoint = V2(0, 0.5)
-    acLine.Position = U2(0, 5, 0.5, 0); acLine.BackgroundColor3 = T.Accent
-    acLine.BorderSizePixel = 0; _crn(acLine,2)
-    _stk(acLine, T.AccentGlow, 2).Transparency = 0.5
+    local bar = INew("Frame"); bar.Parent = f
+    bar.Size = U2(0,2,0.44,0); bar.AnchorPoint = V2(0,0.5)
+    bar.Position = U2(0,5,0.5,0); bar.BackgroundColor3 = T.Accent
+    bar.BorderSizePixel = 0; crn(bar,2)
 
     local lbl = INew("TextLabel"); lbl.Parent = f
-    lbl.AnchorPoint = V2(0, 0.5); lbl.Position = U2(0, 11, 0.5, 0)
-    lbl.Size = U2(1, -16, 0, 11); lbl.BackgroundTransparency = 1
-    lbl.FontFace = Lib.Fonts.R; lbl.TextSize = 11; lbl.ZIndex = 6
+    lbl.AnchorPoint = V2(0,0.5); lbl.Position = U2(0,11,0.5,0)
+    lbl.Size = U2(1,-16,0,11); lbl.BackgroundTransparency = 1
+    lbl.FontFace = Font_R; lbl.TextSize = 11; lbl.ZIndex = 6
     lbl.TextColor3 = T.Text; lbl.AutomaticSize = Enum.AutomaticSize.X
     lbl.TextXAlignment = Enum.TextXAlignment.Left
 
     function WM:SetText(t)
         lbl.Text = tostring(t)
-        tw(f, {Size = U2(0, lbl.TextBounds.X + 20, 0, 22)})
+        pcall(function() f.Size = U2(0, lbl.TextBounds.X+20, 0, 22) end)
     end
     function WM:SetVisibility(b) f.Visible = b end
-    WM:SetText(text); return WM
+    WM:SetText(text)
+    return WM
 end
 
--- -- 
---  KeybindList
--- -- 
+-- KeybindList
 function Lib:KeybindList()
-    local KL = {}; Lib.KeyList = KL
-    local f = INew("Frame"); f.Parent = Lib.Holder
-    f.AnchorPoint = V2(0, 0.5); f.Position = U2(0, 10, 0.5, 0)
+    local KL = {}
+    local f = INew("Frame"); f.Parent = Holder
+    f.AnchorPoint = V2(0,0.5); f.Position = U2(0,10,0.5,0)
     f.BackgroundColor3 = T.Bg2; f.BorderSizePixel = 0
     f.AutomaticSize = Enum.AutomaticSize.XY
-    _crn(f,5); _stk(f, T.Border, 1)
-    mkShadow(f, 24, 4, 0.55); _pad(f,8,8,10,10)
+    crn(f,5); stk(f,T.Border,1); pad(f,8,8,10,10)
 
-    -- header
-    local hdr = INew("TextLabel"); hdr.Parent = f
-    hdr.Size = U2(0, 0, 0, 12); hdr.AutomaticSize = Enum.AutomaticSize.X
-    hdr.BackgroundTransparency = 1; hdr.Text = "KEYBINDS"
-    hdr.FontFace = Lib.Fonts.B; hdr.TextSize = 9; hdr.TextColor3 = T.Accent
-    hdr.TextXAlignment = Enum.TextXAlignment.Left
+    local title = INew("TextLabel"); title.Parent = f
+    title.Size = U2(0,0,0,12); title.AutomaticSize = Enum.AutomaticSize.X
+    title.BackgroundTransparency = 1; title.Text = "KEYBINDS"
+    title.FontFace = Font_B; title.TextSize = 9; title.TextColor3 = T.Accent
+    title.TextXAlignment = Enum.TextXAlignment.Left
 
     local sep = INew("Frame"); sep.Parent = f
-    sep.Size = U2(1, 0, 0, 1); sep.Position = U2(0, 0, 0, 16)
+    sep.Size = U2(1,0,0,1); sep.Position = U2(0,0,0,16)
     sep.BackgroundColor3 = T.Border; sep.BorderSizePixel = 0
 
     local cont = INew("Frame"); cont.Parent = f
-    cont.Position = U2(0, 0, 0, 20); cont.BackgroundTransparency = 1
+    cont.Position = U2(0,0,0,20); cont.BackgroundTransparency = 1
     cont.AutomaticSize = Enum.AutomaticSize.XY; cont.BorderSizePixel = 0
-    _vl(cont,3)
+    vlist(cont,3)
 
     function KL:SetVisibility(b) f.Visible = b end
     function KL:Add(name, key)
-        local row = INew("Frame"); row.Parent = cont
-        row.Size = U2(0, 0, 0, 13); row.AutomaticSize = Enum.AutomaticSize.X
-        row.BackgroundTransparency = 1; row.BorderSizePixel = 0
-
-        local dot = INew("Frame"); dot.Parent = row
-        dot.Size = U2(0, 3, 0, 3); dot.AnchorPoint = V2(0, 0.5)
-        dot.Position = U2(0, 0, 0.5, 0); dot.BackgroundColor3 = T.Accent
-        dot.BorderSizePixel = 0; _crn(dot,99)
-
-        local lbl = INew("TextLabel"); lbl.Parent = row
-        lbl.Position = U2(0, 8, 0, 0); lbl.Size = U2(0, 0, 1, 0)
-        lbl.AutomaticSize = Enum.AutomaticSize.X; lbl.BackgroundTransparency = 1
-        lbl.FontFace = Lib.Fonts.R; lbl.TextSize = 10
-        lbl.TextColor3 = T.TextSub; lbl.Text = name .. "  [" .. key .. "]"
-
-        function lbl:SetText(n, k) lbl.Text = n .. "  [" .. k .. "]" end
-        function lbl:SetStatus(b) row.Visible = b end
+        local lbl = INew("TextLabel"); lbl.Parent = cont
+        lbl.Size = U2(0,0,0,13); lbl.AutomaticSize = Enum.AutomaticSize.X
+        lbl.BackgroundTransparency = 1
+        lbl.FontFace = Font_R; lbl.TextSize = 10; lbl.TextColor3 = T.TextSub
+        lbl.Text = name .. "  [" .. key .. "]"
+        function lbl:SetText(n,k) lbl.Text = n.."  ["..k.."]" end
+        function lbl:SetStatus(b) lbl.Visible = b end
         return lbl
     end
     return KL
 end
 
--- -- 
---  Colorpicker
--- -- 
+-- Colorpicker
 function Lib:CreateColorpicker(Data)
-    local CP = {Hue=0, Sat=0, Val=0, Alpha=0, IsOpen=false,
-                Color=FR(0,0,0), HexValue="000000", Flag=Data.Flag}
+    local CP = {Hue=0,Sat=0,Val=0,Alpha=0,IsOpen=false,Color=FR(0,0,0),HexValue="000000",Flag=Data.Flag}
     local bsz = IsMobile and 20 or 15
-    local cpW = IsMobile and 240 or 228; local cpH = 252
 
-    -- swatch button
     local btn = INew("TextButton"); btn.Parent = Data.Parent
-    btn.Size = U2(0, bsz, 0, bsz); btn.Text = ""
-    btn.AutoButtonColor = false; btn.BackgroundColor3 = T.Accent
-    btn.BorderSizePixel = 0; _crn(btn,3); _stk(btn, T.Border, 1)
+    btn.Size = U2(0,bsz,0,bsz); btn.Text = ""; btn.AutoButtonColor = false
+    btn.BackgroundColor3 = T.Accent; btn.BorderSizePixel = 0
+    crn(btn,3); stk(btn,T.Border,1)
 
-    -- picker window
-    local win = INew("Frame"); win.Parent = Lib.UnusedHolder; win.Visible = false
-    win.Size = U2(0, 0, 0, 0); win.BackgroundColor3 = T.Bg2; win.BorderSizePixel = 0
-    _crn(win,7); _stk(win, T.Border, 1); mkShadow(win, 36, 8, 0.44)
+    local win = INew("Frame"); win.Parent = UnusedHolder; win.Visible = false
+    win.Size = U2(0,230,0,250); win.BackgroundColor3 = T.Bg3; win.BorderSizePixel = 0
+    crn(win,6); stk(win,T.Border,1)
 
-    -- palette
     local pal = INew("TextButton"); pal.Parent = win; pal.Text = ""
-    pal.AutoButtonColor = false; pal.BackgroundColor3 = FR(255, 0, 0)
-    pal.Position = U2(0, 8, 0, 8); pal.Size = U2(1, -30, 1, -54)
-    pal.BorderSizePixel = 0; _crn(pal,5)
-    -- white-to-transparent sat gradient
-    local sg = INew("Frame"); sg.Parent = pal; sg.Size = U2(1,0,1,0)
-    sg.BackgroundColor3 = FR(255,255,255); sg.BorderSizePixel = 0; _crn(sg,5)
-    gradTrans(sg, 1, 0, 0)
-    -- black-to-transparent val gradient
-    local vg = INew("Frame"); vg.Parent = pal; vg.Size = U2(1,0,1,0)
-    vg.BackgroundColor3 = FR(0,0,0); vg.BorderSizePixel = 0; _crn(vg,5)
-    gradTrans(vg, 0, 1, 90)
-    -- dragger circle
-    local pd = INew("Frame"); pd.Parent = pal
-    pd.Size = U2(0, 12, 0, 12); pd.AnchorPoint = V2(0.5, 0.5)
-    pd.Position = U2(0, 8, 0, 8); pd.BackgroundColor3 = FR(255,255,255)
-    pd.BorderSizePixel = 0; _crn(pd,99); _stk(pd, FR(0,0,0), 1.5)
+    pal.AutoButtonColor = false; pal.BackgroundColor3 = FR(255,0,0)
+    pal.Position = U2(0,8,0,8); pal.Size = U2(1,-30,1,-52); pal.BorderSizePixel = 0; crn(pal,4)
 
-    -- hue bar
+    local sg = INew("Frame"); sg.Parent = pal; sg.Size = U2(1,0,1,0)
+    sg.BackgroundColor3 = FR(255,255,255); sg.BorderSizePixel = 0; crn(sg,4)
+    local sgg = INew("UIGradient"); sgg.Parent = sg
+    sgg.Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(1,0)}
+
+    local vg = INew("Frame"); vg.Parent = pal; vg.Size = U2(1,0,1,0)
+    vg.BackgroundColor3 = FR(0,0,0); vg.BorderSizePixel = 0; crn(vg,4)
+    local vgg = INew("UIGradient"); vgg.Parent = vg; vgg.Rotation = 90
+    vgg.Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(1,0)}
+
+    local pd2 = INew("Frame"); pd2.Parent = pal
+    pd2.Size = U2(0,10,0,10); pd2.AnchorPoint = V2(0.5,0.5)
+    pd2.Position = U2(0,8,0,8); pd2.BackgroundColor3 = FR(255,255,255)
+    pd2.BorderSizePixel = 0; crn(pd2,99); stk(pd2,FR(0,0,0),1.5)
+
     local hb = INew("TextButton"); hb.Parent = win; hb.Text = ""
-    hb.AutoButtonColor = false; hb.AnchorPoint = V2(1, 0)
-    hb.Position = U2(1, -8, 0, 8); hb.Size = U2(0, 12, 1, -54)
-    hb.BackgroundColor3 = FR(255,255,255); hb.BorderSizePixel = 0; _crn(hb,4)
+    hb.AutoButtonColor = false; hb.AnchorPoint = V2(1,0)
+    hb.Position = U2(1,-8,0,8); hb.Size = U2(0,12,1,-52)
+    hb.BackgroundColor3 = FR(255,255,255); hb.BorderSizePixel = 0; crn(hb,4)
+
     local hi = INew("TextButton"); hi.Parent = hb; hi.Text = ""
     hi.AutoButtonColor = false; hi.Size = U2(1,0,1,0)
-    hi.BackgroundColor3 = FR(255,255,255); hi.BorderSizePixel = 0; _crn(hi,4)
+    hi.BackgroundColor3 = FR(255,255,255); hi.BorderSizePixel = 0; crn(hi,4)
+
     local hg = INew("UIGradient"); hg.Parent = hi; hg.Rotation = 90
-    hg.Color = CS{CSK(0,FR(255,0,0)),CSK(0.17,FR(255,255,0)),CSK(0.33,FR(0,255,0)),
-                  CSK(0.5,FR(0,255,255)),CSK(0.67,FR(0,0,255)),CSK(0.83,FR(255,0,255)),
-                  CSK(1,FR(255,0,0))}
-    -- hue dragger line
+    hg.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0,FR(255,0,0)),
+        ColorSequenceKeypoint.new(0.17,FR(255,255,0)),
+        ColorSequenceKeypoint.new(0.33,FR(0,255,0)),
+        ColorSequenceKeypoint.new(0.5,FR(0,255,255)),
+        ColorSequenceKeypoint.new(0.67,FR(0,0,255)),
+        ColorSequenceKeypoint.new(0.83,FR(255,0,255)),
+        ColorSequenceKeypoint.new(1,FR(255,0,0))
+    }
+
     local hd = INew("Frame"); hd.Parent = hb
-    hd.Size = U2(1, 2, 0, 4); hd.AnchorPoint = V2(0.5, 0.5)
-    hd.Position = U2(0.5, 0, 0, 0); hd.BackgroundColor3 = FR(255,255,255)
-    hd.BorderSizePixel = 0; _crn(hd,2); _stk(hd, FR(0,0,0), 1)
+    hd.Size = U2(1,2,0,4); hd.AnchorPoint = V2(0.5,0.5)
+    hd.Position = U2(0.5,0,0,0); hd.BackgroundColor3 = FR(255,255,255)
+    hd.BorderSizePixel = 0; crn(hd,2); stk(hd,FR(0,0,0),1)
 
-    -- hex input
-    local hexBox = INew("TextBox"); hexBox.Parent = win
-    hexBox.AnchorPoint = V2(0, 1); hexBox.Position = U2(0, 8, 1, -6)
-    hexBox.Size = U2(1, -28, 0, 20)
-    hexBox.BackgroundColor3 = T.Bg4; hexBox.BorderSizePixel = 0
-    hexBox.FontFace = Lib.Fonts.R; hexBox.TextSize = 11
-    hexBox.TextColor3 = T.Text; hexBox.PlaceholderColor3 = T.TextDim
-    hexBox.ClearTextOnFocus = false; hexBox.Text = ""
-    hexBox.TextXAlignment = Enum.TextXAlignment.Left
-    _crn(hexBox,4); _stk(hexBox, T.Border, 1); _pad(hexBox,0,0,6,0)
+    local hex = INew("TextBox"); hex.Parent = win
+    hex.AnchorPoint = V2(0,1); hex.Position = U2(0,8,1,-6)
+    hex.Size = U2(1,-28,0,20); hex.BackgroundColor3 = T.Bg4; hex.BorderSizePixel = 0
+    hex.FontFace = Font_R; hex.TextSize = 11; hex.TextColor3 = T.Text
+    hex.PlaceholderColor3 = T.TextDim; hex.ClearTextOnFocus = false; hex.Text = ""
+    hex.TextXAlignment = Enum.TextXAlignment.Left
+    crn(hex,4); stk(hex,T.Border,1); pad(hex,0,0,5,0)
 
-    local sP, sH = false, false; local deb = false; local wRS
+    local sP,sH = false,false; local wRS
 
     function CP:SetOpen(bool)
-        if deb then return end; CP.IsOpen = bool; deb = true
-        if CP.IsOpen then
-            win.Size = U2(0, cpW, 0, cpH); win.Visible = true; win.Parent = Lib.Holder
+        CP.IsOpen = bool
+        if bool then
+            win.Visible = true; win.Parent = Holder
             wRS = RS.RenderStepped:Connect(function()
                 local bp = btn.AbsolutePosition; local bs = btn.AbsoluteSize
-                win.Position = U2(0, bp.X, 0, bp.Y + bs.Y + 5)
+                win.Position = U2(0,bp.X,0,bp.Y+bs.Y+5)
             end)
-            for _, v in Lib.OpenFrames do if v ~= CP then v:SetOpen(false) end end
+            for _,v in pairs(Lib.OpenFrames) do if v ~= CP then v:SetOpen(false) end end
             Lib.OpenFrames[CP] = CP
         else
             Lib.OpenFrames[CP] = nil
             if wRS then wRS:Disconnect(); wRS = nil end
+            win.Visible = false; win.Parent = UnusedHolder
         end
-        task.spawn(function()
-            task.wait(Lib.TweenTime + 0.05); deb = false
-            win.Visible = CP.IsOpen
-            if not CP.IsOpen then win.Size = U2(0,0,0,0); win.Parent = Lib.UnusedHolder end
-        end)
+    end
+
+    function CP:Update()
+        CP.Color = FH(CP.Hue,CP.Sat,CP.Val); CP.HexValue = CP.Color:ToHex()
+        Lib.Flags[CP.Flag] = {Color=CP.Color,Alpha=CP.Alpha,HexValue=CP.HexValue,Transparency=1-CP.Alpha}
+        tw(btn,{BackgroundColor3=CP.Color}); tw(pal,{BackgroundColor3=FH(CP.Hue,1,1)})
+        hex.Text = "#"..CP.HexValue
+        if Data.Callback then Lib:SafeCall(Data.Callback,CP.Color,CP.Alpha) end
     end
 
     function CP:SlidePal(i)
-        if not i or not sP then return end
+        if not sP then return end
         local pp = pal.AbsolutePosition; local ps = pal.AbsoluteSize
-        CP.Sat = clamp(1 - (i.Position.X - pp.X) / ps.X, 0, 1)
-        CP.Val = clamp(1 - (i.Position.Y - pp.Y) / ps.Y, 0, 1)
-        local dx = clamp((i.Position.X - pp.X) / ps.X, 0, .99)
-        local dy = clamp((i.Position.Y - pp.Y) / ps.Y, 0, .99)
-        tw(pd, {Position = U2(dx, 0, dy, 0)}, 0.06)
+        CP.Sat = math.clamp(1-(i.Position.X-pp.X)/ps.X,0,1)
+        CP.Val = math.clamp(1-(i.Position.Y-pp.Y)/ps.Y,0,1)
+        pd2.Position = U2(math.clamp((i.Position.X-pp.X)/ps.X,0,.99),0,math.clamp((i.Position.Y-pp.Y)/ps.Y,0,.99),0)
         CP:Update()
     end
-    function CP:SlideHue(i)
-        if not i or not sH then return end
-        local hp = hb.AbsolutePosition; local hs = hb.AbsoluteSize
-        CP.Hue = clamp((i.Position.Y - hp.Y) / hs.Y, 0, 1)
-        tw(hd, {Position = U2(0.5, 0, clamp((i.Position.Y - hp.Y) / hs.Y, 0, .99), 0)}, 0.06)
-        CP:Update()
-    end
-    function CP:Update()
-        CP.Color = FH(CP.Hue, CP.Sat, CP.Val); CP.HexValue = CP.Color:ToHex()
-        Lib.Flags[CP.Flag] = {Color=CP.Color, Alpha=CP.Alpha, HexValue=CP.HexValue, Transparency=1-CP.Alpha}
-        tw(btn, {BackgroundColor3 = CP.Color}); tw(pal, {BackgroundColor3 = FH(CP.Hue, 1, 1)})
-        hexBox.Text = "#" .. CP.HexValue
-        if Data.Callback then Lib:SafeCall(Data.Callback, CP.Color, CP.Alpha) end
-    end
-    function CP:Set(col, alpha)
-        if type(col) == "table" then col = FR(col[1], col[2], col[3])
-        elseif type(col) == "string" then pcall(function() col = FX(col) end) end
-        if typeof(col) ~= "Color3" then return end
-        CP.Hue, CP.Sat, CP.Val = col:ToHSV(); CP.Alpha = alpha or 0
-        tw(pd, {Position = U2(clamp(1-CP.Sat, 0,.99), 0, clamp(1-CP.Val, 0,.99), 0)}, 0.08)
-        tw(hd, {Position = U2(0.5, 0, clamp(CP.Hue, 0,.99), 0)}, 0.08)
-        CP:Update()
-    end
-    function CP:Get() return CP.Color, CP.Alpha end
 
-    local function si(i) return i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch end
-    local function mv(i) return i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch end
-    pal.InputBegan:Connect(function(i) if si(i) then sP = true; CP:SlidePal(i) end end)
-    pal.InputEnded:Connect(function(i) if si(i) then sP = false end end)
-    hi.InputBegan:Connect(function(i) if si(i) then sH = true; CP:SlideHue(i) end end)
-    hi.InputEnded:Connect(function(i) if si(i) then sH = false end end)
-    UIS.InputChanged:Connect(function(i) if not mv(i) then return end; if sP then CP:SlidePal(i) elseif sH then CP:SlideHue(i) end end)
-    hexBox.FocusLost:Connect(function() CP:Set(hexBox.Text, CP.Alpha) end)
+    function CP:SlideHue(i)
+        if not sH then return end
+        local hp = hb.AbsolutePosition; local hs = hb.AbsoluteSize
+        CP.Hue = math.clamp((i.Position.Y-hp.Y)/hs.Y,0,1)
+        hd.Position = U2(0.5,0,math.clamp((i.Position.Y-hp.Y)/hs.Y,0,.99),0)
+        CP:Update()
+    end
+
+    function CP:Set(col,alpha)
+        if type(col)=="string" then pcall(function() col=Color3.fromHex(col) end) end
+        if type(col)=="table" then col=FR(col[1],col[2],col[3]) end
+        if typeof(col)~="Color3" then return end
+        CP.Hue,CP.Sat,CP.Val = col:ToHSV(); CP.Alpha = alpha or 0
+        pd2.Position = U2(math.clamp(1-CP.Sat,0,.99),0,math.clamp(1-CP.Val,0,.99),0)
+        hd.Position = U2(0.5,0,math.clamp(CP.Hue,0,.99),0)
+        CP:Update()
+    end
+    function CP:Get() return CP.Color,CP.Alpha end
+
+    local function isTap(i) return i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch end
+    local function isMove(i) return i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch end
+    pal.InputBegan:Connect(function(i) if isTap(i) then sP=true; CP:SlidePal(i) end end)
+    pal.InputEnded:Connect(function(i) if isTap(i) then sP=false end end)
+    hi.InputBegan:Connect(function(i) if isTap(i) then sH=true; CP:SlideHue(i) end end)
+    hi.InputEnded:Connect(function(i) if isTap(i) then sH=false end end)
+    UIS.InputChanged:Connect(function(i) if not isMove(i) then return end; if sP then CP:SlidePal(i) elseif sH then CP:SlideHue(i) end end)
+    hex.FocusLost:Connect(function() CP:Set(hex.Text,CP.Alpha) end)
     btn.MouseButton1Down:Connect(function() CP:SetOpen(not CP.IsOpen) end)
     UIS.InputBegan:Connect(function(i)
-        if not si(i) then return end
+        if not isTap(i) then return end
         task.defer(function()
             if not CP.IsOpen then return end
-            if Lib:Over(win) or Lib:Over(btn) then return end
-            CP:SetOpen(false)
+            local mp = V2(game:GetService("UserInputService"):GetMouseLocation().X, game:GetService("UserInputService"):GetMouseLocation().Y)
+            local function over(f) return mp.X>=f.AbsolutePosition.X and mp.X<=f.AbsolutePosition.X+f.AbsoluteSize.X and mp.Y>=f.AbsolutePosition.Y and mp.Y<=f.AbsolutePosition.Y+f.AbsoluteSize.Y end
+            if not over(win) and not over(btn) then CP:SetOpen(false) end
         end)
     end)
-    if Data.Default then CP:Set(Data.Default, Data.Alpha) end
-    Lib.SetFlags[CP.Flag] = function(c, a) CP:Set(c, a) end
+    if Data.Default then CP:Set(Data.Default,Data.Alpha) end
+    Lib.SetFlags[CP.Flag] = function(c,a) CP:Set(c,a) end
     return CP
 end
 
--- -- 
---  Keybind
--- -- 
+-- Keybind
 function Lib:CreateKeybind(Data)
-    local KB = {Key="", Toggled=false, Mode="Toggle", Flag=Data.Flag, Picking=false, Value="", IsOpen=false}
+    local KB = {Key="",Toggled=false,Mode="Toggle",Flag=Data.Flag,Value="",IsOpen=false}
     local kH = IsMobile and 19 or 14
 
-    local kBtn = INew("TextButton"); kBtn.Parent = Data.Parent
-    kBtn.Size = U2(0, 0, 0, kH); kBtn.AutomaticSize = Enum.AutomaticSize.X
-    kBtn.Text = "[  ]"; kBtn.AutoButtonColor = false
-    kBtn.FontFace = Lib.Fonts.R; kBtn.TextSize = IsMobile and 11 or 10
-    kBtn.TextColor3 = T.TextSub; kBtn.BackgroundColor3 = T.Bg4; kBtn.BorderSizePixel = 0
-    _crn(kBtn,3); _stk(kBtn, T.Border, 1); _pad(kBtn,0,0,5,5)
+    local kbtn = INew("TextButton"); kbtn.Parent = Data.Parent
+    kbtn.Size = U2(0,0,0,kH); kbtn.AutomaticSize = Enum.AutomaticSize.X
+    kbtn.Text = "[ - ]"; kbtn.AutoButtonColor = false
+    kbtn.FontFace = Font_R; kbtn.TextSize = IsMobile and 11 or 10
+    kbtn.TextColor3 = T.TextSub; kbtn.BackgroundColor3 = T.Bg4; kbtn.BorderSizePixel = 0
+    crn(kbtn,3); stk(kbtn,T.Border,1); pad(kbtn,0,0,5,5)
 
-    local kWin = INew("Frame"); kWin.Parent = Lib.UnusedHolder; kWin.Visible = false
-    kWin.Size = U2(0, 0, 0, 0); kWin.BackgroundColor3 = T.Bg3; kWin.BorderSizePixel = 0
-    _crn(kWin,5); _stk(kWin, T.Border, 1); _pad(kWin,5,5,5,5); _vl(kWin,2)
-    mkShadow(kWin, 20, 4, 0.5)
+    local kwin = INew("Frame"); kwin.Parent = UnusedHolder; kwin.Visible = false
+    kwin.BackgroundColor3 = T.Bg3; kwin.BorderSizePixel = 0
+    kwin.Size = U2(0,85,0,63)
+    crn(kwin,5); stk(kwin,T.Border,1); pad(kwin,5,5,5,5); vlist(kwin,2)
 
-    local mH = IsMobile and 22 or 17
     local function mkMode(name)
-        local b = INew("TextButton"); b.Parent = kWin; b.Text = name
+        local b = INew("TextButton"); b.Parent = kwin; b.Text = name
         b.AutoButtonColor = false; b.BackgroundTransparency = 1
-        b.Size = U2(1, 0, 0, mH); b.FontFace = Lib.Fonts.R
-        b.TextSize = IsMobile and 11 or 10; b.TextColor3 = T.TextSub
-        b.BorderSizePixel = 0; _crn(b,3)
+        b.Size = U2(1,0,0,17); b.FontFace = Font_R; b.TextSize = 10
+        b.TextColor3 = T.TextSub; b.BorderSizePixel = 0; crn(b,3)
         local bar = INew("Frame"); bar.Parent = b; bar.BackgroundTransparency = 1
-        bar.Size = U2(0, 2, 0.5, 0); bar.AnchorPoint = V2(0, 0.5)
-        bar.Position = U2(0, 2, 0.5, 0); bar.BackgroundColor3 = T.Accent
-        bar.BorderSizePixel = 0; _crn(bar,2)
-        return b, bar
+        bar.Size = U2(0,2,0.5,0); bar.AnchorPoint = V2(0,0.5)
+        bar.Position = U2(0,2,0.5,0); bar.BackgroundColor3 = T.Accent
+        bar.BorderSizePixel = 0; crn(bar,2)
+        return b,bar
     end
-    local tB, tBar = mkMode("Toggle")
-    local hB, hBar = mkMode("Hold")
-    local aB, aBar = mkMode("Always On")
-    local Modes = {Toggle={tB,tBar}, Hold={hB,hBar}, ["Always On"]={aB,aBar}}
+    local tB,tBar = mkMode("Toggle")
+    local hB,hBar = mkMode("Hold")
+    local aB,aBar = mkMode("Always On")
+    local Modes = {Toggle={tB,tBar},Hold={hB,hBar},["Always On"]={aB,aBar}}
 
-    local kdeb = false; local kRS
+    local kRS
     function KB:SetOpen(bool)
-        if kdeb then return end; KB.IsOpen = bool; kdeb = true
+        KB.IsOpen = bool
         if bool then
-            kWin.Size = U2(0, IsMobile and 108 or 85, 0, IsMobile and 80 or 65)
-            kWin.Visible = true; kWin.Parent = Lib.Holder
+            kwin.Visible = true; kwin.Parent = Holder
             kRS = RS.RenderStepped:Connect(function()
-                local bp = kBtn.AbsolutePosition; local bs = kBtn.AbsoluteSize
-                kWin.Position = U2(0, bp.X, 0, bp.Y + bs.Y + 4)
+                local bp = kbtn.AbsolutePosition; local bs = kbtn.AbsoluteSize
+                kwin.Position = U2(0,bp.X,0,bp.Y+bs.Y+4)
             end)
         else
             if kRS then kRS:Disconnect(); kRS = nil end
+            kwin.Visible = false; kwin.Parent = UnusedHolder
         end
-        task.spawn(function()
-            task.wait(Lib.TweenTime + 0.05); kdeb = false
-            kWin.Visible = bool
-            if not bool then kWin.Size = U2(0,0,0,0); kWin.Parent = Lib.UnusedHolder end
-        end)
     end
 
-    local SK = {RightShift="RShift", LeftShift="LShift", RightControl="RCtrl",
-                LeftControl="LCtrl", LeftAlt="LAlt", RightAlt="RAlt"}
+    local SK = {RightShift="RShift",LeftShift="LShift",RightControl="RCtrl",LeftControl="LCtrl",LeftAlt="LAlt",RightAlt="RAlt"}
     function KB:SetMode(m)
         KB.Mode = m
-        for k, v in Modes do
-            if k == m then tw(v[1],{BackgroundTransparency=0}); tw(v[2],{BackgroundTransparency=0})
+        for k,v in pairs(Modes) do
+            if k==m then tw(v[1],{BackgroundTransparency=0}); tw(v[2],{BackgroundTransparency=0})
             else tw(v[1],{BackgroundTransparency=1}); tw(v[2],{BackgroundTransparency=1}) end
         end
-        Lib.Flags[KB.Flag] = {Mode=KB.Mode, Key=KB.Key, Toggled=KB.Toggled}
-        if Data.Callback then Lib:SafeCall(Data.Callback, KB.Toggled) end
+        Lib.Flags[KB.Flag] = {Mode=KB.Mode,Key=KB.Key,Toggled=KB.Toggled}
+        if Data.Callback then Lib:SafeCall(Data.Callback,KB.Toggled) end
     end
     function KB:Press(b)
         if KB.Mode=="Toggle" then KB.Toggled = not KB.Toggled
         elseif KB.Mode=="Hold" then KB.Toggled = b
         elseif KB.Mode=="Always" then KB.Toggled = true end
-        Lib.Flags[KB.Flag] = {Mode=KB.Mode, Key=KB.Key, Toggled=KB.Toggled}
-        if Data.Callback then Lib:SafeCall(Data.Callback, KB.Toggled) end
+        Lib.Flags[KB.Flag] = {Mode=KB.Mode,Key=KB.Key,Toggled=KB.Toggled}
+        if Data.Callback then Lib:SafeCall(Data.Callback,KB.Toggled) end
     end
     function KB:Set(key)
-        if sfind(tostring(key), "Enum") then
+        if type(key)=="table" then
+            KB.Key = tostring(key.Key); KB.Mode = key.Mode or "Toggle"; KB:SetMode(KB.Mode)
+            local kn = SK[key.Key] or tostring(key.Key):gsub("Enum%.KeyCode%.",""):gsub("KeyCode%.","")
+            KB.Value = kn; kbtn.Text = "[ "..kn.." ]"
+            Lib.Flags[KB.Flag] = {Mode=KB.Mode,Key=KB.Key,Toggled=KB.Toggled}
+        elseif tostring(key):find("Enum") then
             KB.Key = tostring(key)
             local kn = SK[key.Name] or key.Name
-            kn = gsub(gsub(kn, "KeyCode%.", ""), "UserInputType%.", "")
-            KB.Value = kn; kBtn.Text = "[ " .. kn .. " ]"
-            Lib.Flags[KB.Flag] = {Mode=KB.Mode, Key=KB.Key, Toggled=KB.Toggled}
-            if Data.Callback then Lib:SafeCall(Data.Callback, KB.Toggled) end
-        elseif type(key) == "table" then
-            KB.Key = tostring(key.Key); KB.Mode = key.Mode or "Toggle"; KB:SetMode(KB.Mode)
-            local kn = SK[key.Key] or gsub(tostring(key.Key), "Enum%.KeyCode%.", "") or tostring(key.Key)
-            kn = gsub(gsub(kn, "KeyCode%.", ""), "UserInputType%.", "")
-            KB.Value = kn; kBtn.Text = "[ " .. kn .. " ]"
-            Lib.Flags[KB.Flag] = {Mode=KB.Mode, Key=KB.Key, Toggled=KB.Toggled}
-            if Data.Callback then Lib:SafeCall(Data.Callback, KB.Toggled) end
-        elseif type(key) == "boolean" then KB:Press(key) end
+            KB.Value = kn; kbtn.Text = "[ "..kn.." ]"
+            Lib.Flags[KB.Flag] = {Mode=KB.Mode,Key=KB.Key,Toggled=KB.Toggled}
+        elseif type(key)=="boolean" then KB:Press(key) end
         KB.Picking = false
     end
-    function KB:Get() return KB.Mode, KB.Key, KB.Toggled end
+    function KB:Get() return KB.Mode,KB.Key,KB.Toggled end
 
-    kBtn.MouseButton1Click:Connect(function()
-        KB.Picking = true; kBtn.Text = "[ ... ]"
+    kbtn.MouseButton1Click:Connect(function()
+        KB.Picking = true; kbtn.Text = "[ ... ]"
         local ib; ib = UIS.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.Keyboard then KB:Set(i.KeyCode)
+            if i.UserInputType==Enum.UserInputType.Keyboard then KB:Set(i.KeyCode)
             else KB:Set(i.UserInputType) end
             ib:Disconnect()
         end)
     end)
-    kBtn.MouseButton2Down:Connect(function() KB:SetOpen(not KB.IsOpen) end)
+    kbtn.MouseButton2Down:Connect(function() KB:SetOpen(not KB.IsOpen) end)
     UIS.InputBegan:Connect(function(i)
-        if KB.Value ~= "" and KB.Value ~= "" then
-            if tostring(i.KeyCode) == KB.Key or tostring(i.UserInputType) == KB.Key then
+        if KB.Value~="" then
+            if tostring(i.KeyCode)==KB.Key or tostring(i.UserInputType)==KB.Key then
                 if KB.Mode=="Toggle" then KB:Press()
                 elseif KB.Mode=="Hold" then KB:Press(true)
                 elseif KB.Mode=="Always" then KB:Press(true) end
@@ -666,561 +569,397 @@ function Lib:CreateKeybind(Data)
         end
     end)
     UIS.InputEnded:Connect(function(i)
-        if KB.Value ~= "" and tostring(i.KeyCode) == KB.Key and KB.Mode == "Hold" then KB:Press(false) end
+        if KB.Value~="" and tostring(i.KeyCode)==KB.Key and KB.Mode=="Hold" then KB:Press(false) end
     end)
     tB.MouseButton1Down:Connect(function() KB:SetMode("Toggle") end)
     hB.MouseButton1Down:Connect(function() KB:SetMode("Hold") end)
     aB.MouseButton1Down:Connect(function() KB:SetMode("Always On") end)
-    if Data.Default then KB:Set({Key=Data.Default, Mode=Data.Mode or "Toggle"}) end
+    if Data.Default then KB:Set({Key=Data.Default,Mode=Data.Mode or "Toggle"}) end
     Lib.SetFlags[KB.Flag] = function(v) KB:Set(v) end
     return KB
 end
 
--- -- 
---  Window
--- -- 
+-- Window
 function Lib:Window(Data)
     Data = Data or {}
-    local W = {Name=Data.Name or "flow", Pages={}, Items={}, IsOpen=true}
-    local WW, WH = winSize()
-    local SBW = IsMobile and 88 or 108; local TPH = IsMobile and 38 or 30
+    local W = {Name=Data.Name or "zerohub",Pages={},Items={},IsOpen=true}
+    local WW = IsMobile and math.round(math.clamp(Cam.ViewportSize.X-10,320,640)) or 740
+    local WH = IsMobile and math.round(math.clamp(Cam.ViewportSize.Y-40,340,490)) or 490
+    local SBW = IsMobile and 88 or 108
+    local TPH = IsMobile and 38 or 30
 
--- --  main container 
-    local main = INew("Frame"); main.Parent = Lib.Holder
-    main.AnchorPoint = V2(0.5, 0.5); main.Position = U2(0.5, 0, 0.5, 0)
-    main.Size = U2(0, WW, 0, WH); main.BackgroundColor3 = T.Bg1; main.BorderSizePixel = 0
-    _crn(main,8)
-    -- outer glow border (very subtle red)
-    _stk(main, T.Border, 1)
-    -- deep shadow
-    mkShadow(main, 60, 12, 0.35)
+    local main = INew("Frame"); main.Parent = Holder
+    main.AnchorPoint = V2(0.5,0.5); main.Position = U2(0.5,0,0.5,0)
+    main.Size = U2(0,WW,0,WH); main.BackgroundColor3 = T.Bg1; main.BorderSizePixel = 0
+    crn(main,8); stk(main,T.Border,1)
 
--- --  topbar 
     local top = INew("Frame"); top.Parent = main
-    top.Size = U2(1, 0, 0, TPH); top.BackgroundColor3 = T.TopBar; top.BorderSizePixel = 0; _crn(top,8)
-    -- cover bottom corners
-    INew("Frame").Parent = top; top:FindFirstChildOfClass("Frame").Position = U2(0,0,0.5,0)
-    top:FindFirstChildOfClass("Frame").Size = U2(1,0,0.5,0)
-    top:FindFirstChildOfClass("Frame").BackgroundColor3 = T.TopBar
-    top:FindFirstChildOfClass("Frame").BorderSizePixel = 0
-    -- bottom separator line
-    local topSep = INew("Frame"); topSep.Parent = top
-    topSep.Size = U2(1,0,0,1); topSep.Position = U2(0,0,1,-1)
-    topSep.BackgroundColor3 = T.TopBarLine; topSep.BorderSizePixel = 0
+    top.Size = U2(1,0,0,TPH); top.BackgroundColor3 = T.TopBar; top.BorderSizePixel = 0; crn(top,8)
+    local tf = INew("Frame"); tf.Parent = top
+    tf.Position = U2(0,0,0.5,0); tf.Size = U2(1,0,0.5,0)
+    tf.BackgroundColor3 = T.TopBar; tf.BorderSizePixel = 0
+    local tsep = INew("Frame"); tsep.Parent = top
+    tsep.Size = U2(1,0,0,1); tsep.Position = U2(0,0,1,-1)
+    tsep.BackgroundColor3 = T.Border; tsep.BorderSizePixel = 0
 
--- -- subtle gradient on topbar (left darker  right slightly lighter)
-    local topGrad = INew("Frame"); topGrad.Parent = top
-    topGrad.Size = U2(1,0,1,0); topGrad.BackgroundTransparency = 0.85
-    topGrad.BackgroundColor3 = T.Accent; topGrad.BorderSizePixel = 0; _crn(topGrad,8)
-    gradTrans(topGrad, 0.95, 1, 0)
+    local tdot = INew("Frame"); tdot.Parent = top
+    tdot.Size = U2(0,6,0,6); tdot.AnchorPoint = V2(0,0.5)
+    tdot.Position = U2(0,12,0.5,0); tdot.BackgroundColor3 = T.Accent
+    tdot.BorderSizePixel = 0; crn(tdot,99)
 
-    -- title area
-    local titleDot = INew("Frame"); titleDot.Parent = top
-    titleDot.Size = U2(0, 6, 0, 6); titleDot.AnchorPoint = V2(0, 0.5)
-    titleDot.Position = U2(0, 12, 0.5, 0); titleDot.BackgroundColor3 = T.Accent
-    titleDot.BorderSizePixel = 0; _crn(titleDot,99)
-    _stk(titleDot, T.AccentGlow, 3).Transparency = 0.4  -- glow ring
+    local titlelbl = INew("TextLabel"); titlelbl.Parent = top
+    titlelbl.AnchorPoint = V2(0,0.5); titlelbl.Position = U2(0,23,0.5,0)
+    titlelbl.Size = U2(0,0,0,12); titlelbl.AutomaticSize = Enum.AutomaticSize.X
+    titlelbl.BackgroundTransparency = 1; titlelbl.Text = W.Name
+    titlelbl.FontFace = Font_B; titlelbl.TextSize = IsMobile and 13 or 11
+    titlelbl.TextColor3 = T.Text
 
-    local titleLbl = INew("TextLabel"); titleLbl.Parent = top
-    titleLbl.AnchorPoint = V2(0, 0.5); titleLbl.Position = U2(0, 23, 0.5, 0)
-    titleLbl.Size = U2(0, 0, 0, 12); titleLbl.AutomaticSize = Enum.AutomaticSize.X
-    titleLbl.BackgroundTransparency = 1; titleLbl.Text = W.Name
-    titleLbl.FontFace = Lib.Fonts.B; titleLbl.TextSize = IsMobile and 13 or 11
-    titleLbl.TextColor3 = T.Text
+    local verlbl = INew("TextLabel"); verlbl.Parent = top
+    verlbl.AnchorPoint = V2(1,0.5); verlbl.Position = U2(1,-12,0.5,0)
+    verlbl.Size = U2(0,0,0,10); verlbl.AutomaticSize = Enum.AutomaticSize.X
+    verlbl.BackgroundTransparency = 1; verlbl.Text = Data.Version or ""
+    verlbl.FontFace = Font_R; verlbl.TextSize = 10; verlbl.TextColor3 = T.TextDim
 
-    -- version / subtitle  (right side of topbar)
-    local versionLbl = INew("TextLabel"); versionLbl.Parent = top
-    versionLbl.AnchorPoint = V2(1, 0.5); versionLbl.Position = U2(1, -12, 0.5, 0)
-    versionLbl.Size = U2(0, 0, 0, 10); versionLbl.AutomaticSize = Enum.AutomaticSize.X
-    versionLbl.BackgroundTransparency = 1; versionLbl.Text = Data.Version or ""
-    versionLbl.FontFace = Lib.Fonts.R; versionLbl.TextSize = 10
-    versionLbl.TextColor3 = T.TextDim
-
--- --  sidebar 
     local sb = INew("Frame"); sb.Parent = main
-    sb.Position = U2(0, 0, 0, TPH); sb.Size = U2(0, SBW, 1, -TPH)
-    sb.BackgroundColor3 = T.Sidebar; sb.BorderSizePixel = 0; _crn(sb,8)
-    -- fill top corners of sidebar
-    INew("Frame").Parent = sb; sb:FindFirstChildOfClass("Frame").Size = U2(1,0,0,10)
-    sb:FindFirstChildOfClass("Frame").BackgroundColor3 = T.Sidebar
-    sb:FindFirstChildOfClass("Frame").BorderSizePixel = 0
-    -- right border line
-    local sbLine = INew("Frame"); sbLine.Parent = sb
-    sbLine.Position = U2(1,-1,0,0); sbLine.Size = U2(0,1,1,0)
-    sbLine.BackgroundColor3 = T.SidebarLine; sbLine.BorderSizePixel = 0
+    sb.Position = U2(0,0,0,TPH); sb.Size = U2(0,SBW,1,-TPH)
+    sb.BackgroundColor3 = T.Sidebar; sb.BorderSizePixel = 0; crn(sb,8)
+    local sbf = INew("Frame"); sbf.Parent = sb
+    sbf.Size = U2(1,0,0,10); sbf.BackgroundColor3 = T.Sidebar; sbf.BorderSizePixel = 0
+    local sbline = INew("Frame"); sbline.Parent = sb
+    sbline.Position = U2(1,-1,0,0); sbline.Size = U2(0,1,1,0)
+    sbline.BackgroundColor3 = T.Border; sbline.BorderSizePixel = 0
 
-    -- nav container inside sidebar
     local nav = INew("Frame"); nav.Parent = sb
-    nav.BackgroundTransparency = 1; nav.Position = U2(0, 4, 0, 8)
-    nav.Size = U2(1, -8, 1, -16); nav.AutomaticSize = Enum.AutomaticSize.Y
-    nav.BorderSizePixel = 0; _vl(nav,2)
+    nav.BackgroundTransparency = 1; nav.Position = U2(0,4,0,8)
+    nav.Size = U2(1,-8,1,-16); nav.AutomaticSize = Enum.AutomaticSize.Y
+    nav.BorderSizePixel = 0; vlist(nav,2)
 
--- --  content area 
     local cont = INew("Frame"); cont.Parent = main
-    cont.Position = U2(0, SBW, 0, TPH)
-    cont.Size = U2(1, -SBW, 1, -TPH)
+    cont.Position = U2(0,SBW,0,TPH); cont.Size = U2(1,-SBW,1,-TPH)
     cont.BackgroundTransparency = 1; cont.BorderSizePixel = 0
     cont.ClipsDescendants = true
 
-    W.Items = {main=main, nav=nav, content=cont, top=top}
-    makeDraggable(main, top)
+    W.Items = {main=main,nav=nav,content=cont,top=top}
+    makeDraggable(main,top)
 
-    local deb = false
     function W:SetOpen(b)
-        for _, v in Lib.OpenFrames do v:SetOpen(false) end
-        if deb then return end; W.IsOpen = b; deb = true
+        W.IsOpen = b
         if b then
-            main.Visible = true; main.Size = U2(0, 0, 0, 0); main.BackgroundTransparency = 1
-            tw(main, {Size=U2(0,WW,0,WH), BackgroundTransparency=0}, 0.22, Enum.EasingStyle.Back)
-            task.delay(0.24, function() main.Size=U2(0,WW,0,WH); main.BackgroundTransparency=0; deb=false end)
-            -- hide hamburger when GUI open
-            if W._hambtn then tw(W._hambtn, {BackgroundTransparency=1, ImageTransparency=1}) end
+            main.Visible = true
+            tw(main,{Size=U2(0,WW,0,WH),BackgroundTransparency=0},0.2,Enum.EasingStyle.Back)
         else
-            tw(main, {Size=U2(0,0,0,0), BackgroundTransparency=1}, 0.16, Enum.EasingStyle.Quart)
-            task.delay(0.18, function()
-                main.Visible=false; main.Size=U2(0,WW,0,WH); main.BackgroundTransparency=0; deb=false
-                -- show hamburger when GUI closed
-                if W._hambtn then tw(W._hambtn, {BackgroundTransparency=0, ImageTransparency=0}) end
-            end)
+            tw(main,{Size=U2(0,0,0,0),BackgroundTransparency=1},0.15)
+            task.delay(0.16,function() main.Visible=false; main.Size=U2(0,WW,0,WH); main.BackgroundTransparency=0 end)
         end
     end
 
-    -- keyboard toggle (desktop)
     UIS.InputBegan:Connect(function(i)
-        if tostring(i.KeyCode) == Lib.MenuKeybind then if not deb then W:SetOpen(not W.IsOpen) end end
+        if tostring(i.KeyCode)==Lib.MenuKeybind then W:SetOpen(not W.IsOpen) end
     end)
 
--- --  mobile hamburger button (draggable) 
     if IsMobile then
         local hamSize = 44
-
-        local hambg = INew("Frame"); hambg.Parent = Lib.Holder
-        hambg.Size = U2(0, hamSize, 0, hamSize)
-        hambg.Position = U2(0, 10, 1, -(hamSize + 80))
-        hambg.BackgroundColor3 = T.Bg2
-        hambg.BorderSizePixel = 0; hambg.ZIndex = 10
-        _crn(hambg,10); _stk(hambg, T.Accent, 1)
-
-        -- three lines icon
-        for li = 1, 3 do
+        local hambg = INew("Frame"); hambg.Parent = Holder
+        hambg.Size = U2(0,hamSize,0,hamSize)
+        hambg.Position = U2(0,10,1,-(hamSize+80))
+        hambg.BackgroundColor3 = T.Bg2; hambg.BorderSizePixel = 0; hambg.ZIndex = 10
+        crn(hambg,10); stk(hambg,T.Accent,1)
+        for li = 1,3 do
             local line = INew("Frame"); line.Parent = hambg
-            line.Size = U2(0, 20, 0, 2)
-            line.AnchorPoint = V2(0.5, 0.5)
-            line.Position = U2(0.5, 0, 0, 10 + (li-1) * 9)
-            line.BackgroundColor3 = T.Accent
-            line.BorderSizePixel = 0; _crn(line,2)
+            line.Size = U2(0,20,0,2); line.AnchorPoint = V2(0.5,0.5)
+            line.Position = U2(0.5,0,0,10+(li-1)*9)
+            line.BackgroundColor3 = T.Accent; line.BorderSizePixel = 0; crn(line,2)
         end
-
-        -- red dot accent corner
-        local rdot = INew("Frame"); rdot.Parent = hambg
-        rdot.Size = U2(0, 7, 0, 7)
-        rdot.AnchorPoint = V2(1, 0); rdot.Position = U2(1, 1, 0, -1)
-        rdot.BackgroundColor3 = T.AccentHi; rdot.BorderSizePixel = 0; _crn(rdot,99)
-
-        -- tap to toggle
         local tapBtn = INew("TextButton"); tapBtn.Parent = hambg
-        tapBtn.Size = U2(1, 0, 1, 0); tapBtn.BackgroundTransparency = 1
+        tapBtn.Size = U2(1,0,1,0); tapBtn.BackgroundTransparency = 1
         tapBtn.Text = ""; tapBtn.ZIndex = 11; tapBtn.BorderSizePixel = 0
-        tapBtn.MouseButton1Click:Connect(function()
-            W:SetOpen(not W.IsOpen)
-        end)
-
-        -- draggable
-        local hdrag, hds, hsp = false, nil, nil
-        hambg.InputBegan:Connect(function(i)
-            if i.UserInputType ~= Enum.UserInputType.Touch then return end
-            hdrag = true; hds = i.Position; hsp = hambg.Position
-        end)
-        UIS.InputChanged:Connect(function(i)
-            if not hdrag then return end
-            if i.UserInputType ~= Enum.UserInputType.Touch then return end
-            local d = i.Position - hds
-            local sc = Cam.ViewportSize
-            local nx = clamp(hsp.X.Offset + d.X, 0, sc.X - hamSize)
-            local ny = clamp(hsp.Y.Offset + d.Y, 0, sc.Y - hamSize)
-            hambg.Position = U2(0, nx, 0, ny)
-        end)
-        UIS.InputEnded:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.Touch then hdrag = false end
-        end)
-
+        tapBtn.MouseButton1Click:Connect(function() W:SetOpen(not W.IsOpen) end)
+        makeDraggable(hambg)
         W._hambtn = hambg
     end
 
     task.wait()
-    local ap = main.AbsolutePosition
-    main.AnchorPoint = V2(0, 0); main.Position = U2(0, ap.X, 0, ap.Y)
-    return setmetatable(W, Lib)
+    pcall(function()
+        local ap = main.AbsolutePosition
+        main.AnchorPoint = V2(0,0); main.Position = U2(0,ap.X,0,ap.Y)
+    end)
+    return setmetatable(W,Lib)
 end
 
--- -- 
---  Page
--- -- 
+-- Page
 function Lib:Page(Data)
     Data = Data or {}
-    local P = {Window=self, Name=Data.Name or "Page",
+    local P = {Window=self,Name=Data.Name or "Page",
                Columns=Data.Columns or (IsMobile and 1 or 2),
-               ColumnsData={}, Items={}, Active=false}
+               ColumnsData={},Items={},Active=false}
     local nav = P.Window.Items.nav
 
-    -- nav tab button
     local tab = INew("TextButton"); tab.Parent = nav; tab.Text = ""
     tab.AutoButtonColor = false; tab.BackgroundTransparency = 1
-    tab.Size = U2(1, 0, 0, IsMobile and 30 or 25)
-    tab.BorderSizePixel = 0; tab.BackgroundColor3 = T.Bg3; _crn(tab,5)
+    tab.Size = U2(1,0,0, IsMobile and 28 or 24)
+    tab.BorderSizePixel = 0; tab.BackgroundColor3 = T.Bg3; crn(tab,4)
 
-    -- active bg (filled when selected)
     local tabBg = INew("Frame"); tabBg.Parent = tab
-    tabBg.Size = U2(1, 0, 1, 0); tabBg.BackgroundColor3 = T.Bg4
-    tabBg.BackgroundTransparency = 1; tabBg.BorderSizePixel = 0; _crn(tabBg,5)
+    tabBg.Size = U2(1,0,1,0); tabBg.BackgroundColor3 = T.Bg4
+    tabBg.BackgroundTransparency = 1; tabBg.BorderSizePixel = 0; crn(tabBg,4)
 
-    -- left accent bar
     local aBar = INew("Frame"); aBar.Parent = tab
-    aBar.Size = U2(0, 2, 0.46, 0); aBar.AnchorPoint = V2(0, 0.5)
-    aBar.Position = U2(0, 3, 0.5, 0); aBar.BackgroundColor3 = T.Accent
-    aBar.BackgroundTransparency = 1; aBar.BorderSizePixel = 0; _crn(aBar,2)
-    _stk(aBar, T.AccentGlow, 1.5).Transparency = 0.55
+    aBar.Size = U2(0,2,0.44,0); aBar.AnchorPoint = V2(0,0.5)
+    aBar.Position = U2(0,3,0.5,0); aBar.BackgroundColor3 = T.Accent
+    aBar.BackgroundTransparency = 1; aBar.BorderSizePixel = 0; crn(aBar,2)
 
-    -- small dot
     local aDot = INew("Frame"); aDot.Parent = tab
-    aDot.Size = U2(0, 3, 0, 3); aDot.AnchorPoint = V2(0, 0.5)
-    aDot.Position = U2(0, 8, 0.5, 0); aDot.BackgroundColor3 = T.TextDim
-    aDot.BorderSizePixel = 0; _crn(aDot,99)
+    aDot.Size = U2(0,3,0,3); aDot.AnchorPoint = V2(0,0.5)
+    aDot.Position = U2(0,8,0.5,0); aDot.BackgroundColor3 = T.TextDim
+    aDot.BorderSizePixel = 0; crn(aDot,99)
 
-    -- label
     local lbl = INew("TextLabel"); lbl.Parent = tab
-    lbl.AnchorPoint = V2(0, 0.5); lbl.Position = U2(0, 16, 0.5, 0)
-    lbl.Size = U2(0, 0, 0, 0); lbl.AutomaticSize = Enum.AutomaticSize.XY
+    lbl.AnchorPoint = V2(0,0.5); lbl.Position = U2(0,15,0.5,0)
+    lbl.Size = U2(0,0,0,0); lbl.AutomaticSize = Enum.AutomaticSize.XY
     lbl.BackgroundTransparency = 1; lbl.Text = P.Name
-    lbl.FontFace = Lib.Fonts.M; lbl.TextSize = IsMobile and 11 or 10
+    lbl.FontFace = Font_M; lbl.TextSize = IsMobile and 11 or 10
     lbl.TextColor3 = T.TextSub; lbl.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- page frame
-    local pf = INew("Frame"); pf.Parent = Lib.UnusedHolder
+    local pf = INew("Frame"); pf.Parent = UnusedHolder
     pf.BackgroundTransparency = 1; pf.Visible = false
-    pf.Size = U2(1, 0, 1, 0); pf.BorderSizePixel = 0
+    pf.Size = U2(1,0,1,0); pf.BorderSizePixel = 0
 
-    -- manual column sizing (no UIFlexAlignment - not supported by most executors)
-    local colW = 1 / P.Columns
-    for i = 1, P.Columns do
+    local colW = 1/P.Columns
+    for i = 1,P.Columns do
         local col = INew("ScrollingFrame"); col.Parent = pf
         col.BackgroundTransparency = 1; col.BorderSizePixel = 0
-        col.ScrollBarThickness = IsMobile and 3 or 2
-        col.ScrollBarImageColor3 = T.Border
+        col.ScrollBarThickness = 2; col.ScrollBarImageColor3 = T.Border
         col.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        col.CanvasSize = U2(0, 0, 0, 0)
-        col.Size = U2(colW, 0, 1, 0)
-        col.Position = U2(colW * (i - 1), 0, 0, 0)
-        col.ElasticBehavior = IsMobile and Enum.ElasticBehavior.Always or Enum.ElasticBehavior.WhenScrollable
+        col.CanvasSize = U2(0,0,0,0)
+        col.Size = U2(colW,0,1,0)
+        col.Position = U2(colW*(i-1),0,0,0)
         local pv = IsMobile and 8 or 6
-        _pad(col,pv,pv+2,pv,pv); _vl(col,IsMobile and 9 or 7)
+        pad(col,pv,pv+2,pv,pv); vlist(col, IsMobile and 9 or 7)
         P.ColumnsData[i] = col
     end
 
-    P.Items = {tab=tab, page=pf, bar=aBar, dot=aDot, lbl=lbl, bg=tabBg}
-    local pdeb = false
+    P.Items = {tab=tab,page=pf,bar=aBar,dot=aDot,lbl=lbl,bg=tabBg}
 
     function P:Turn(bool)
-        if pdeb then return end; P.Active = bool; pdeb = true
+        P.Active = bool
         pf.Visible = bool
-        pf.Parent = bool and P.Window.Items.content or Lib.UnusedHolder
+        pf.Parent = bool and P.Window.Items.content or UnusedHolder
         if bool then
-            tw(tabBg, {BackgroundTransparency = 0})
-            tw(aBar, {BackgroundTransparency = 0})
-            tw(aDot, {BackgroundColor3 = T.Accent})
-            lbl.TextColor3 = T.Text; lbl.FontFace = Lib.Fonts.B
+            tw(tabBg,{BackgroundTransparency=0}); tw(aBar,{BackgroundTransparency=0})
+            tw(aDot,{BackgroundColor3=T.Accent}); lbl.TextColor3=T.Text; lbl.FontFace=Font_B
         else
-            tw(tabBg, {BackgroundTransparency = 1})
-            tw(aBar, {BackgroundTransparency = 1})
-            tw(aDot, {BackgroundColor3 = T.TextDim})
-            lbl.TextColor3 = T.TextSub; lbl.FontFace = Lib.Fonts.M
+            tw(tabBg,{BackgroundTransparency=1}); tw(aBar,{BackgroundTransparency=1})
+            tw(aDot,{BackgroundColor3=T.TextDim}); lbl.TextColor3=T.TextSub; lbl.FontFace=Font_M
         end
-        pdeb = false
     end
 
     tab.MouseButton1Down:Connect(function()
-        for _, v in P.Window.Pages do
-            if v == P and P.Active then return end
-            v:Turn(v == P)
+        for _,v in pairs(P.Window.Pages) do
+            if v==P and P.Active then return end
+            v:Turn(v==P)
         end
     end)
-    if not IsMobile then
-        tab.MouseEnter:Connect(function() if not P.Active then tw(tabBg, {BackgroundTransparency = 0.5}) end end)
-        tab.MouseLeave:Connect(function() if not P.Active then tw(tabBg, {BackgroundTransparency = 1}) end end)
-    end
 
-    if #P.Window.Pages == 0 then P:Turn(true) end
-    tins(P.Window.Pages, P)
-    return setmetatable(P, Lib.Pages)
+    if #P.Window.Pages==0 then P:Turn(true) end
+    table.insert(P.Window.Pages,P)
+    return setmetatable(P,Lib.Pages)
 end
 
--- -- 
---  Section
--- -- 
+-- Section
 function Lib.Pages:Section(Data)
     Data = Data or {}
-    local S = {Window=self.Window, Page=self,
-               Name=Data.Name or "Section", Side=Data.Side or 1, Items={}}
+    local S = {Window=self.Window,Page=self,Name=Data.Name or "Section",Side=Data.Side or 1,Items={}}
     local parent = S.Page.ColumnsData[S.Side]
-    local hH = IsMobile and 27 or 22
+    local hH = IsMobile and 26 or 21
 
     local box = INew("Frame"); box.Parent = parent
-    box.Size = U2(1, 0, 0, 30); box.AutomaticSize = Enum.AutomaticSize.Y
-    box.BackgroundColor3 = T.Bg2; box.BorderSizePixel = 0; _crn(box,7)
-    _stk(box, T.Border, 1); _pad(box,0,IsMobile and 10 or 7,0,0)
-    mkShadow(box, 16, 2, 0.7)
+    box.Size = U2(1,0,0,30); box.AutomaticSize = Enum.AutomaticSize.Y
+    box.BackgroundColor3 = T.Bg2; box.BorderSizePixel = 0; crn(box,6); stk(box,T.Border,1)
+    pad(box,0, IsMobile and 9 or 6,0,0)
 
-    -- header
     local hdr = INew("Frame"); hdr.Parent = box
-    hdr.Size = U2(1, 0, 0, hH); hdr.BackgroundColor3 = T.Bg3; hdr.BorderSizePixel = 0; _crn(hdr,7)
-    -- fill bottom corners of header
-    local hFill = INew("Frame"); hFill.Parent = hdr
-    hFill.Position = U2(0, 0, 0.5, 0); hFill.Size = U2(1, 0, 0.5, 0)
-    hFill.BackgroundColor3 = T.Bg3; hFill.BorderSizePixel = 0
+    hdr.Size = U2(1,0,0,hH); hdr.BackgroundColor3 = T.Bg3; hdr.BorderSizePixel = 0; crn(hdr,6)
+    local hf = INew("Frame"); hf.Parent = hdr
+    hf.Position = U2(0,0,0.5,0); hf.Size = U2(1,0,0.5,0)
+    hf.BackgroundColor3 = T.Bg3; hf.BorderSizePixel = 0
 
-    -- glowing accent bar (left side)
     local acb = INew("Frame"); acb.Parent = hdr
-    acb.Size = U2(0, 2, 0.42, 0); acb.AnchorPoint = V2(0, 0.5)
-    acb.Position = U2(0, 6, 0.5, 0); acb.BackgroundColor3 = T.Accent
-    acb.BorderSizePixel = 0; _crn(acb,2)
-    _stk(acb, T.AccentGlow, 2).Transparency = 0.45  -- glow
+    acb.Size = U2(0,2,0.4,0); acb.AnchorPoint = V2(0,0.5)
+    acb.Position = U2(0,6,0.5,0); acb.BackgroundColor3 = T.Accent
+    acb.BorderSizePixel = 0; crn(acb,2)
 
-    -- section name
     local hl = INew("TextLabel"); hl.Parent = hdr
-    hl.AnchorPoint = V2(0, 0.5); hl.Position = U2(0, 13, 0.5, 0)
-    hl.Size = U2(1, -18, 0, 10); hl.AutomaticSize = Enum.AutomaticSize.X
+    hl.AnchorPoint = V2(0,0.5); hl.Position = U2(0,12,0.5,0)
+    hl.Size = U2(1,-16,0,10); hl.AutomaticSize = Enum.AutomaticSize.X
     hl.BackgroundTransparency = 1; hl.Text = S.Name
-    hl.FontFace = Lib.Fonts.B; hl.TextSize = IsMobile and 11 or 10
+    hl.FontFace = Font_B; hl.TextSize = IsMobile and 11 or 10
     hl.TextColor3 = T.Text; hl.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- separator
     local sep = INew("Frame"); sep.Parent = box
-    sep.Position = U2(0, 8, 0, hH); sep.Size = U2(1, -16, 0, 1)
+    sep.Position = U2(0,8,0,hH); sep.Size = U2(1,-16,0,1)
     sep.BackgroundColor3 = T.Border; sep.BorderSizePixel = 0
 
-    -- content area
     local cont = INew("Frame"); cont.Parent = box
-    cont.Position = U2(0, 9, 0, hH + 6); cont.Size = U2(1, -18, 0, 0)
+    cont.Position = U2(0,9,0,hH+5); cont.Size = U2(1,-18,0,0)
     cont.AutomaticSize = Enum.AutomaticSize.Y; cont.BackgroundTransparency = 1
-    cont.BorderSizePixel = 0; _vl(cont,IsMobile and 7 or 5)
+    cont.BorderSizePixel = 0; vlist(cont, IsMobile and 7 or 5)
 
-    S.Items = {box=box, content=cont}
-    return setmetatable(S, Lib.Sections)
+    S.Items = {box=box,content=cont}
+    return setmetatable(S,Lib.Sections)
 end
 
--- -- 
---  Toggle
--- -- 
+-- Toggle
 function Lib.Sections:Toggle(Data)
     Data = Data or {}
-    local TG = {Window=self.Window, Page=self.Page, Section=self,
-                Name=Data.Name or "Toggle", Flag=Data.Flag or Lib:_flag(),
-                Default=Data.Default or false,
-                Callback=Data.Callback or function() end, Value=false}
-    local rH = IsMobile and 22 or 17
-    local pW = IsMobile and 30 or 24; local pH = IsMobile and 14 or 11; local tSz = IsMobile and 9 or 7
+    local TG = {Window=self.Window,Page=self.Page,Section=self,
+                Name=Data.Name or "Toggle",Flag=Data.Flag or Lib:_flag(),
+                Default=Data.Default or false,Callback=Data.Callback or function()end,Value=false}
+    local rH = IsMobile and 21 or 16
+    local pW = IsMobile and 28 or 23; local pH = IsMobile and 13 or 10; local tSz = IsMobile and 8 or 6
 
     local row = INew("TextButton"); row.Parent = TG.Section.Items.content
-    row.Size = U2(1, 0, 0, rH); row.Text = ""; row.AutoButtonColor = false
+    row.Size = U2(1,0,0,rH); row.Text = ""; row.AutoButtonColor = false
     row.BackgroundTransparency = 1; row.BorderSizePixel = 0
 
-    -- hover bg
-    local rowBg = INew("Frame"); rowBg.Parent = row
-    rowBg.Size = U2(1, 4, 1, 2); rowBg.AnchorPoint = V2(0.5, 0.5)
-    rowBg.Position = U2(0.5, 0, 0.5, 0); rowBg.BackgroundColor3 = T.Bg4
-    rowBg.BackgroundTransparency = 1; rowBg.BorderSizePixel = 0; _crn(rowBg,4)
-
     local nl = INew("TextLabel"); nl.Parent = row
-    nl.AnchorPoint = V2(0, 0.5); nl.Position = U2(0, 0, 0.5, 0)
-    nl.Size = U2(0, 0, 0, 10); nl.AutomaticSize = Enum.AutomaticSize.X
+    nl.AnchorPoint = V2(0,0.5); nl.Position = U2(0,0,0.5,0)
+    nl.Size = U2(0,0,0,10); nl.AutomaticSize = Enum.AutomaticSize.X
     nl.BackgroundTransparency = 1; nl.Text = TG.Name
-    nl.FontFace = Lib.Fonts.R; nl.TextSize = IsMobile and 12 or 10
+    nl.FontFace = Font_R; nl.TextSize = IsMobile and 11 or 10
     nl.TextColor3 = T.TextSub; nl.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- sub-elements container (colorpicker/keybind)
     local sub = INew("Frame"); sub.Parent = row
-    sub.AnchorPoint = V2(1, 0.5); sub.Position = U2(1, 0, 0.5, 0)
-    sub.Size = U2(0, 0, 1, 0); sub.AutomaticSize = Enum.AutomaticSize.X
+    sub.AnchorPoint = V2(1,0.5); sub.Position = U2(1,0,0.5,0)
+    sub.Size = U2(0,0,1,0); sub.AutomaticSize = Enum.AutomaticSize.X
     sub.BackgroundTransparency = 1; sub.BorderSizePixel = 0; sub.ZIndex = 2
-    _hl(sub,IsMobile and 6 or 5,Enum.HorizontalAlignment.Right,Enum.VerticalAlignment.Center)
+    hlist(sub, IsMobile and 6 or 5, Enum.HorizontalAlignment.Right)
 
-    -- pill track
     local track = INew("Frame"); track.Parent = sub
-    track.Size = U2(0, pW, 0, pH); track.BackgroundColor3 = T.Pill
-    track.BorderSizePixel = 0; track.LayoutOrder = 999; _crn(track,99)
-    local trkStk = _stk(track, T.PillBorder, 1)
+    track.Size = U2(0,pW,0,pH); track.BackgroundColor3 = T.Pill
+    track.BorderSizePixel = 0; track.LayoutOrder = 999; crn(track,99)
+    local trkStk = stk(track,T.PillBorder,1)
 
-    -- pill thumb
     local thumb = INew("Frame"); thumb.Parent = track
-    thumb.Size = U2(0, tSz, 0, tSz); thumb.AnchorPoint = V2(0, 0.5)
-    thumb.Position = U2(0, 2, 0.5, 0); thumb.BackgroundColor3 = T.TextDim
-    thumb.BorderSizePixel = 0; _crn(thumb,99)
+    thumb.Size = U2(0,tSz,0,tSz); thumb.AnchorPoint = V2(0,0.5)
+    thumb.Position = U2(0,2,0.5,0); thumb.BackgroundColor3 = T.TextDim
+    thumb.BorderSizePixel = 0; crn(thumb,99)
 
     function TG:Get() return TG.Value end
     function TG:Set(v)
         TG.Value = v; Lib.Flags[TG.Flag] = v
         if v then
-            tw(track, {BackgroundColor3 = T.PillOn})
-            tw(trkStk, {Color = T.PillOnBrd})
-            twSpring(thumb, {Position = U2(1, -(tSz+2), 0.5, 0), BackgroundColor3 = T.AccentHi})
+            tw(track,{BackgroundColor3=T.AccentDim}); tw(trkStk,{Color=T.Accent})
+            tw(thumb,{Position=U2(1,-(tSz+2),0.5,0),BackgroundColor3=T.AccentHi},0.15,Enum.EasingStyle.Back)
             nl.TextColor3 = T.Text
         else
-            tw(track, {BackgroundColor3 = T.Pill})
-            tw(trkStk, {Color = T.PillBorder})
-            twSpring(thumb, {Position = U2(0, 2, 0.5, 0), BackgroundColor3 = T.TextDim})
+            tw(track,{BackgroundColor3=T.Pill}); tw(trkStk,{Color=T.PillBorder})
+            tw(thumb,{Position=U2(0,2,0.5,0),BackgroundColor3=T.TextDim},0.13,Enum.EasingStyle.Back,Enum.EasingDirection.In)
             nl.TextColor3 = T.TextSub
         end
-        Lib:SafeCall(TG.Callback, TG.Value)
+        Lib:SafeCall(TG.Callback,TG.Value)
     end
     function TG:Colorpicker(d)
         d = d or {}
-        return Lib:CreateColorpicker({Parent=sub, Flag=d.Flag or Lib:_flag(),
-            Default=d.Default or FR(205,35,45), Alpha=d.Alpha or 0,
-            Callback=d.Callback or function() end})
+        return Lib:CreateColorpicker({Parent=sub,Flag=d.Flag or Lib:_flag(),
+            Default=d.Default or FR(205,35,45),Alpha=d.Alpha or 0,Callback=d.Callback or function()end})
     end
     function TG:Keybind(d)
         d = d or {}
-        return Lib:CreateKeybind({Name=TG.Name, Parent=sub, Flag=d.Flag or Lib:_flag(),
-            Default=d.Default or Enum.KeyCode.RightShift,
-            Mode=d.Mode or "Toggle", Callback=d.Callback or function() end})
+        return Lib:CreateKeybind({Name=TG.Name,Parent=sub,Flag=d.Flag or Lib:_flag(),
+            Default=d.Default or Enum.KeyCode.RightShift,Mode=d.Mode or "Toggle",Callback=d.Callback or function()end})
     end
     function TG:SetVisibility(b) row.Visible = b end
-
-    if not IsMobile then
-        row.MouseEnter:Connect(function()
-            tw(rowBg, {BackgroundTransparency = 0.75})
-            if not TG.Value then tw(track, {BackgroundColor3 = Lib:Lighter(T.Pill, 1.5)}) end
-        end)
-        row.MouseLeave:Connect(function()
-            tw(rowBg, {BackgroundTransparency = 1})
-            if not TG.Value then tw(track, {BackgroundColor3 = T.Pill}) end
-        end)
-    end
     row.MouseButton1Down:Connect(function() TG:Set(not TG.Value) end)
     TG:Set(TG.Default)
     Lib.SetFlags[TG.Flag] = function(v) TG:Set(v) end
     return TG
 end
 
--- -- 
---  Button
--- -- 
+-- Button
 function Lib.Sections:Button(Data)
     Data = Data or {}
-    local B = {Window=self.Window, Page=self.Page, Section=self,
-               Name=Data.Name or "Button", Callback=Data.Callback or function() end}
-    local bH = IsMobile and 27 or 20
-
+    local B = {Window=self.Window,Page=self.Page,Section=self,Name=Data.Name or "Button",Callback=Data.Callback or function()end}
+    local bH = IsMobile and 26 or 19
     local btn = INew("TextButton"); btn.Parent = B.Section.Items.content
-    btn.Size = U2(1, 0, 0, bH); btn.Text = B.Name; btn.AutoButtonColor = false
-    btn.FontFace = Lib.Fonts.M; btn.TextSize = IsMobile and 12 or 10
+    btn.Size = U2(1,0,0,bH); btn.Text = B.Name; btn.AutoButtonColor = false
+    btn.FontFace = Font_M; btn.TextSize = IsMobile and 11 or 10
     btn.TextColor3 = T.TextSub; btn.BackgroundColor3 = T.Bg3; btn.BorderSizePixel = 0
-    _crn(btn,4); _stk(btn, T.Border, 1)
-
-    -- inner highlight line at top
-    local btnLine = INew("Frame"); btnLine.Parent = btn
-    btnLine.Size = U2(0.6, 0, 0, 1); btnLine.AnchorPoint = V2(0.5, 0)
-    btnLine.Position = U2(0.5, 0, 0, 0); btnLine.BackgroundColor3 = T.BorderHi
-    btnLine.BackgroundTransparency = 0.5; btnLine.BorderSizePixel = 0
-
-    if not IsMobile then
-        btn.MouseEnter:Connect(function()
-            tw(btn, {BackgroundColor3 = T.Bg5, TextColor3 = T.AccentHi})
-            tw(btnLine, {BackgroundColor3 = T.Accent, BackgroundTransparency = 0})
-        end)
-        btn.MouseLeave:Connect(function()
-            tw(btn, {BackgroundColor3 = T.Bg3, TextColor3 = T.TextSub})
-            tw(btnLine, {BackgroundColor3 = T.BorderHi, BackgroundTransparency = 0.5})
-        end)
-    end
+    crn(btn,4); stk(btn,T.Border,1)
+    btn.MouseEnter:Connect(function() tw(btn,{BackgroundColor3=T.Bg5,TextColor3=T.AccentHi}) end)
+    btn.MouseLeave:Connect(function() tw(btn,{BackgroundColor3=T.Bg3,TextColor3=T.TextSub}) end)
     function B:SetVisibility(b) btn.Visible = b end
     function B:Press()
-        tw(btn, {BackgroundColor3 = T.AccentFaint, TextColor3 = T.Accent})
-        Lib:SafeCall(B.Callback); task.wait(0.12)
-        tw(btn, {BackgroundColor3 = T.Bg3, TextColor3 = T.TextSub})
+        tw(btn,{BackgroundColor3=T.AccentFaint,TextColor3=T.Accent})
+        Lib:SafeCall(B.Callback); task.wait(0.1)
+        tw(btn,{BackgroundColor3=T.Bg3,TextColor3=T.TextSub})
     end
     btn.MouseButton1Down:Connect(function() B:Press() end)
     return B
 end
 
--- -- 
---  Slider
--- -- 
+-- Slider
 function Lib.Sections:Slider(Data)
     Data = Data or {}
-    local SL = {Window=self.Window, Page=self.Page, Section=self,
-                Name=Data.Name or "Slider", Flag=Data.Flag or Lib:_flag(),
-                Min=Data.Min or 0, Max=Data.Max or 100, Default=Data.Default or 0,
-                Decimals=Data.Decimals or 1, Suffix=Data.Suffix or "",
-                Callback=Data.Callback or function() end, Value=0, Sliding=false}
-    local cH = IsMobile and 36 or 28; local tH = IsMobile and 10 or 7
+    local SL = {Window=self.Window,Page=self.Page,Section=self,
+                Name=Data.Name or "Slider",Flag=Data.Flag or Lib:_flag(),
+                Min=Data.Min or 0,Max=Data.Max or 100,Default=Data.Default or 0,
+                Decimals=Data.Decimals or 1,Suffix=Data.Suffix or "",
+                Callback=Data.Callback or function()end,Value=0,Sliding=false}
+    local cH = IsMobile and 34 or 27; local tH = IsMobile and 9 or 6
 
     local wrap = INew("Frame"); wrap.Parent = SL.Section.Items.content
-    wrap.Size = U2(1, 0, 0, cH); wrap.BackgroundTransparency = 1; wrap.BorderSizePixel = 0
+    wrap.Size = U2(1,0,0,cH); wrap.BackgroundTransparency = 1; wrap.BorderSizePixel = 0
 
-    -- top row: name + value
     local top = INew("Frame"); top.Parent = wrap
-    top.Size = U2(1, 0, 0, 13); top.BackgroundTransparency = 1; top.BorderSizePixel = 0
+    top.Size = U2(1,0,0,12); top.BackgroundTransparency = 1; top.BorderSizePixel = 0
 
-    local nameLbl = INew("TextLabel"); nameLbl.Parent = top
-    nameLbl.Size = U2(0, 0, 1, 0); nameLbl.AutomaticSize = Enum.AutomaticSize.X
-    nameLbl.BackgroundTransparency = 1; nameLbl.Text = SL.Name
-    nameLbl.FontFace = Lib.Fonts.R; nameLbl.TextSize = IsMobile and 11 or 10
-    nameLbl.TextColor3 = T.TextSub; nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+    local nl = INew("TextLabel"); nl.Parent = top
+    nl.Size = U2(0,0,1,0); nl.AutomaticSize = Enum.AutomaticSize.X
+    nl.BackgroundTransparency = 1; nl.Text = SL.Name
+    nl.FontFace = Font_R; nl.TextSize = IsMobile and 11 or 10
+    nl.TextColor3 = T.TextSub; nl.TextXAlignment = Enum.TextXAlignment.Left
 
-    local valBox = INew("TextBox"); valBox.Parent = top
-    valBox.AnchorPoint = V2(1, 0); valBox.Position = U2(1, 0, 0, 0)
-    valBox.Size = U2(0, 0, 1, 0); valBox.AutomaticSize = Enum.AutomaticSize.X
-    valBox.BackgroundTransparency = 1; valBox.Text = "0"
-    valBox.FontFace = Lib.Fonts.M; valBox.TextSize = IsMobile and 11 or 10
-    valBox.TextColor3 = T.Accent; valBox.Selectable = false
-    valBox.ClearTextOnFocus = false; valBox.TextXAlignment = Enum.TextXAlignment.Right
+    local vl = INew("TextBox"); vl.Parent = top
+    vl.AnchorPoint = V2(1,0); vl.Position = U2(1,0,0,0)
+    vl.Size = U2(0,0,1,0); vl.AutomaticSize = Enum.AutomaticSize.X
+    vl.BackgroundTransparency = 1; vl.Text = "0"
+    vl.FontFace = Font_M; vl.TextSize = IsMobile and 11 or 10
+    vl.TextColor3 = T.Accent; vl.Selectable = false; vl.ClearTextOnFocus = false
+    vl.TextXAlignment = Enum.TextXAlignment.Right
 
-    -- track
     local track = INew("TextButton"); track.Parent = wrap; track.Text = ""
-    track.AutoButtonColor = false; track.AnchorPoint = V2(0, 1)
-    track.Position = U2(0, 0, 1, 0); track.Size = U2(1, 0, 0, tH)
+    track.AutoButtonColor = false; track.AnchorPoint = V2(0,1)
+    track.Position = U2(0,0,1,0); track.Size = U2(1,0,0,tH)
     track.BackgroundColor3 = T.Bg4; track.BorderSizePixel = 0
-    _crn(track,99); _stk(track, T.Border, 1)
+    crn(track,99); stk(track,T.Border,1)
 
-    -- fill bar with glow
     local fill = INew("Frame"); fill.Parent = track
-    fill.Position = U2(0, 1, 0, 1); fill.Size = U2(0.5, 0, 1, -2)
-    fill.BackgroundColor3 = T.Accent; fill.BorderSizePixel = 0; _crn(fill,99)
-    _stk(fill, T.AccentSoft, 1).Transparency = 0.45
-
-    -- thumb indicator on track
-    local thumb2 = INew("Frame"); thumb2.Parent = track
-    thumb2.Size = U2(0, tH+2, 0, tH+2); thumb2.AnchorPoint = V2(0.5, 0.5)
-    thumb2.Position = U2(0.5, 0, 0.5, 0); thumb2.BackgroundColor3 = T.AccentHi
-    thumb2.BorderSizePixel = 0; _crn(thumb2,99); _stk(thumb2, T.AccentGlow, 1.5).Transparency=0.4
+    fill.Position = U2(0,1,0,1); fill.Size = U2(0.5,0,1,-2)
+    fill.BackgroundColor3 = T.Accent; fill.BorderSizePixel = 0; crn(fill,99)
 
     function SL:Get() return SL.Value end
     function SL:Set(v)
-        SL.Value = clamp(Lib:Round(v, SL.Decimals), SL.Min, SL.Max)
+        SL.Value = math.clamp(Lib:Round(v,SL.Decimals),SL.Min,SL.Max)
         Lib.Flags[SL.Flag] = SL.Value
-        local pct = (SL.Value - SL.Min) / (SL.Max - SL.Min)
-        tw(fill, {Size = U2(pct, -2, 1, -2)}, 0.07)
-        tw(thumb2, {Position = U2(pct, 0, 0.5, 0)}, 0.07)
-        valBox.Text = fmt("%s%s", SL.Value, SL.Suffix)
+        local pct = (SL.Value-SL.Min)/(SL.Max-SL.Min)
+        tw(fill,{Size=U2(pct,-2,1,-2)},0.06)
+        vl.Text = tostring(SL.Value)..SL.Suffix
         fill.Visible = SL.Value > SL.Min
-        Lib:SafeCall(SL.Callback, SL.Value)
+        Lib:SafeCall(SL.Callback,SL.Value)
     end
-    local function getX(i) return (i.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X end
+    local function getX(i) return (i.Position.X-track.AbsolutePosition.X)/track.AbsoluteSize.X end
     track.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-            SL.Sliding = true; SL:Set((SL.Max - SL.Min) * getX(i) + SL.Min)
+        if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+            SL.Sliding=true; SL:Set((SL.Max-SL.Min)*getX(i)+SL.Min)
         end
     end)
     track.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-            SL.Sliding = false
-        end
+        if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then SL.Sliding=false end
     end)
     UIS.InputChanged:Connect(function(i)
         if not SL.Sliding then return end
-        if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then
-            SL:Set((SL.Max - SL.Min) * getX(i) + SL.Min)
+        if i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch then
+            SL:Set((SL.Max-SL.Min)*getX(i)+SL.Min)
         end
     end)
     if SL.Default then SL:Set(SL.Default) end
@@ -1228,222 +967,182 @@ function Lib.Sections:Slider(Data)
     return SL
 end
 
--- -- 
---  Dropdown
--- -- 
+-- Dropdown
 function Lib.Sections:Dropdown(Data)
     Data = Data or {}
-    local DD = {Window=self.Window, Page=self.Page, Section=self,
-                Name=Data.Name or "Dropdown", Flag=Data.Flag or Lib:_flag(),
-                Items=Data.Items or {}, Default=Data.Default or nil,
-                Callback=Data.Callback or function() end,
-                Multi=Data.Multi or false, Options={}, Value={}, IsOpen=false}
-    local bH = IsMobile and 22 or 17
+    local DD = {Window=self.Window,Page=self.Page,Section=self,
+                Name=Data.Name or "Dropdown",Flag=Data.Flag or Lib:_flag(),
+                Items=Data.Items or {},Default=Data.Default,
+                Callback=Data.Callback or function()end,
+                Multi=Data.Multi or false,Options={},Value={},IsOpen=false}
+    local bH = IsMobile and 21 or 16
 
     local wrap = INew("Frame"); wrap.Parent = DD.Section.Items.content
     wrap.BackgroundTransparency = 1; wrap.Size = U2(1,0,0,0)
     wrap.AutomaticSize = Enum.AutomaticSize.Y; wrap.BorderSizePixel = 0
 
-    local nameLbl = INew("TextLabel"); nameLbl.Parent = wrap
-    nameLbl.Size = U2(1,0,0,11); nameLbl.BackgroundTransparency = 1
-    nameLbl.Text = DD.Name; nameLbl.FontFace = Lib.Fonts.R
-    nameLbl.TextSize = IsMobile and 11 or 10; nameLbl.TextColor3 = T.TextSub
-    nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+    local nl = INew("TextLabel"); nl.Parent = wrap
+    nl.Size = U2(1,0,0,11); nl.BackgroundTransparency = 1
+    nl.Text = DD.Name; nl.FontFace = Font_R
+    nl.TextSize = IsMobile and 11 or 10; nl.TextColor3 = T.TextSub
+    nl.TextXAlignment = Enum.TextXAlignment.Left
 
-    local selBtn = INew("TextButton"); selBtn.Parent = wrap; selBtn.Text = ""
-    selBtn.AutoButtonColor = false; selBtn.Position = U2(0,0,0,13)
-    selBtn.Size = U2(1,0,0,bH); selBtn.BackgroundColor3 = T.Bg3; selBtn.BorderSizePixel = 0
-    _crn(selBtn,4); _stk(selBtn, T.Border, 1)
+    local sbtn = INew("TextButton"); sbtn.Parent = wrap; sbtn.Text = ""
+    sbtn.AutoButtonColor = false; sbtn.Position = U2(0,0,0,13)
+    sbtn.Size = U2(1,0,0,bH); sbtn.BackgroundColor3 = T.Bg3; sbtn.BorderSizePixel = 0
+    crn(sbtn,4); stk(sbtn,T.Border,1)
 
-    local selLbl = INew("TextLabel"); selLbl.Parent = selBtn
-    selLbl.AnchorPoint = V2(0,0.5); selLbl.Position = U2(0,7,0.5,0)
-    selLbl.Size = U2(1,-22,0,bH); selLbl.BackgroundTransparency = 1
-    selLbl.Text = ""; selLbl.FontFace = Lib.Fonts.R
-    selLbl.TextSize = IsMobile and 11 or 10; selLbl.TextColor3 = T.TextSub
-    selLbl.TextXAlignment = Enum.TextXAlignment.Left
+    local sl = INew("TextLabel"); sl.Parent = sbtn
+    sl.AnchorPoint = V2(0,0.5); sl.Position = U2(0,7,0.5,0)
+    sl.Size = U2(1,-22,0,bH); sl.BackgroundTransparency = 1
+    sl.Text = "-"; sl.FontFace = Font_R
+    sl.TextSize = IsMobile and 11 or 10; sl.TextColor3 = T.TextSub
+    sl.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- arrow
-    local arrow = INew("TextLabel"); arrow.Parent = selBtn
+    local arrow = INew("TextLabel"); arrow.Parent = sbtn
     arrow.AnchorPoint = V2(1,0.5); arrow.Position = U2(1,-6,0.5,0)
     arrow.Size = U2(0,10,0,10); arrow.BackgroundTransparency = 1
-    arrow.Text = ""; arrow.FontFace = Lib.Fonts.R; arrow.TextSize = 11
+    arrow.Text = "v"; arrow.FontFace = Font_R; arrow.TextSize = 10
     arrow.TextColor3 = T.TextDim
 
-    -- list frame (inline expand)
     local lf = INew("Frame"); lf.Parent = wrap
     lf.Position = U2(0,0,0,13+bH+2); lf.Size = U2(1,0,0,0)
     lf.AutomaticSize = Enum.AutomaticSize.Y; lf.Visible = false
-    lf.BackgroundColor3 = T.Bg3; lf.BackgroundTransparency = 1; lf.BorderSizePixel = 0
-    _crn(lf,4); _pad(lf,3,3,4,4); _vl(lf,2)
-    DD.Items_ = {OptionHolder=lf, Holder=lf}
-
-    if not IsMobile then
-        selBtn.MouseEnter:Connect(function() tw(selBtn, {BackgroundColor3 = T.Bg4}) end)
-        selBtn.MouseLeave:Connect(function() tw(selBtn, {BackgroundColor3 = T.Bg3}) end)
-    end
+    lf.BackgroundColor3 = T.Bg3; lf.BackgroundTransparency = 0; lf.BorderSizePixel = 0
+    crn(lf,4); pad(lf,3,3,4,4); vlist(lf,2)
+    DD.Items_ = {OptionHolder=lf,Holder=lf}
 
     function DD:Get() return DD.Value end
     function DD:SetOpen(bool)
-        DD.IsOpen = bool; lf.Visible = bool; lf.BackgroundTransparency = bool and 0 or 1
-        tw(arrow, {TextColor3 = bool and T.Accent or T.TextDim})
-        _stk(selBtn, bool and T.Accent or T.Border, 1)
+        DD.IsOpen = bool; lf.Visible = bool
+        tw(arrow,{TextColor3=bool and T.Accent or T.TextDim})
         if bool then
-            for _, v in Lib.OpenFrames do if v ~= DD then v:SetOpen(false) end end
+            for _,v in pairs(Lib.OpenFrames) do if v~=DD then v:SetOpen(false) end end
             Lib.OpenFrames[DD] = DD
         else Lib.OpenFrames[DD] = nil end
     end
     function DD:Set(opt)
         if Data.Multi then
-            if type(opt) ~= "table" then return end
-            DD.Value = opt; Lib.Flags[DD.Flag] = opt
-            for _, v in opt do local od = DD.Options[v]; if od then od:Toggle("Active") end end
-            selLbl.Text = #opt > 0 and tconcat(opt, ", ") or ""
+            if type(opt)~="table" then return end
+            DD.Value=opt; Lib.Flags[DD.Flag]=opt
+            for _,v in pairs(opt) do local od=DD.Options[v]; if od then od:Toggle("Active") end end
+            sl.Text = #opt>0 and table.concat(opt,", ") or "-"
         else
             if not DD.Options[opt] then return end
-            DD.Value = opt; Lib.Flags[DD.Flag] = opt
-            for _, v in DD.Options do v:Toggle(v.Name == opt and "Active" or "Inactive") end
-            selLbl.Text = opt
+            DD.Value=opt; Lib.Flags[DD.Flag]=opt
+            for _,v in pairs(DD.Options) do v:Toggle(v.Name==opt and "Active" or "Inactive") end
+            sl.Text = opt
         end
-        Lib:SafeCall(DD.Callback, DD.Value)
+        Lib:SafeCall(DD.Callback,DD.Value)
     end
     function DD:Add(opt)
-        local first = next(DD.Options) == nil
-        local oH = IsMobile and 21 or 16
+        local first = next(DD.Options)==nil
+        local oH = IsMobile and 20 or 15
         local ob = INew("TextButton"); ob.Parent = lf; ob.Text = ""
         ob.AutoButtonColor = false; ob.BackgroundTransparency = 1
-        ob.Size = U2(1, 0, 0, oH); ob.BorderSizePixel = 0; _crn(ob,3)
-
-        -- left accent bar
-        local oBar = INew("Frame"); oBar.Parent = ob; oBar.BackgroundTransparency = 1
-        oBar.Size = U2(0, 2, 0.52, 0); oBar.AnchorPoint = V2(0, 0.5)
-        oBar.Position = U2(0, 2, 0.5, 0); oBar.BackgroundColor3 = T.Accent
-        oBar.BorderSizePixel = 0; _crn(oBar,2)
-
+        ob.Size = U2(1,0,0,oH); ob.BorderSizePixel = 0; crn(ob,3)
+        local obar = INew("Frame"); obar.Parent = ob; obar.BackgroundTransparency = 1
+        obar.Size = U2(0,2,0.5,0); obar.AnchorPoint = V2(0,0.5)
+        obar.Position = U2(0,2,0.5,0); obar.BackgroundColor3 = T.Accent
+        obar.BorderSizePixel = 0; crn(obar,2)
         local otxt = INew("TextLabel"); otxt.Parent = ob
-        otxt.AnchorPoint = V2(0, 0.5); otxt.Position = U2(0, 8, 0.5, 0)
+        otxt.AnchorPoint = V2(0,0.5); otxt.Position = U2(0,8,0.5,0)
         otxt.Size = U2(1,-10,0,oH); otxt.AutomaticSize = Enum.AutomaticSize.X
         otxt.BackgroundTransparency = 1; otxt.Text = opt
-        otxt.FontFace = Lib.Fonts.R; otxt.TextSize = IsMobile and 11 or 10
+        otxt.FontFace = Font_R; otxt.TextSize = IsMobile and 11 or 10
         otxt.TextColor3 = T.TextSub; otxt.TextXAlignment = Enum.TextXAlignment.Left
-
-        local od = {Button=ob, Name=opt, Selected=false, IsFirstOption=first}
+        local od = {Button=ob,Name=opt,Selected=false,IsFirstOption=first}
         function od:Toggle(s)
-            if s == "Active" then
-                tw(oBar, {BackgroundTransparency = 0}); tw(otxt, {TextColor3 = T.Accent})
-                ob.BackgroundTransparency = 0
+            if s=="Active" then
+                tw(obar,{BackgroundTransparency=0}); tw(otxt,{TextColor3=T.Accent}); ob.BackgroundTransparency=0
             else
-                tw(oBar, {BackgroundTransparency = 1}); tw(otxt, {TextColor3 = T.TextSub})
-                ob.BackgroundTransparency = 1
+                tw(obar,{BackgroundTransparency=1}); tw(otxt,{TextColor3=T.TextSub}); ob.BackgroundTransparency=1
             end
-        end
-        if not IsMobile then
-            ob.MouseEnter:Connect(function() if not od.Selected then tw(ob, {BackgroundTransparency=0.5}) end end)
-            ob.MouseLeave:Connect(function() if not od.Selected then tw(ob, {BackgroundTransparency=1}) end end)
         end
         ob.MouseButton1Click:Connect(function()
             if not Data.Multi then
-                for _, v in DD.Options do v:Toggle("Inactive") end
-                od:Toggle("Active"); DD.Value = opt; Lib.Flags[DD.Flag] = opt
-                selLbl.Text = opt; DD:SetOpen(false)
+                for _,v in pairs(DD.Options) do v:Toggle("Inactive") end
+                od:Toggle("Active"); DD.Value=opt; Lib.Flags[DD.Flag]=opt; sl.Text=opt; DD:SetOpen(false)
             else
                 od.Selected = not od.Selected
-                local idx = tfind(DD.Value or {}, opt)
-                if idx then trem(DD.Value, idx); od:Toggle("Inactive")
-                else DD.Value = DD.Value or {}; tins(DD.Value, opt); od:Toggle("Active") end
-                Lib.Flags[DD.Flag] = DD.Value
-                selLbl.Text = #(DD.Value or {}) > 0 and tconcat(DD.Value, ", ") or ""
+                local idx = table.find(DD.Value or {},opt)
+                if idx then table.remove(DD.Value,idx); od:Toggle("Inactive")
+                else DD.Value=DD.Value or {}; table.insert(DD.Value,opt); od:Toggle("Active") end
+                Lib.Flags[DD.Flag]=DD.Value
+                sl.Text = #(DD.Value or {})>0 and table.concat(DD.Value,", ") or "-"
             end
-            Lib:SafeCall(DD.Callback, DD.Value)
+            Lib:SafeCall(DD.Callback,DD.Value)
         end)
         DD.Options[opt] = od; return od
     end
-    function DD:Remove(opt) local od = DD.Options[opt]; if od then od.Button:Destroy(); DD.Options[opt] = nil end end
-    function DD:Refresh(list) for k in DD.Options do DD:Remove(k) end; for _, v in list do DD:Add(v) end end
+    function DD:Remove(opt) local od=DD.Options[opt]; if od then od.Button:Destroy(); DD.Options[opt]=nil end end
+    function DD:Refresh(list) for k in pairs(DD.Options) do DD:Remove(k) end; for _,v in ipairs(list) do DD:Add(v) end end
 
-    selBtn.MouseButton1Click:Connect(function() DD:SetOpen(not DD.IsOpen) end)
-    for _, v in DD.Items do DD:Add(v) end
+    sbtn.MouseButton1Click:Connect(function() DD:SetOpen(not DD.IsOpen) end)
+    for _,v in ipairs(DD.Items) do DD:Add(v) end
     Lib.SetFlags[DD.Flag] = function(v) DD:Set(v) end
     if DD.Default then DD:Set(DD.Default)
-    else for _, v in DD.Options do if v.IsFirstOption then DD:Set(v.Name); break end end end
+    else for _,v in pairs(DD.Options) do if v.IsFirstOption then DD:Set(v.Name); break end end end
     return DD
 end
 
--- -- 
---  Label
--- -- 
+-- Label
 function Lib.Sections:Label(text)
-    local L = {Window=self.Window, Page=self.Page, Section=self, Name=text or ""}
+    local L = {Window=self.Window,Page=self.Page,Section=self}
     local row = INew("Frame"); row.Parent = L.Section.Items.content
-    row.Size = U2(1,0,0, IsMobile and 18 or 14); row.BackgroundTransparency = 1; row.BorderSizePixel = 0
-
+    row.Size = U2(1,0,0, IsMobile and 17 or 13); row.BackgroundTransparency=1; row.BorderSizePixel=0
     local lbl = INew("TextLabel"); lbl.Parent = row
     lbl.Size = U2(0,0,1,0); lbl.AutomaticSize = Enum.AutomaticSize.X
     lbl.BackgroundTransparency = 1; lbl.Text = text or ""
-    lbl.FontFace = Lib.Fonts.R; lbl.TextSize = IsMobile and 11 or 10
+    lbl.FontFace = Font_R; lbl.TextSize = IsMobile and 11 or 10
     lbl.TextColor3 = T.TextSub; lbl.TextXAlignment = Enum.TextXAlignment.Left
-
     local sub = INew("Frame"); sub.Parent = row
     sub.AnchorPoint = V2(1,0.5); sub.Position = U2(1,0,0.5,0)
     sub.Size = U2(0,0,1,0); sub.AutomaticSize = Enum.AutomaticSize.X
     sub.BackgroundTransparency = 1; sub.BorderSizePixel = 0; sub.ZIndex = 2
-    _hl(sub,IsMobile and 6 or 5,Enum.HorizontalAlignment.Right,Enum.VerticalAlignment.Center)
-
+    hlist(sub, IsMobile and 6 or 5, Enum.HorizontalAlignment.Right)
     function L:SetText(t) lbl.Text = tostring(t) end
     function L:SetVisibility(b) row.Visible = b end
     function L:Colorpicker(d)
         d = d or {}
-        return Lib:CreateColorpicker({Parent=sub, Flag=d.Flag or Lib:_flag(),
-            Default=d.Default or FR(205,35,45), Alpha=d.Alpha or 0,
-            Callback=d.Callback or function() end})
+        return Lib:CreateColorpicker({Parent=sub,Flag=d.Flag or Lib:_flag(),
+            Default=d.Default or FR(205,35,45),Alpha=d.Alpha or 0,Callback=d.Callback or function()end})
     end
     function L:Keybind(d)
         d = d or {}
-        return Lib:CreateKeybind({Name=d.Name or "Keybind", Parent=sub, Flag=d.Flag or Lib:_flag(),
-            Default=d.Default or Enum.KeyCode.RightShift, Mode=d.Mode or "Toggle",
-            Callback=d.Callback or function() end})
+        return Lib:CreateKeybind({Name=d.Name or "Keybind",Parent=sub,Flag=d.Flag or Lib:_flag(),
+            Default=d.Default or Enum.KeyCode.RightShift,Mode=d.Mode or "Toggle",Callback=d.Callback or function()end})
     end
     return L
 end
 
--- -- 
---  Textbox
--- -- 
+-- Textbox
 function Lib.Sections:Textbox(Data)
     Data = Data or {}
-    local TX = {Window=self.Window, Page=self.Page, Section=self,
-                Name=Data.Name or "Textbox", Flag=Data.Flag or Lib:_flag(),
-                Default=Data.Default or "", Placeholder=Data.Placeholder or "...",
-                Callback=Data.Callback or function() end,
-                Finished=Data.Finished or false, Value=""}
-    local rH = IsMobile and 24 or 18
-
+    local TX = {Window=self.Window,Page=self.Page,Section=self,
+                Name=Data.Name or "Textbox",Flag=Data.Flag or Lib:_flag(),
+                Default=Data.Default or "",Placeholder=Data.Placeholder or "...",
+                Callback=Data.Callback or function()end,Finished=Data.Finished or false,Value=""}
+    local rH = IsMobile and 23 or 18
     local row = INew("Frame"); row.Parent = TX.Section.Items.content
-    row.Size = U2(1,0,0,rH); row.BackgroundTransparency = 1; row.BorderSizePixel = 0
-
+    row.Size = U2(1,0,0,rH); row.BackgroundTransparency=1; row.BorderSizePixel=0
     local inp = INew("TextBox"); inp.Parent = row
-    inp.Size = U2(0.55, 0, 1, 0); inp.BackgroundColor3 = T.Bg4; inp.BorderSizePixel = 0
-    inp.FontFace = Lib.Fonts.R; inp.TextSize = IsMobile and 11 or 10
+    inp.Size = U2(0.55,0,1,0); inp.BackgroundColor3 = T.Bg4; inp.BorderSizePixel = 0
+    inp.FontFace = Font_R; inp.TextSize = IsMobile and 11 or 10
     inp.TextColor3 = T.Text; inp.PlaceholderColor3 = T.TextDim
     inp.PlaceholderText = TX.Placeholder; inp.ClearTextOnFocus = false
     inp.TextXAlignment = Enum.TextXAlignment.Left
-    _crn(inp,4); _stk(inp, T.Border, 1); _pad(inp,0,0,5,0)
-
-    if not IsMobile then
-        inp.Focused:Connect(function() _stk(inp, T.Accent, 1) end)
-        inp.FocusLost:Connect(function() _stk(inp, T.Border, 1) end)
-    end
-
+    crn(inp,4); stk(inp,T.Border,1); pad(inp,0,0,5,0)
     local nl = INew("TextLabel"); nl.Parent = row
-    nl.AnchorPoint = V2(1, 0.5); nl.Position = U2(1, 0, 0.5, 0)
+    nl.AnchorPoint = V2(1,0.5); nl.Position = U2(1,0,0.5,0)
     nl.Size = U2(0,0,0,11); nl.AutomaticSize = Enum.AutomaticSize.X
-    nl.BackgroundTransparency = 1; nl.Text = TX.Name
-    nl.FontFace = Lib.Fonts.R; nl.TextSize = IsMobile and 11 or 10; nl.TextColor3 = T.TextSub
-
+    nl.BackgroundTransparency=1; nl.Text=TX.Name
+    nl.FontFace=Font_R; nl.TextSize=IsMobile and 11 or 10; nl.TextColor3=T.TextSub
     function TX:Get() return TX.Value end
-    function TX:SetVisibility(b) row.Visible = b end
+    function TX:SetVisibility(b) row.Visible=b end
     function TX:Set(v)
-        TX.Value = v; inp.Text = v; Lib.Flags[TX.Flag] = v
-        Lib:SafeCall(TX.Callback, TX.Value)
+        TX.Value=v; inp.Text=v; Lib.Flags[TX.Flag]=v
+        Lib:SafeCall(TX.Callback,TX.Value)
     end
     if TX.Finished then
         inp.FocusLost:Connect(function(enter) if enter then TX:Set(inp.Text) end end)
@@ -1455,673 +1154,7 @@ function Lib.Sections:Textbox(Data)
     return TX
 end
 
--- -- 
---  Theming system
--- -- 
-function Lib:ChangeTheme(key, color)
-    T[key] = color
-    for _, item in self.ThemeItems do
-        for prop, val in item.Properties do
-            if type(val) == "string" and val == key then
-                pcall(function() item.Item[prop] = color end)
-            elseif type(val) == "function" then
-                pcall(function() item.Item[prop] = val() end)
-            end
-        end
-    end
-end
-function Lib:AddToTheme(inst, props)
-    inst = inst.Instance or inst
-    local td = {Item=inst, Properties=props}
-    for p, v in props do
-        if type(v) == "string" then pcall(function() inst[p] = T[v] end)
-        elseif type(v) == "function" then pcall(function() inst[p] = v() end) end
-    end
-    tins(self.ThemeItems, td); self.ThemeMap[inst] = td
-end
-
--- -- 
---  Config system
--- -- 
-local Http2 = game:GetService("HttpService")
-function Lib:GetConfig()
-    local cfg = {}
-    for flag, val in self.Flags do
-        if type(val) == "table" and val.Key then
-            cfg[flag] = {Key=tostring(val.Key), Mode=val.Mode, Toggled=val.Toggled}
-        elseif type(val) == "table" and val.Color then
-            cfg[flag] = {Color="#"..val.HexValue, Alpha=val.Alpha}
-        else
-            cfg[flag] = val
-        end
-    end
-    return Http2:JSONEncode(cfg)
-end
-function Lib:LoadConfig(data)
-    local ok, d = pcall(function() return Http2:JSONDecode(data) end)
-    if not ok then return false end
-    for flag, val in d do
-        local fn = self.SetFlags[flag]
-        if not fn then continue end
-        if type(val) == "table" and val.Key then fn(val)
-        elseif type(val) == "table" and val.Color then fn(val.Color, val.Alpha)
-        else fn(val) end
-    end
-    return true
-end
-function Lib:SaveConfig(name, folder)
-    folder = folder or "FlowLib"
-    if not isfolder(folder) then makefolder(folder) end
-    writefile(folder.."/"..name..".json", self:GetConfig())
-end
-function Lib:LoadConfigFile(name, folder)
-    folder = folder or "FlowLib"
-    local path = folder.."/"..name..".json"
-    if not isfile(path) then return false end
-    return self:LoadConfig(readfile(path))
-end
-function Lib:DeleteConfig(name, folder)
-    folder = folder or "FlowLib"
-    local path = folder.."/"..name..".json"
-    if isfile(path) then delfile(path) end
-end
-function Lib:ListConfigs(folder)
-    folder = folder or "FlowLib"
-    if not isfolder(folder) then return {} end
-    local list = {}
-    for _, f in listfiles(folder) do
-        local n = f:match("([^/\\]+)%.json$")
-        if n then tins(list, n) end
-    end
-    return list
-end
-
--- -- 
---  ModeratorList
--- -- 
-function Lib:ModeratorList()
-    local ML = {}; local mods = {}
-    local f = INew("Frame"); f.Parent = Lib.Holder
-    f.AnchorPoint = V2(1, 0.5); f.Position = U2(1, -14, 0.5, 0)
-    f.Size = U2(0, 200, 0, 0); f.AutomaticSize = Enum.AutomaticSize.Y
-    f.BackgroundColor3 = T.Bg2; f.BorderSizePixel = 0
-    _crn(f,6); _stk(f, T.Border, 1)
-    mkShadow(f, 22, 4, 0.55); _pad(f,8,8,10,10)
-    makeDraggable(f)
-
-    -- red top line
-    local topLine = INew("Frame"); topLine.Parent = f
-    topLine.Size = U2(1, 0, 0, 1); topLine.BackgroundColor3 = T.Accent
-    topLine.BorderSizePixel = 0
-
-    local title = INew("TextLabel"); title.Parent = f
-    title.Size = U2(0, 0, 0, 12); title.AutomaticSize = Enum.AutomaticSize.X
-    title.BackgroundTransparency = 1; title.Text = "MODERATORS"
-    title.FontFace = Lib.Fonts.B; title.TextSize = 9
-    title.TextColor3 = T.Accent; title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Position = U2(0, 0, 0, 4)
-
-    local sep = INew("Frame"); sep.Parent = f
-    sep.Size = U2(1, 0, 0, 1); sep.Position = U2(0, 0, 0, 20)
-    sep.BackgroundColor3 = T.Border; sep.BorderSizePixel = 0
-
-    local cont = INew("Frame"); cont.Parent = f
-    cont.Position = U2(0, 0, 0, 25); cont.BackgroundTransparency = 1
-    cont.AutomaticSize = Enum.AutomaticSize.XY; cont.BorderSizePixel = 0
-    _vl(cont,4)
-
-    function ML:SetVisibility(b) f.Visible = b end
-    function ML:add_mod(username, role)
-        if mods[username] then ML:remove_mod(username) end
-        role = role or "Moderator"
-        local row = INew("Frame"); row.Parent = cont
-        row.Size = U2(1, 0, 0, 15); row.BackgroundTransparency = 1; row.BorderSizePixel = 0
-
-        local dot = INew("Frame"); dot.Parent = row
-        dot.Size = U2(0, 4, 0, 4); dot.AnchorPoint = V2(0, 0.5)
-        dot.Position = U2(0, 0, 0.5, 0); dot.BackgroundColor3 = T.Accent
-        dot.BorderSizePixel = 0; _crn(dot,99)
-
-        local namelbl = INew("TextLabel"); namelbl.Parent = row
-        namelbl.Position = U2(0, 9, 0, 0); namelbl.Size = U2(0.6, 0, 1, 0)
-        namelbl.BackgroundTransparency = 1; namelbl.Text = username
-        namelbl.FontFace = Lib.Fonts.M; namelbl.TextSize = 11
-        namelbl.TextColor3 = T.Text; namelbl.TextXAlignment = Enum.TextXAlignment.Left
-
-        local rolelbl = INew("TextLabel"); rolelbl.Parent = row
-        rolelbl.AnchorPoint = V2(1, 0.5); rolelbl.Position = U2(1, 0, 0.5, 0)
-        rolelbl.Size = U2(0, 0, 0, 11); rolelbl.AutomaticSize = Enum.AutomaticSize.X
-        rolelbl.BackgroundTransparency = 1; rolelbl.Text = role
-        rolelbl.FontFace = Lib.Fonts.R; rolelbl.TextSize = 10
-        rolelbl.TextColor3 = T.TextSub; rolelbl.TextXAlignment = Enum.TextXAlignment.Right
-
-        local md = {Frame=row, Username=username, Role=role}
-        function md:SetRole(r) role=r; rolelbl.Text=r end
-        mods[username] = md; return md
-    end
-    function ML:remove_mod(username)
-        if mods[username] then mods[username].Frame:Destroy(); mods[username]=nil end
-    end
-    function ML:Get()
-        local t={}; for u,d in mods do tins(t,{username=u,role=d.Role}) end; return t
-    end
-    return ML
-end
-
--- -- 
---  Search bar (inject into sidebar)
--- -- 
-function Lib:AddSearch(Window)
-    local nav = Window.Items.nav
-    local sb = nav.Parent  -- sidebar frame
-
-    local searchWrap = INew("Frame"); searchWrap.Parent = sb
-    searchWrap.AnchorPoint = V2(0, 1); searchWrap.Position = U2(0, 5, 1, -8)
-    searchWrap.Size = U2(1, -10, 0, 22); searchWrap.BackgroundColor3 = T.Bg3
-    searchWrap.BorderSizePixel = 0; _crn(searchWrap,4); _stk(searchWrap, T.Border, 1)
-
-    local searchIcon = INew("TextLabel"); searchIcon.Parent = searchWrap
-    searchIcon.Size = U2(0, 14, 1, 0); searchIcon.BackgroundTransparency = 1
-    searchIcon.Text = ""; searchIcon.FontFace = Lib.Fonts.R
-    searchIcon.TextSize = 13; searchIcon.TextColor3 = T.TextDim
-    searchIcon.Position = U2(0, 3, 0, 0)
-
-    local searchBox = INew("TextBox"); searchBox.Parent = searchWrap
-    searchBox.Position = U2(0, 18, 0, 0); searchBox.Size = U2(1, -20, 1, 0)
-    searchBox.BackgroundTransparency = 1; searchBox.Text = ""
-    searchBox.FontFace = Lib.Fonts.R; searchBox.TextSize = 10
-    searchBox.TextColor3 = T.TextSub; searchBox.PlaceholderColor3 = T.TextDim
-    searchBox.PlaceholderText = "search..."; searchBox.ClearTextOnFocus = false
-    searchBox.TextXAlignment = Enum.TextXAlignment.Left
-
-    -- filter sections by name
-    searchBox:GetPropertyChangedSignal("Text"):Connect(function()
-        local query = searchBox.Text:lower()
-        if query == "" then
-            -- show all pages normally
-            for _, page in Window.Pages do
-                page.Items.page.Visible = page.Active
-            end
-            return
-        end
-        -- show sections that match
-        for _, page in Window.Pages do
-            local hasMatch = false
-            for _, col in page.ColumnsData do
-                for _, sec in col:GetChildren() do
-                    if sec:IsA("Frame") then
-                        local hdr = sec:FindFirstChildOfClass("Frame")
-                        local lbl = hdr and hdr:FindFirstChildOfClass("TextLabel")
-                        if lbl then
-                            local match = lbl.Text:lower():find(query, 1, true)
-                            sec.Visible = match ~= nil
-                            if match then hasMatch = true end
-                        end
-                    end
-                end
-            end
-            if hasMatch then
-                page.Items.page.Visible = true
-                page.Items.page.Parent = Window.Items.content
-            end
-        end
-    end)
-    return searchBox
-end
-
--- -- 
---  Settings page
--- -- 
-function Lib:CreateSettingsPage(Window, KBL, WM, ML)
-    local cols = IsMobile and 1 or 2
-    local SP = Window:Page({Name="Settings", Columns=cols})
-    local s1 = 1; local s2 = IsMobile and 1 or 2
-
-    -- General settings
-    local SS = SP:Section({Name="General", Side=s1})
-    SS:Button({Name="Unload", Callback=function() self:Unload() end})
-    SS:Toggle({Name="Watermark", Flag="_wm", Default=true, Callback=function(v)
-        if WM then WM:SetVisibility(v) end
-    end})
-    SS:Toggle({Name="Keybind List", Flag="_kbl", Default=true, Callback=function(v)
-        if KBL then KBL:SetVisibility(v) end
-    end})
-    SS:Toggle({Name="Moderator List", Flag="_ml", Default=true, Callback=function(v)
-        if ML then ML:SetVisibility(v) end
-    end})
-    SS:Slider({Name="Tween Speed", Flag="_tw", Min=0.05, Max=0.5, Default=0.14, Decimals=0.01, Suffix="s",
-        Callback=function(v) self.TweenTime=v end})
-    SS:Dropdown({Name="Tween Style", Flag="_ts", Items={"Quart","Back","Bounce","Elastic","Linear","Sine","Cubic"},
-        Default="Quart", Callback=function(v)
-            local ok, style = pcall(function() return Enum.EasingStyle[v] end)
-            if ok then self.TweenStyle=style end
-        end})
-
-    -- Theming
-    local TS = SP:Section({Name="Theme", Side=s1})
-    local themeKeys = {"Accent","AccentHi","Text","TextSub","Bg1","Bg2","Bg3","Sidebar","Border"}
-    for _, k in themeKeys do
-        local lbl = TS:Label(k)
-        lbl:Colorpicker({Flag="_theme_"..k, Default=T[k], Callback=function(col)
-            self:ChangeTheme(k, col)
-        end})
-    end
-
-    -- Config
-    local CS = SP:Section({Name="Configs", Side=s2})
-    local configFolder = "FlowLib"
-    local selectedConfig = ""
-
-    local configNameBox = CS:Textbox({Name="Config Name", Placeholder="name...", Callback=function(v)
-        selectedConfig = v
-    end})
-
-    local configDrop = CS:Dropdown({Name="Saved Configs", Flag="_cfgdrop",
-        Items=self:ListConfigs(configFolder), Default=nil,
-        Callback=function(v) selectedConfig=v; configNameBox:Set(v) end})
-
-    CS:Button({Name="Refresh", Callback=function()
-        configDrop:Refresh(self:ListConfigs(configFolder))
-        self:Notification("Refreshed", 2)
-    end})
-    CS:Button({Name="Save", Callback=function()
-        if selectedConfig ~= "" then
-            self:SaveConfig(selectedConfig, configFolder)
-            self:Notification("Saved: "..selectedConfig, 3)
-            configDrop:Refresh(self:ListConfigs(configFolder))
-        else self:Notification("Enter a config name", 2) end
-    end})
-    CS:Button({Name="Load", Callback=function()
-        if selectedConfig ~= "" then
-            if self:LoadConfigFile(selectedConfig, configFolder) then
-                self:Notification("Loaded: "..selectedConfig, 3)
-            else self:Notification("Config not found", 2) end
-        end
-    end})
-    CS:Button({Name="Delete", Callback=function()
-        if selectedConfig ~= "" then
-            self:DeleteConfig(selectedConfig, configFolder)
-            self:Notification("Deleted: "..selectedConfig, 3)
-            configDrop:Refresh(self:ListConfigs(configFolder))
-        end
-    end})
-
-    return SP
-end
-
--- -- 
---  Enhanced KeybindList (override existing)
--- -- 
-function Lib:KeybindList()
-    local KL = {}; Lib.KeyList = KL
-    local f = INew("Frame"); f.Parent = Lib.Holder
-    f.AnchorPoint = V2(0, 0.5); f.Position = U2(0, 10, 0.5, 0)
-    f.BackgroundColor3 = T.Bg2; f.BorderSizePixel = 0
-    f.AutomaticSize = Enum.AutomaticSize.XY
-    _crn(f,6); _stk(f, T.Border, 1)
-    mkShadow(f, 24, 4, 0.55); _pad(f,8,8,10,10)
-
-    -- red top accent
-    local topLine = INew("Frame"); topLine.Parent = f
-    topLine.Size = U2(1, 0, 0, 1); topLine.BackgroundColor3 = T.Accent
-    topLine.BorderSizePixel = 0
-
-    local title = INew("TextLabel"); title.Parent = f
-    title.Size = U2(0, 0, 0, 12); title.AutomaticSize = Enum.AutomaticSize.X
-    title.BackgroundTransparency = 1; title.Text = "KEYBINDS"
-    title.FontFace = Lib.Fonts.B; title.TextSize = 9
-    title.TextColor3 = T.Accent; title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Position = U2(0, 0, 0, 4)
-
-    local sep = INew("Frame"); sep.Parent = f
-    sep.Size = U2(1, 0, 0, 1); sep.Position = U2(0, 0, 0, 20)
-    sep.BackgroundColor3 = T.Border; sep.BorderSizePixel = 0
-
-    local cont = INew("Frame"); cont.Parent = f
-    cont.Position = U2(0, 0, 0, 25); cont.BackgroundTransparency = 1
-    cont.AutomaticSize = Enum.AutomaticSize.XY; cont.BorderSizePixel = 0
-    _vl(cont,3)
-
-    function KL:SetVisibility(b) f.Visible = b end
-    function KL:Add(name, key)
-        local row = INew("Frame"); row.Parent = cont
-        row.Size = U2(0, 0, 0, 13); row.AutomaticSize = Enum.AutomaticSize.X
-        row.BackgroundTransparency = 1; row.BorderSizePixel = 0
-
-        local dot = INew("Frame"); dot.Parent = row
-        dot.Size = U2(0, 3, 0, 3); dot.AnchorPoint = V2(0, 0.5)
-        dot.Position = U2(0, 0, 0.5, 0); dot.BackgroundColor3 = T.Accent
-        dot.BorderSizePixel = 0; _crn(dot,99)
-
-        local lbl = INew("TextLabel"); lbl.Parent = row
-        lbl.Position = U2(0, 8, 0, 0); lbl.Size = U2(0, 0, 1, 0)
-        lbl.AutomaticSize = Enum.AutomaticSize.X; lbl.BackgroundTransparency = 1
-        lbl.FontFace = Lib.Fonts.R; lbl.TextSize = 10
-        lbl.TextColor3 = T.TextSub; lbl.Text = name .. "  [" .. key .. "]"
-        function lbl:SetText(n, k) lbl.Text = n .. "  [" .. k .. "]" end
-        function lbl:SetStatus(b)
-            row.Visible = b
-            tw(dot, {BackgroundColor3 = b and T.Accent or T.TextDim})
-        end
-        return lbl
-    end
-    return KL
-end
-
-
--- -- 
---  Spring animation system
--- -- 
-local Springs = {}
-
-local function createSpring(mass, force, damping, speed)
-    return {
-        mass=mass or 1, force=force or 50,
-        damping=damping or 10, speed=speed or 4,
-        pos=0, vel=0, target=0,
-    }
-end
-
-local function stepSpring(spring, dt)
-    local tension  = spring.force
-    local damping  = spring.damping
-    local accel    = (tension * (spring.target - spring.pos) - damping * spring.vel) / spring.mass
-    spring.vel = spring.vel + accel * dt
-    spring.pos = spring.pos + spring.vel * dt
-    return spring.pos
-end
-
--- Animate a numeric property with spring physics
-function Lib:SpringTween(obj, prop, target, mass, force, damping)
-    local spring = createSpring(mass or 1, force or 60, damping or 12)
-    spring.pos = obj[prop]; spring.target = target
-    local conn
-    conn = RS.Heartbeat:Connect(function(dt)
-        local val = stepSpring(spring, dt * 4)
-        pcall(function() obj[prop] = val end)
-        if math.abs(spring.target - spring.pos) < 0.001 and math.abs(spring.vel) < 0.001 then
-            pcall(function() obj[prop] = target end)
-            conn:Disconnect()
-        end
-    end)
-    return conn
-end
-
--- Bounce scale animation (for button press feedback)
-function Lib:BounceScale(frame, intensity)
-    intensity = intensity or 0.06
-    local orig = frame.Size
-    local sx = orig.X.Scale; local sy = orig.Y.Scale
-    local ox = orig.X.Offset; local oy = orig.Y.Offset
-    -- shrink
-    tw(frame, {Size=U2(sx*(1-intensity), ox, sy*(1-intensity), oy)}, 0.08, Enum.EasingStyle.Quart)
-    task.delay(0.09, function()
-        -- overshoot
-        tw(frame, {Size=U2(sx*(1+intensity*0.5), ox, sy*(1+intensity*0.5), oy)}, 0.1, Enum.EasingStyle.Back)
-        task.delay(0.12, function()
-            -- settle
-            tw(frame, {Size=orig}, 0.1, Enum.EasingStyle.Quart)
-        end)
-    end)
-end
-
--- Slide in from direction animation
-function Lib:SlideIn(frame, direction, distance, duration)
-    direction = direction or right  -- right, left, up, down
-    distance  = distance or 30
-    duration  = duration or 0.2
-    local origPos = frame.Position
-    local startPos
-    if direction == right then
-        startPos = U2(origPos.X.Scale, origPos.X.Offset + distance, origPos.Y.Scale, origPos.Y.Offset)
-    elseif direction == left then
-        startPos = U2(origPos.X.Scale, origPos.X.Offset - distance, origPos.Y.Scale, origPos.Y.Offset)
-    elseif direction == down then
-        startPos = U2(origPos.X.Scale, origPos.X.Offset, origPos.Y.Scale, origPos.Y.Offset + distance)
-    else
-        startPos = U2(origPos.X.Scale, origPos.X.Offset, origPos.Y.Scale, origPos.Y.Offset - distance)
-    end
-    frame.Position = startPos
-    tw(frame, {Position=origPos}, duration, Enum.EasingStyle.Back)
-end
-
--- Pulse glow on a UIStroke
-function Lib:PulseGlow(stroke, col1, col2, duration)
-    col1 = col1 or T.Accent; col2 = col2 or T.AccentHi
-    duration = duration or 0.6
-    local running = true
-    task.spawn(function()
-        while running do
-            tw(stroke, {Color=col2}, duration*0.5)
-            task.wait(duration*0.5)
-            tw(stroke, {Color=col1}, duration*0.5)
-            task.wait(duration*0.5)
-        end
-    end)
-    return function() running=false; stroke.Color=col1 end  -- stop fn
-end
-
--- Fade in with upward drift
-function Lib:FadeInDrift(frame, distance, duration)
-    distance = distance or 8; duration = duration or 0.2
-    local op = frame.Position
-    frame.Position = U2(op.X.Scale, op.X.Offset, op.Y.Scale, op.Y.Offset + distance)
-    frame.BackgroundTransparency = 1
-    tw(frame, {Position=op, BackgroundTransparency=0}, duration, Enum.EasingStyle.Quart)
-end
-
--- Ripple effect on click (draws expanding circle)
-function Lib:Ripple(parent, x, y)
-    local rip = INew(Frame); rip.Parent = parent
-    rip.AnchorPoint = V2(0.5, 0.5); rip.Position = U2(0, x, 0, y)
-    rip.Size = U2(0, 0, 0, 0); rip.BackgroundColor3 = T.Accent
-    rip.BackgroundTransparency = 0.6; rip.BorderSizePixel = 0
-    rip.ZIndex = (parent.ZIndex or 1) + 5; _crn(rip,99)
-    local sz = math.max(parent.AbsoluteSize.X, parent.AbsoluteSize.Y) * 2
-    tw(rip, {Size=U2(0,sz,0,sz), BackgroundTransparency=1}, 0.4, Enum.EasingStyle.Quart)
-    game:GetService(Debris):AddItem(rip, 0.5)
-end
-
--- -- 
---  Separator element
--- -- 
-function Lib.Sections:Separator(label)
-    local row = INew(Frame); row.Parent = self.Items.content
-    row.Size = U2(1, 0, 0, IsMobile and 18 or 14)
-    row.BackgroundTransparency = 1; row.BorderSizePixel = 0
-
-    local line1 = INew(Frame); line1.Parent = row
-    line1.Size = U2(0.35, 0, 0, 1); line1.AnchorPoint = V2(0, 0.5)
-    line1.Position = U2(0, 0, 0.5, 0); line1.BackgroundColor3 = T.Border; line1.BorderSizePixel = 0
-
-    if label and label ~=  then
-        local lbl = INew(TextLabel); lbl.Parent = row
-        lbl.AnchorPoint = V2(0.5, 0.5); lbl.Position = U2(0.5, 0, 0.5, 0)
-        lbl.Size = U2(0, 0, 0, 10); lbl.AutomaticSize = Enum.AutomaticSize.X
-        lbl.BackgroundTransparency = 1; lbl.Text = label
-        lbl.FontFace = Lib.Fonts.R; lbl.TextSize = 9
-        lbl.TextColor3 = T.TextFaint
-        local line2 = INew(Frame); line2.Parent = row
-        line2.Size = U2(0.35, 0, 0, 1); line2.AnchorPoint = V2(1, 0.5)
-        line2.Position = U2(1, 0, 0.5, 0); line2.BackgroundColor3 = T.Border; line2.BorderSizePixel = 0
-    else
-        line1.Size = U2(1, 0, 0, 1)
-    end
-    return row
-end
-
--- -- 
---  Toggle group (radio buttons - only one can be on)
--- -- 
-function Lib.Sections:ToggleGroup(items, default, callback)
-    local group = {}; local current = default
-    for _, item in items do
-        local tog = self:Toggle({Name=item, Default=(item==default), Callback=function(v)
-            if v then
-                current = item
-                for k, t in group do
-                    if k ~= item then t:Set(false) end
-                end
-                if callback then callback(item) end
-            else
-                -- prevent turning off without another selection
-                if current == item then group[item]:Set(true) end
-            end
-        end})
-        group[item] = tog
-    end
-    return group
-end
-
-
--- -- 
---  Tooltip system
--- -- 
-local tooltipFrame, tooltipText
-local function ensureTooltip()
-    if tooltipFrame then return end
-    tooltipFrame = INew('Frame'); tooltipFrame.Parent = Lib.Holder
-    tooltipFrame.Size = U2(0,0,0,20); tooltipFrame.AutomaticSize = Enum.AutomaticSize.X
-    tooltipFrame.BackgroundColor3 = T.Bg4; tooltipFrame.BorderSizePixel = 0
-    tooltipFrame.Visible = false; tooltipFrame.ZIndex = 20; _crn(tooltipFrame,4)
-    _stk(tooltipFrame, T.Border, 1); _pad(tooltipFrame,0,0,7,7)
-    tooltipText = INew('TextLabel'); tooltipText.Parent = tooltipFrame
-    tooltipText.Size = U2(0,0,1,0); tooltipText.AutomaticSize = Enum.AutomaticSize.X
-    tooltipText.BackgroundTransparency = 1; tooltipText.Text = ''
-    tooltipText.FontFace = Lib.Fonts.R; tooltipText.TextSize = 10
-    tooltipText.TextColor3 = T.TextSub; tooltipText.ZIndex = 21
-end
-
-function Lib:AttachTooltip(frame, text)
-    if IsMobile then return end
-    ensureTooltip()
-    frame = frame.Instance or frame
-    frame.MouseEnter:Connect(function()
-        tooltipText.Text = text
-        tooltipFrame.Visible = true
-    end)
-    frame.MouseLeave:Connect(function()
-        tooltipFrame.Visible = false
-    end)
-    RS.RenderStepped:Connect(function()
-        if not tooltipFrame.Visible then return end
-        local mp = Lib:MousePos()
-        tooltipFrame.Position = U2(0, mp.X + 12, 0, mp.Y - 24)
-    end)
-end
-
--- -- 
---  Progress bar element
--- -- 
-function Lib.Sections:ProgressBar(Data)
-    Data = Data or {}
-    local PB = {Window=self.Window, Page=self.Page, Section=self,
-                Name=Data.Name or Progress, Value=Data.Default or 0,
-                Max=Data.Max or 100, Color=Data.Color or T.Accent}
-    local pH = IsMobile and 9 or 7
-
-    local wrap = INew('Frame'); wrap.Parent = PB.Section.Items.content
-    wrap.Size = U2(1,0,0, IsMobile and 28 or 22); wrap.BackgroundTransparency=1; wrap.BorderSizePixel=0
-
-    local nl = INew('TextLabel'); nl.Parent = wrap
-    nl.Size = U2(0,0,0,11); nl.AutomaticSize=Enum.AutomaticSize.X
-    nl.BackgroundTransparency=1; nl.Text=PB.Name
-    nl.FontFace=Lib.Fonts.R; nl.TextSize=IsMobile and 11 or 10; nl.TextColor3=T.TextSub
-    nl.TextXAlignment=Enum.TextXAlignment.Left
-
-    local valLbl = INew('TextLabel'); valLbl.Parent=wrap
-    valLbl.AnchorPoint=V2(1,0); valLbl.Position=U2(1,0,0,0)
-    valLbl.Size=U2(0,0,0,11); valLbl.AutomaticSize=Enum.AutomaticSize.X
-    valLbl.BackgroundTransparency=1; valLbl.Text='0%'
-    valLbl.FontFace=Lib.Fonts.M; valLbl.TextSize=IsMobile and 11 or 10
-    valLbl.TextColor3=T.Accent; valLbl.TextXAlignment=Enum.TextXAlignment.Right
-
-    local track = INew('Frame'); track.Parent=wrap
-    track.AnchorPoint=V2(0,1); track.Position=U2(0,0,1,0)
-    track.Size=U2(1,0,0,pH); track.BackgroundColor3=T.Bg4; track.BorderSizePixel=0
-    _crn(track,99); _stk(track,T.Border,1)
-
-    local fill = INew('Frame'); fill.Parent=track
-    fill.Position=U2(0,1,0,1); fill.Size=U2(0,-2,1,-2)
-    fill.BackgroundColor3=PB.Color; fill.BorderSizePixel=0; _crn(fill,99)
-    _stk(fill, T.AccentSoft, 1).Transparency = 0.5
-
-    function PB:Set(v)
-        PB.Value = clamp(v, 0, PB.Max)
-        local pct = PB.Value / PB.Max
-        tw(fill, {Size=U2(pct,-2,1,-2)}, 0.12)
-        valLbl.Text = fmt('%d%%', math.floor(pct*100))
-        fill.Visible = PB.Value > 0
-    end
-    function PB:SetColor(col) PB.Color=col; tw(fill,{BackgroundColor3=col}) end
-    PB:Set(PB.Value)
-    return PB
-end
-
--- -- 
---  Color tag label  (name + colored badge)
--- -- 
-function Lib.Sections:ColorTag(Data)
-    Data = Data or {}
-    local row = INew('Frame'); row.Parent = self.Items.content
-    row.Size = U2(1,0,0, IsMobile and 20 or 16); row.BackgroundTransparency=1; row.BorderSizePixel=0
-
-    local badge = INew('Frame'); badge.Parent=row
-    badge.Size=U2(0, IsMobile and 10 or 8, 0, IsMobile and 10 or 8)
-    badge.AnchorPoint=V2(0,0.5); badge.Position=U2(0,0,0.5,0)
-    badge.BackgroundColor3 = Data.Color or T.Accent; badge.BorderSizePixel=0; _crn(badge,99)
-
-    local lbl = INew('TextLabel'); lbl.Parent=row
-    lbl.Position=U2(0, IsMobile and 15 or 12, 0, 0)
-    lbl.Size=U2(1,-14,1,0); lbl.BackgroundTransparency=1
-    lbl.Text=Data.Name or ''; lbl.FontFace=Lib.Fonts.R
-    lbl.TextSize=IsMobile and 11 or 10; lbl.TextColor3=T.TextSub
-    lbl.TextXAlignment=Enum.TextXAlignment.Left
-
-    local valLbl = INew('TextLabel'); valLbl.Parent=row
-    valLbl.AnchorPoint=V2(1,0.5); valLbl.Position=U2(1,0,0.5,0)
-    valLbl.Size=U2(0,0,0,10); valLbl.AutomaticSize=Enum.AutomaticSize.X
-    valLbl.BackgroundTransparency=1; valLbl.Text=Data.Value or ''
-    valLbl.FontFace=Lib.Fonts.M; valLbl.TextSize=IsMobile and 11 or 10
-    valLbl.TextColor3=Data.Color or T.Accent
-
-    local CT = {}
-    function CT:Set(name, value, color)
-        if name  then lbl.Text=tostring(name) end
-        if value then valLbl.Text=tostring(value) end
-        if color then badge.BackgroundColor3=color; valLbl.TextColor3=color end
-    end
-    function CT:SetVisibility(b) row.Visible=b end
-    return CT
-end
-
--- -- 
---  Input validator helpers
--- -- 
-function Lib:IsValidHex(str)
-    str = str:gsub('#','')
-    return #str == 6 and str:match('^%x+$') ~= nil
-end
-function Lib:HexToColor(hex)
-    hex = hex:gsub('#','')
-    if not self:IsValidHex(hex) then return FR(255,255,255) end
-    local r = tonumber(hex:sub(1,2),16)/255
-    local g = tonumber(hex:sub(3,4),16)/255
-    local b = tonumber(hex:sub(5,6),16)/255
-    return FR(r*255, g*255, b*255)
-end
-function Lib:ColorToHex(color)
-    return fmt('%02X%02X%02X',
-        math.floor(color.R*255),
-        math.floor(color.G*255),
-        math.floor(color.B*255))
-end
-
--- -- 
---  Version info
--- -- 
-Lib.Version = 'FlowLib v3.0'
-Lib.Author  = 'zerohub.fun'
-Lib.Build   = '2025.03'
+Lib.Version = "FlowLib v4.0"
+Lib.Author = "zerohub.fun"
 
 return Lib
