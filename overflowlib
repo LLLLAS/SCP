@@ -138,22 +138,12 @@ local function makeSpringDrag(frame,handle)
         local ny=clamp(sp.Y.Offset+d.Y,0,ps.Y-frame.AbsoluteSize.Y)
         frame.Position=U2(0,nx,0,ny)
 
-        -- tilt based on velocity
-        local tiltX=clamp(velX*0.003,-3,3)
-        local tiltY=clamp(velY*0.002,-2,2)
-        -- we cant do 3d rotation in roblox GUI but we fake it with size
-        pcall(function()
-            frame.Size=U2(0,frame.AbsoluteSize.X+abs(velX)*0.01,0,frame.AbsoluteSize.Y+abs(velY)*0.008)
-        end)
+        -- no size stretching
     end)
 
     UIS.InputEnded:Connect(function(i)
         if i.UserInputType~=Enum.UserInputType.MouseButton1 and i.UserInputType~=Enum.UserInputType.Touch then return end
         dragging=false
-        -- spring settle back to original size
-        local WW=IsMobile and math.round(clamp(Cam.ViewportSize.X-10,320,640)) or 740
-        local WH=IsMobile and math.round(clamp(Cam.ViewportSize.Y-40,340,490)) or 490
-        twBack(frame,{Size=U2(0,WW,0,WH)},0.35)
     end)
 end
 
