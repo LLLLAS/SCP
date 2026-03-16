@@ -767,18 +767,21 @@ end
 
 Library.Watermark = function(self, Name)
     local Watermark={}; local Items={}
-    local wPos=IsMobile and U2(0.5,0,0,60) or U2(0.5,0,0,10)
+    -- AnchorPoint=V2(0,0) so MakeDraggable works correctly
     Items["Watermark"]=Instances:Create("Frame",{
-        Parent=Library.Holder.Instance,Name="\0",AnchorPoint=V2(0.5,0),
-        Position=wPos,Size=U2(0,180,0,24),BorderSizePixel=0,ZIndex=5,BackgroundColor3=T.Surface})
+        Parent=Library.Holder.Instance,Name="\0",AnchorPoint=V2(0,0),
+        Position=U2(0,10,0,10),Size=U2(0,180,0,24),BorderSizePixel=0,ZIndex=5,BackgroundColor3=T.Surface})
     Corner(Items["Watermark"].Instance,4); Stroke(Items["Watermark"].Instance,T.Border,1)
+    Items["Watermark"]:MakeDraggable()
     local acLine=Instances:Create("Frame",{Parent=Items["Watermark"].Instance,Name="\0",Size=U2(0,3,0.6,0),AnchorPoint=V2(0,0.5),Position=U2(0,6,0.5,0),BorderSizePixel=0,BackgroundColor3=T.Accent})
     Corner(acLine.Instance,2); acLine:AddToTheme({BackgroundColor3="Accent"})
     Items["Text"]=Instances:Create("TextLabel",{Parent=Items["Watermark"].Instance,Name="\0",FontFace=Library.Font,TextColor3=T.Text,Text=Name,AnchorPoint=V2(0,0.5),Size=U2(1,-22,0,12),BackgroundTransparency=1,Position=U2(0,16,0.5,0),BorderSizePixel=0,ZIndex=5,AutomaticSize=Enum.AutomaticSize.X,TextSize=11,TextXAlignment=Enum.TextXAlignment.Left,BackgroundColor3=FromRGB(255,255,255)})
     Items["Text"]:AddToTheme({TextColor3="Text"})
     function Watermark:SetText(Text)
         Items["Text"].Instance.Text=tostring(Text)
-        Items["Watermark"]:Tween(nil,{Size=U2(0,Items["Text"].Instance.TextBounds.X+28,0,24)})
+        task.defer(function()
+            Items["Watermark"]:Tween(nil,{Size=U2(0,Items["Text"].Instance.TextBounds.X+28,0,24)})
+        end)
     end
     function Watermark:SetVisibility(Bool) Items["Watermark"].Instance.Visible=Bool end
     Watermark:SetText(Name); return Watermark
@@ -843,32 +846,46 @@ Library.ModeratorList = function(self)
 end
 
 Library.Notification = function(self, Name, Duration)
+    Duration = Duration or 3
     local Items={}
-    Items["Frame"]=Instances:Create("Frame",{Parent=self.NotifHolder.Instance,Name="\0",Size=U2(0,20,0,20),BorderSizePixel=0,AutomaticSize=Enum.AutomaticSize.XY,BackgroundColor3=T.Surface})
-    Corner(Items["Frame"].Instance,4); Stroke(Items["Frame"].Instance,T.Border,1)
-    local acBar=Instances:Create("Frame",{Parent=Items["Frame"].Instance,Name="\0",Size=U2(0,3,0.7,0),AnchorPoint=V2(0,0.5),Position=U2(0,7,0.5,0),BorderSizePixel=0,BackgroundColor3=T.Accent})
+    Items["Frame"]=Instances:Create("Frame",{Parent=self.NotifHolder.Instance,Name="\0",Size=U2(0,260,0,38),BorderSizePixel=0,BackgroundColor3=T.Surface})
+    Corner(Items["Frame"].Instance,5); Stroke(Items["Frame"].Instance,T.Border,1)
+
+    -- top red accent line (animates in)
+    local topLine=Instances:Create("Frame",{Parent=Items["Frame"].Instance,Name="\0",Size=U2(0,0,0,1),BorderSizePixel=0,BackgroundColor3=T.Accent})
+    topLine:AddToTheme({BackgroundColor3="Accent"})
+
+    local acBar=Instances:Create("Frame",{Parent=Items["Frame"].Instance,Name="\0",Size=U2(0,3,0,-10),AnchorPoint=V2(0,0.5),Position=U2(0,7,0.5,0),BorderSizePixel=0,BackgroundColor3=T.Accent})
     Corner(acBar.Instance,2); acBar:AddToTheme({BackgroundColor3="Accent"})
+
     Pad(Items["Frame"].Instance,7,7,18,10)
-    Items["Text"]=Instances:Create("TextLabel",{Parent=Items["Frame"].Instance,Name="\0",FontFace=Library.Font,TextColor3=T.Text,Text=Name,Size=U2(0,0,0,14),BackgroundTransparency=1,TextXAlignment=Enum.TextXAlignment.Left,BorderSizePixel=0,AutomaticSize=Enum.AutomaticSize.XY,TextSize=IsMobile and 13 or 11,BackgroundColor3=FromRGB(255,255,255)})
+    Items["Text"]=Instances:Create("TextLabel",{Parent=Items["Frame"].Instance,Name="\0",FontFace=Library.Font,TextColor3=T.Text,Text=Name,Size=U2(1,0,0,16),BackgroundTransparency=1,TextXAlignment=Enum.TextXAlignment.Left,BorderSizePixel=0,TextSize=IsMobile and 13 or 11,BackgroundColor3=FromRGB(255,255,255)})
     Items["Text"]:AddToTheme({TextColor3="Text"})
-    local sz=Items["Frame"].Instance.AbsoluteSize
-    for _,v in Items do
-        if v.Instance:IsA("Frame") then v.Instance.BackgroundTransparency=1
-        elseif v.Instance:IsA("TextLabel") then v.Instance.TextTransparency=1 end
-    end
-    Items["Frame"].Instance.AutomaticSize=Enum.AutomaticSize.None
+
+    -- progress bar at bottom
+    local prog=Instances:Create("Frame",{Parent=Items["Frame"].Instance,Name="\0",AnchorPoint=V2(0,1),Position=U2(0,0,1,0),Size=U2(1,0,0,2),BorderSizePixel=0,BackgroundColor3=T.Accent})
+    prog:AddToTheme({BackgroundColor3="Accent"})
+
+    -- fade in
+    Items["Frame"].Instance.BackgroundTransparency=1
+    Items["Text"].Instance.TextTransparency=1
+    acBar.Instance.Size=U2(0,3,0,0)
+
     Library:Thread(function()
-        for _,v in Items do
-            if v.Instance:IsA("Frame") then v:Tween(nil,{BackgroundTransparency=0})
-            elseif v.Instance:IsA("TextLabel") then v:Tween(nil,{TextTransparency=0}) end
-        end
-        Items["Frame"]:Tween(nil,{Size=U2(0,sz.X,0,sz.Y)})
-        task.delay(Duration+0.1,function()
-            for _,v in Items do
-                if v.Instance:IsA("Frame") then v:Tween(nil,{BackgroundTransparency=1})
-                elseif v.Instance:IsA("TextLabel") then v:Tween(nil,{TextTransparency=1}) end
-            end
-            Items["Frame"]:Tween(nil,{Size=U2(0,0,0,0)}); task.wait(0.5); Items["Frame"]:Clean()
+        task.wait(0.05)
+        Items["Frame"]:Tween(nil,{BackgroundTransparency=0})
+        Items["Text"]:Tween(nil,{TextTransparency=0})
+        acBar:Tween(TweenInfo.new(0.3,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=U2(0,3,0.7,0)})
+        topLine:Tween(TweenInfo.new(0.4,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Size=U2(1,0,0,1)})
+
+        -- progress shrink
+        task.wait(0.3)
+        prog:Tween(TweenInfo.new(Duration,Enum.EasingStyle.Linear,Enum.EasingDirection.Out),{Size=U2(0,0,0,2)})
+
+        task.delay(Duration,function()
+            Items["Frame"]:Tween(TweenInfo.new(0.2,Enum.EasingStyle.Quart,Enum.EasingDirection.In),{BackgroundTransparency=1,Size=U2(0,260,0,0)})
+            Items["Text"]:Tween(nil,{TextTransparency=1})
+            task.wait(0.25); Items["Frame"]:Clean()
         end)
     end)
 end
