@@ -1,25 +1,22 @@
 --[[
-    ZeroHub UI Library v2
-    Style: Sidebar nav, pill toggles, dark theme, green accent
-    
+    FlowLib v1.0
+    Design: Sidebar nav, pill toggles, red/black accent
+    API: Same as ZeroHub v3
+
     Usage:
-        local Library = loadstring(game:HttpGet("YOUR_URL"))()
-        local Window = Library:Window({ Name = "ZeroHub" })
-        local Page = Window:Page({ Name = "Combat" })
-        local Section = Page:Section({ Name = "Aimbot" })
-        Section:Toggle({ Name = "Silent Aim", Flag = "sa", Default = false, Callback = function(v) end })
-        Section:Slider({ Name = "FOV", Flag = "fov", Min = 1, Max = 360, Default = 90, Suffix = "°", Callback = function(v) end })
-        Section:Dropdown({ Name = "Part", Flag = "part", Items = {"Head","HRP"}, Default = "Head", Callback = function(v) end })
+        local Library = loadstring(game:HttpGet("URL"))()
+        local Window  = Library:Window({ Name = "Script" })
+        local Page    = Window:Page({ Name = "Combat" })
+        local Section = Page:Section({ Name = "Aimbot", Side = 1 })
+        local toggle  = Section:Toggle({ Name = "Silent Aim", Default = false, Callback = function(v) end })
+        local cp      = toggle:Colorpicker({ Default = Color3.fromRGB(255,50,50) })
+        local kb      = toggle:Keybind({ Default = Enum.KeyCode.E, Mode = "Toggle" })
+        Section:Slider({ Name = "FOV", Min = 1, Max = 360, Default = 90, Callback = function(v) end })
+        Section:Dropdown({ Name = "Part", Items = {"Head","HRP"}, Default = "Head", Callback = function(v) end })
         Section:Button({ Name = "Do Thing", Callback = function() end })
-        Section:Textbox({ Name = "Tag", Flag = "tag", Placeholder = "...", Callback = function(v) end })
+        Section:Textbox({ Name = "Tag", Placeholder = "...", Callback = function(v) end })
         local lbl = Section:Label("Status: idle")
         lbl:SetText("active")
-        local t = Section:Toggle({ Name = "Color", Flag = "ct" })
-        local cp = t:Colorpicker({ Flag = "ct_col", Default = Color3.fromRGB(64,208,128) })
-        local kb = t:Keybind({ Flag = "ct_kb", Default = Enum.KeyCode.F })
-        local WM  = Library:Watermark("ZeroHub v2")
-        local KBL = Library:KeybindList()
-        Library:CreateSettingsPage(Window, KBL, WM)
         Library:Notification("Loaded!", 3)
 ]]
 
@@ -31,1470 +28,1462 @@ local TweenService     = game:GetService("TweenService")
 
 local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
-local function MakeLongPress(instance, callback)
-    local holdStart, holdConn, moved
-    instance.InputBegan:Connect(function(i)
-        if i.UserInputType ~= Enum.UserInputType.Touch then return end
-        moved = false; holdStart = tick()
-        holdConn = RunService.RenderStepped:Connect(function()
-            if tick() - holdStart >= 0.45 and not moved then
-                if holdConn then holdConn:Disconnect(); holdConn = nil end
-                callback()
-            end
-        end)
-    end)
-    instance.InputEnded:Connect(function(i)
-        if i.UserInputType ~= Enum.UserInputType.Touch then return end
-        if holdConn then holdConn:Disconnect(); holdConn = nil end
-    end)
-    instance.InputChanged:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.Touch then
-            moved = true
-            if holdConn then holdConn:Disconnect(); holdConn = nil end
-        end
-    end)
-end
-
--- ─── Theme ────────────────────────────────────────────────────────────────────
-local T = {
-    Background  = Color3.fromRGB(10, 10, 18),
-    Surface     = Color3.fromRGB(16, 16, 26),
-    Surface2    = Color3.fromRGB(20, 20, 32),
-    Surface3    = Color3.fromRGB(26, 26, 40),
-    Sidebar     = Color3.fromRGB(8, 8, 14),
-    Accent      = Color3.fromRGB(64, 208, 128),
-    AccentDark  = Color3.fromRGB(32, 140, 80),
-    AccentDim   = Color3.fromRGB(20, 60, 36),
-    Text        = Color3.fromRGB(220, 225, 230),
-    TextMuted   = Color3.fromRGB(100, 110, 125),
-    TextDim     = Color3.fromRGB(55, 60, 72),
-    Border      = Color3.fromRGB(30, 32, 48),
-    BorderLight = Color3.fromRGB(40, 44, 62),
-    TopBar      = Color3.fromRGB(12, 12, 20),
-}
-
--- ─── Library core ─────────────────────────────────────────────────────────────
-local Library = {
-    Theme = T, Flags = {}, SetFlags = {}, Connections = {}, Threads = {},
-    ThemeItems = {}, ThemeMap = {}, OpenFrames = {},
+-- ─── Library core ────────────────────────────────────────────────────────────
+local Library
+Library = {
+    Theme       = {},
     MenuKeybind = tostring(Enum.KeyCode.RightControl),
-    Tween = { Time = 0.18, Style = Enum.EasingStyle.Quart, Direction = Enum.EasingDirection.Out },
-    FadeSpeed = 0.12,
-    Folders = { Directory = "ZeroHub", Configs = "ZeroHub/Configs" },
-    UnnamedFlags = 0, UnnamedConnections = 0,
-    Font = nil, Fonts = {}, IsMobile = IsMobile,
-    Holder = nil, NotifHolder = nil, UnusedHolder = nil, KeyList = nil,
-    CopiedColor = nil,
-    Pages = {}, Sections = {},
+    Flags       = {},
+    Tween       = { Time = 0.15, Style = Enum.EasingStyle.Quart, Direction = Enum.EasingDirection.Out },
+    FadeSpeed   = 0.12,
+    Folders     = { Directory = "FlowLib", Configs = "FlowLib/Configs" },
+    Pages = {}, Sections = {}, Connections = {}, Threads = {},
+    ThemeMap = {}, ThemeItems = {}, OpenFrames = {}, SetFlags = {},
+    UnnamedConnections = 0, UnnamedFlags = 0,
+    Holder = nil, NotifHolder = nil, UnusedHolder = nil,
+    Font = nil, CopiedColor = nil, Fonts = {}, IsMobile = IsMobile,
 }
 Library.__index = Library
 Library.Sections.__index = Library.Sections
-Library.Pages.__index = Library.Pages
+Library.Pages.__index    = Library.Pages
 
 gethui = gethui or function() return game:GetService("CoreGui") end
+
 local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
-local I = Instance.new
-local V2 = Vector2.new
-local U2 = UDim2.new
-local UD = UDim.new
-local RGB = Color3.fromRGB
-local HSV = Color3.fromHSV
-local HEX = Color3.fromHex
-local CS  = ColorSequence.new
-local CSK = ColorSequenceKeypoint.new
-local NS  = NumberSequence.new
-local NSK = NumberSequenceKeypoint.new
+local Camera      = workspace.CurrentCamera
+local Mouse       = LocalPlayer:GetMouse()
+
+local FromRGB  = Color3.fromRGB
+local FromHSV  = Color3.fromHSV
+local FromHex  = Color3.fromHex
+local RGBSeq   = ColorSequence.new
+local RGBSeqKP = ColorSequenceKeypoint.new
+local NumSeq   = NumberSequence.new
+local NumSeqKP = NumberSequenceKeypoint.new
+local U2       = UDim2.new
+local UD       = UDim.new
+local V2       = Vector2.new
+local Clamp    = math.clamp
+local Floor    = math.floor
+local TIns     = table.insert
+local TFind    = table.find
+local TRem     = table.remove
+local TConcat  = table.concat
+local TClone   = table.clone
+local TUnpack  = table.unpack
+local SFormat  = string.format
+local SFind    = string.find
+local SGSub    = string.gsub
+local SLen     = string.len
+local INew     = Instance.new
+
+-- ─── Theme: red/black ────────────────────────────────────────────────────────
+local NewTheme = {
+    Background  = FromRGB(8,  8,  10),
+    Surface     = FromRGB(13, 13, 16),
+    Surface2    = FromRGB(18, 18, 22),
+    Surface3    = FromRGB(24, 24, 30),
+    Sidebar     = FromRGB(6,  6,  8),
+    Accent      = FromRGB(220, 40, 40),
+    AccentDark  = FromRGB(140, 20, 20),
+    AccentDim   = FromRGB(60,  10, 10),
+    AccentGlow  = FromRGB(255, 80, 80),
+    Text        = FromRGB(230, 225, 220),
+    TextMuted   = FromRGB(110, 105, 108),
+    TextDim     = FromRGB(50,  48,  52),
+    Border      = FromRGB(32,  28,  32),
+    BorderLight = FromRGB(48,  40,  48),
+    TopBar      = FromRGB(10,  10,  13),
+    Element     = FromRGB(24,  24,  30),
+    ElementHover= FromRGB(30,  28,  35),
+    ["Toggle On"]  = FromRGB(220, 40, 40),
+    ["Toggle Off"] = FromRGB(24,  24,  30),
+}
+Library.Theme = TClone(NewTheme)
 
 for _, v in Library.Folders do
     if not isfolder(v) then makefolder(v) end
 end
 
--- ─── Helpers ──────────────────────────────────────────────────────────────────
-local function Corner(p, r)
-    local c = I("UICorner"); c.CornerRadius = UD(0, r or 4); c.Parent = p; return c
-end
-local function Stroke(p, col, thick)
-    local s = I("UIStroke"); s.Color = col or T.Border; s.Thickness = thick or 1; s.Parent = p; return s
-end
-local function Pad(p, t, b, l, r)
-    local pd = I("UIPadding"); pd.PaddingTop = UD(0,t or 0); pd.PaddingBottom = UD(0,b or 0)
-    pd.PaddingLeft = UD(0,l or 0); pd.PaddingRight = UD(0,r or 0); pd.Parent = p; return pd
-end
-local function List(p, dir, pad, ha, va, so)
-    local ll = I("UIListLayout")
-    ll.FillDirection = dir or Enum.FillDirection.Vertical
-    ll.Padding = UD(0, pad or 0)
-    ll.HorizontalAlignment = ha or Enum.HorizontalAlignment.Left
-    ll.VerticalAlignment = va or Enum.VerticalAlignment.Top
-    ll.SortOrder = so or Enum.SortOrder.LayoutOrder
-    ll.Parent = p; return ll
-end
-local function Label(p, text, size, color, bold, xa)
-    local lbl = I("TextLabel")
-    lbl.FontFace = bold and Library.Fonts["GothamBold"] or Library.Font
-    lbl.Text = text or ""; lbl.TextSize = size or 12
-    lbl.TextColor3 = color or T.Text
-    lbl.BackgroundTransparency = 1; lbl.BorderSizePixel = 0
-    lbl.TextXAlignment = xa or Enum.TextXAlignment.Left
-    lbl.AutomaticSize = Enum.AutomaticSize.XY
-    lbl.Parent = p; return lbl
-end
-local function Btn(p, text, size, col)
-    local b = I("TextButton")
-    b.FontFace = Library.Font; b.Text = text or ""; b.TextSize = size or 12
-    b.TextColor3 = col or T.Text; b.BackgroundColor3 = T.Surface
-    b.AutoButtonColor = false; b.BorderSizePixel = 0
-    b.Parent = p; return b
-end
-
-local function tw(obj, goal, t)
-    local info = TweenInfo.new(t or Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction)
-    TweenService:Create(obj, info, goal):Play()
-end
-
-local function GetScreenSize() return game:GetService("Workspace").CurrentCamera.ViewportSize end
-
+local function GetScreenSize() return Camera.ViewportSize end
 local function GetWindowSize()
     if not IsMobile then return 640, 460 end
     local s = GetScreenSize()
-    return math.round(math.clamp(s.X-10, 320, 620)), math.round(math.clamp(s.Y-40, 340, 480))
+    return math.round(math.clamp(s.X-10,320,620)), math.round(math.clamp(s.Y-40,340,480))
+end
+
+-- ─── Tween system ────────────────────────────────────────────────────────────
+local Tween = {}
+Tween.__index = Tween
+Tween.Create = function(self, Item, Info, Goal, IsRaw)
+    Item = IsRaw and Item or Item.Instance
+    Info = Info or TweenInfo.new(Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction)
+    local t = { Tween = TweenService:Create(Item, Info, Goal), Info=Info, Goal=Goal, Item=Item }
+    t.Tween:Play(); setmetatable(t, Tween); return t
+end
+Tween.GetProperty = function(self, Item)
+    Item = Item or self.Item
+    if     Item:IsA("Frame")                                 then return {"BackgroundTransparency"}
+    elseif Item:IsA("TextLabel") or Item:IsA("TextButton")   then return {"TextTransparency","BackgroundTransparency"}
+    elseif Item:IsA("ImageLabel") or Item:IsA("ImageButton") then return {"BackgroundTransparency","ImageTransparency"}
+    elseif Item:IsA("ScrollingFrame")                        then return {"BackgroundTransparency","ScrollBarImageTransparency"}
+    elseif Item:IsA("TextBox")                               then return {"TextTransparency","BackgroundTransparency"}
+    elseif Item:IsA("UIStroke")                              then return {"Transparency"} end
+end
+Tween.FadeItem = function(self, Item, Property, Visibility, Speed)
+    local Old = Item[Property]; Item[Property] = Visibility and 1 or Old
+    local t = Tween:Create(Item, TweenInfo.new(Speed or Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), {[Property]=Visibility and Old or 1}, true)
+    Library:Connect(t.Tween.Completed, function()
+        if not Visibility then task.wait(); Item[Property] = Old end
+    end)
+    return t
+end
+Tween.Get   = function(self) return self.Tween, self.Info, self.Goal end
+Tween.Pause = function(self) if self.Tween then self.Tween:Pause() end end
+Tween.Play  = function(self) if self.Tween then self.Tween:Play() end end
+
+-- ─── Instances system ────────────────────────────────────────────────────────
+local Instances = {}
+Instances.__index = Instances
+Instances.Create = function(self, Class, Properties)
+    local obj = { Instance=INew(Class), Properties=Properties, Class=Class }
+    setmetatable(obj, Instances)
+    for k,v in obj.Properties do obj.Instance[k]=v end
+    return obj
+end
+Instances.AddToTheme = function(self, Properties)
+    if not self.Instance then return end; Library:AddToTheme(self, Properties)
+end
+Instances.Connect = function(self, Event, Callback, Name)
+    if not self.Instance or not self.Instance[Event] then return end
+    return Library:Connect(self.Instance[Event], Callback, Name)
+end
+Instances.Tween = function(self, Info, Goal)
+    if not self.Instance then return end; return Tween:Create(self, Info, Goal)
+end
+Instances.Clean = function(self)
+    if not self.Instance then return end; self.Instance:Destroy(); self=nil
+end
+Instances.MakeDraggable = function(self)
+    if not self.Instance then return end
+    local Gui=self.Instance; local Dragging,DragStart,StartPos=false,nil,nil
+    local ic
+    self:Connect("InputBegan", function(Input)
+        if Input.UserInputType~=Enum.UserInputType.MouseButton1 and Input.UserInputType~=Enum.UserInputType.Touch then return end
+        Dragging=true; DragStart=Input.Position; StartPos=Gui.Position
+        if ic then return end
+        ic=Input.Changed:Connect(function()
+            if Input.UserInputState==Enum.UserInputState.End then Dragging=false; ic:Disconnect(); ic=nil end
+        end)
+    end)
+    Library:Connect(UserInputService.InputChanged, function(Input)
+        if (Input.UserInputType==Enum.UserInputType.MouseMovement or Input.UserInputType==Enum.UserInputType.Touch) and Dragging then
+            local d=Input.Position-DragStart
+            local nx=Clamp(StartPos.X.Offset+d.X,0,Gui.Parent.AbsoluteSize.X-Gui.AbsoluteSize.X)
+            local ny=Clamp(StartPos.Y.Offset+d.Y,0,Gui.Parent.AbsoluteSize.Y-Gui.AbsoluteSize.Y)
+            self:Tween(TweenInfo.new(0.08,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Position=U2(0,nx,0,ny)})
+        end
+    end)
+end
+Instances.OnHover = function(self, fn)
+    if not self.Instance or IsMobile then return end
+    return Library:Connect(self.Instance.MouseEnter, fn)
+end
+Instances.OnHoverLeave = function(self, fn)
+    if not self.Instance or IsMobile then return end
+    return Library:Connect(self.Instance.MouseLeave, fn)
+end
+
+-- ─── Fonts ───────────────────────────────────────────────────────────────────
+Library.Font = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
+Library.Fonts["Gotham"]     = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
+Library.Fonts["GothamBold"] = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+Library.Fonts["Montserrat"] = Font.new("rbxasset://fonts/families/Montserrat.json", Enum.FontWeight.Regular)
+
+-- ─── Holders ─────────────────────────────────────────────────────────────────
+Library.Holder = Instances:Create("ScreenGui", {
+    Parent=gethui(), Name="\0", ZIndexBehavior=Enum.ZIndexBehavior.Global,
+    DisplayOrder=2, IgnoreGuiInset=true, ResetOnSpawn=false })
+Library.UnusedHolder = Instances:Create("ScreenGui", {
+    Parent=gethui(), Name="\0", ZIndexBehavior=Enum.ZIndexBehavior.Global,
+    Enabled=false, ResetOnSpawn=false })
+Library.NotifHolder = Instances:Create("Frame", {
+    Parent=Library.Holder.Instance, Name="\0",
+    AnchorPoint=V2(1,1), BackgroundTransparency=1,
+    Position=U2(1,-12,1,-12), Size=U2(0,0,1,0),
+    AutomaticSize=Enum.AutomaticSize.X, BorderSizePixel=0,
+    BackgroundColor3=FromRGB(255,255,255) })
+Instances:Create("UIListLayout", {
+    Parent=Library.NotifHolder.Instance, Name="\0",
+    SortOrder=Enum.SortOrder.LayoutOrder,
+    HorizontalAlignment=Enum.HorizontalAlignment.Right,
+    VerticalAlignment=Enum.VerticalAlignment.Bottom,
+    Padding=UD(0,6) })
+
+-- ─── Helpers ──────────────────────────────────────────────────────────────────
+local T = Library.Theme
+
+local function Corner(p, r)
+    local c=INew("UICorner"); c.CornerRadius=UD(0,r or 4); c.Parent=p; return c
+end
+local function Stroke(p, col, thick)
+    local s=INew("UIStroke"); s.Color=col or T.Border; s.Thickness=thick or 1; s.Parent=p; return s
+end
+local function Pad(p, t, b, l, r)
+    local pd=INew("UIPadding")
+    pd.PaddingTop=UD(0,t or 0); pd.PaddingBottom=UD(0,b or 0)
+    pd.PaddingLeft=UD(0,l or 0); pd.PaddingRight=UD(0,r or 0)
+    pd.Parent=p; return pd
+end
+local function List(p, dir, pad, ha, va)
+    local l=INew("UIListLayout")
+    l.FillDirection=dir or Enum.FillDirection.Vertical
+    l.Padding=UD(0,pad or 0)
+    l.HorizontalAlignment=ha or Enum.HorizontalAlignment.Left
+    l.VerticalAlignment=va or Enum.VerticalAlignment.Top
+    l.SortOrder=Enum.SortOrder.LayoutOrder
+    l.Parent=p; return l
+end
+local function tw(obj, goal, t)
+    TweenService:Create(obj, TweenInfo.new(t or Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), goal):Play()
 end
 
 -- ─── Library methods ──────────────────────────────────────────────────────────
 Library.Unload = function(self)
-    for _, c in self.Connections do pcall(function() c:Disconnect() end) end
-    for _, t in self.Threads do pcall(function() coroutine.close(t) end) end
-    if self.Holder then self.Holder:Destroy() end
-    Library = nil; getgenv().Library = nil
+    for _,c in self.Connections do pcall(function() c.Connection:Disconnect() end) end
+    for _,t in self.Threads do coroutine.close(t) end
+    if self.Holder then self.Holder:Clean() end
+    Library=nil; getgenv().Library=nil
 end
-Library.Thread = function(self, fn)
-    local t = coroutine.create(fn)
+Library.Round = function(self, Number, Float)
+    local m=1/(Float or 1); return Floor(Number*m)/m
+end
+Library.Thread = function(self, Function)
+    local t=coroutine.create(Function)
     coroutine.wrap(function() coroutine.resume(t) end)()
-    table.insert(self.Threads, t); return t
+    TIns(self.Threads, t); return t
 end
-Library.SafeCall = function(self, fn, ...)
-    local args = {...}
-    local ok, err = pcall(fn, table.unpack(args))
-    if not ok then warn("ZeroHub Error: "..tostring(err)) end
+Library.SafeCall = function(self, Function, ...)
+    local args={...}
+    local ok,res=pcall(Function, TUnpack(args))
+    if not ok then warn("FlowLib Error: "..tostring(res)) end
     return ok
 end
-Library.Connect = function(self, event, cb)
-    local c = event:Connect(cb); table.insert(self.Connections, c); return c
+Library.Connect = function(self, Event, Callback, Name)
+    Name=Name or SFormat("conn_%d_%s",self.UnnamedConnections+1,HttpService:GenerateGUID(false))
+    self.UnnamedConnections=self.UnnamedConnections+1
+    local c={Event=Event,Callback=Callback,Name=Name,Connection=nil}
+    Library:Thread(function() c.Connection=Event:Connect(Callback) end)
+    TIns(self.Connections, c); return c
+end
+Library.Disconnect = function(self, Name)
+    for _,c in self.Connections do if c.Name==Name then c.Connection:Disconnect(); break end end
 end
 Library.NextFlag = function(self)
-    self.UnnamedFlags += 1
-    return "flag_"..self.UnnamedFlags.."_"..HttpService:GenerateGUID(false)
+    self.UnnamedFlags=self.UnnamedFlags+1
+    return SFormat("flag_%d_%s",self.UnnamedFlags,HttpService:GenerateGUID(false))
 end
-Library.GetLighterColor = function(self, color, inc)
-    local h,s,v = color:ToHSV()
-    return HSV(h, s, math.clamp(v*inc, 0, 1))
-end
-Library.GetCursorPos = function(self)
-    return V2(Mouse.X, Mouse.Y)
-end
-Library.IsOverFrame = function(self, frame)
-    if not frame.Visible then return false end
-    local mp = Library:GetCursorPos()
-    local ap = frame.AbsolutePosition; local as = frame.AbsoluteSize
-    return mp.X >= ap.X and mp.X <= ap.X+as.X and mp.Y >= ap.Y and mp.Y <= ap.Y+as.Y
-end
-Library.AddToTheme = function(self, item, props)
-    local td = { Item = item, Properties = props }
-    for p, v in props do
-        if type(v) == "string" then item[p] = self.Theme[v]
-        else item[p] = v() end
+Library.AddToTheme = function(self, Item, Properties)
+    Item=Item.Instance or Item
+    local td={Item=Item,Properties=Properties}
+    for p,v in td.Properties do
+        if type(v)=="string" then Item[p]=self.Theme[v] else Item[p]=v() end
     end
-    table.insert(self.ThemeItems, td); self.ThemeMap[item] = td
+    TIns(self.ThemeItems, td); self.ThemeMap[Item]=td
 end
-Library.ChangeTheme = function(self, name, color)
-    self.Theme[name] = color
-    for _, item in self.ThemeItems do
-        for p, v in item.Properties do
-            if type(v) == "string" and v == name then item.Item[p] = color
-            elseif type(v) == "function" then item.Item[p] = v() end
+Library.ChangeTheme = function(self, ThemeName, Color)
+    self.Theme[ThemeName]=Color
+    for _,item in self.ThemeItems do
+        for p,v in item.Properties do
+            if type(v)=="string" and v==ThemeName then item.Item[p]=Color
+            elseif type(v)=="function" then item.Item[p]=v() end
         end
     end
 end
-Library.GetConfig = function(self)
-    local cfg = {}
-    for i, v in self.Flags do
-        if type(v) == "table" and v.Key then cfg[i] = {Key=tostring(v.Key),Mode=v.Mode,Toggled=v.Toggled}
-        elseif type(v) == "table" and v.Color then cfg[i] = {Color="#"..v.HexValue,Alpha=v.Alpha}
-        else cfg[i] = v end
-    end
-    return HttpService:JSONEncode(cfg)
+Library.GetLighterColor = function(self, Color, Inc)
+    local h,s,v=Color:ToHSV(); return FromHSV(h,s,Clamp(v*Inc,0,1))
 end
-Library.LoadConfig = function(self, data)
-    local d = HttpService:JSONDecode(data)
-    for i, v in d do
-        local fn = self.SetFlags[i]; if not fn then continue end
-        if type(v) == "table" and v.Key then fn(v)
-        elseif type(v) == "table" and v.Color then fn(v.Color, v.Alpha)
-        else fn(v) end
-    end
+Library.GetCursorPos = function(self) return V2(Mouse.X, Mouse.Y) end
+Library.IsMouseOverFrame = function(self, Frame)
+    Frame=Frame.Instance or Frame
+    local mp=Library:GetCursorPos()
+    return mp.X>=Frame.AbsolutePosition.X and mp.X<=Frame.AbsolutePosition.X+Frame.AbsoluteSize.X
+       and mp.Y>=Frame.AbsolutePosition.Y and mp.Y<=Frame.AbsolutePosition.Y+Frame.AbsoluteSize.Y
 end
-Library.RefreshConfigsList = function(self, elem)
-    local list = listfiles(self.Folders.Configs); local ret = {}
-    for _, f in list do
-        if f:sub(-5) == ".json" then
-            local pos = f:find(".json",1,true); local start = pos
-            local ch = f:sub(pos,pos)
-            while ch ~= "/" and ch ~= "\\" and ch ~= "" do pos=pos-1; ch=f:sub(pos,pos) end
-            if ch=="/" or ch=="\\" then table.insert(ret, f:sub(pos+1,start-1)) end
+
+-- ─── Notification ─────────────────────────────────────────────────────────────
+Library.Notification = function(self, Name, Duration)
+    local Items={}
+    Items["Frame"]=Instances:Create("Frame",{
+        Parent=self.NotifHolder.Instance, Name="\0",
+        Size=U2(0,20,0,20), BorderSizePixel=0,
+        AutomaticSize=Enum.AutomaticSize.XY, BackgroundColor3=T.Surface})
+    Corner(Items["Frame"].Instance,4)
+    local st=Stroke(Items["Frame"].Instance,T.Border,1)
+    -- red left accent bar
+    local acBar=Instances:Create("Frame",{Parent=Items["Frame"].Instance,Name="\0",
+        Size=U2(0,3,0.7,0),AnchorPoint=V2(0,0.5),Position=U2(0,7,0.5,0),
+        BorderSizePixel=0,BackgroundColor3=T.Accent})
+    Corner(acBar.Instance,2)
+    Pad(Items["Frame"].Instance,7,7,18,10)
+    Items["Text"]=Instances:Create("TextLabel",{
+        Parent=Items["Frame"].Instance, Name="\0",
+        FontFace=Library.Font, TextColor3=T.Text, Text=Name,
+        Size=U2(0,0,0,14), BackgroundTransparency=1,
+        TextXAlignment=Enum.TextXAlignment.Left, BorderSizePixel=0,
+        AutomaticSize=Enum.AutomaticSize.XY,
+        TextSize=IsMobile and 13 or 11, BackgroundColor3=FromRGB(255,255,255)})
+    local sz=Items["Frame"].Instance.AbsoluteSize
+    for _,v in Items do
+        if v.Instance:IsA("Frame") then v.Instance.BackgroundTransparency=1
+        elseif v.Instance:IsA("TextLabel") then v.Instance.TextTransparency=1 end
+    end
+    Items["Frame"].Instance.AutomaticSize=Enum.AutomaticSize.None
+    Library:Thread(function()
+        for _,v in Items do
+            if v.Instance:IsA("Frame") then v:Tween(nil,{BackgroundTransparency=0})
+            elseif v.Instance:IsA("TextLabel") then v:Tween(nil,{TextTransparency=0}) end
         end
-    end
-    elem:Refresh(ret)
-end
-Library.EscapePattern = function(self, s)
-    return (string.gsub(s, "[%(%)%.%%%+%-%*%?%[%]%^%$]", "%%%1"))
-end
-
--- ─── Fonts ────────────────────────────────────────────────────────────────────
-Library.Font = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
-Library.Fonts["Gotham"]     = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
-Library.Fonts["GothamBold"] = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
-Library.Fonts["Mono"]       = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular)
-
--- ─── GUI Holders ──────────────────────────────────────────────────────────────
-Library.Holder = I("ScreenGui")
-Library.Holder.Parent = gethui(); Library.Holder.Name = "\0"
-Library.Holder.ZIndexBehavior = Enum.ZIndexBehavior.Global
-Library.Holder.DisplayOrder = 2; Library.Holder.IgnoreGuiInset = true
-Library.Holder.ResetOnSpawn = false
-
-Library.UnusedHolder = I("ScreenGui")
-Library.UnusedHolder.Parent = gethui(); Library.UnusedHolder.Name = "\0"
-Library.UnusedHolder.Enabled = false; Library.UnusedHolder.ResetOnSpawn = false
-
-local NH = I("Frame"); NH.Parent = Library.Holder; NH.Name = "\0"
-NH.AnchorPoint = V2(1,1); NH.BackgroundTransparency = 1
-NH.Position = U2(1,-12,1,-12); NH.Size = U2(0,0,1,0)
-NH.AutomaticSize = Enum.AutomaticSize.X; NH.BorderSizePixel = 0
-List(NH, Enum.FillDirection.Vertical, 6, Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Bottom)
-Library.NotifHolder = NH
-
--- ─── Draggable ────────────────────────────────────────────────────────────────
-local function MakeDraggable(frame)
-    local dragging, dragStart, startPos = false, nil, nil
-    local ic
-    frame.InputBegan:Connect(function(input)
-        if input.UserInputType ~= Enum.UserInputType.MouseButton1
-        and input.UserInputType ~= Enum.UserInputType.Touch then return end
-        dragging = true; dragStart = input.Position; startPos = frame.Position
-        if ic then return end
-        ic = input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false; if ic then ic:Disconnect(); ic = nil end
+        Items["Frame"]:Tween(nil,{Size=U2(0,sz.X,0,sz.Y)})
+        task.delay(Duration+0.1,function()
+            for _,v in Items do
+                if v.Instance:IsA("Frame") then v:Tween(nil,{BackgroundTransparency=1})
+                elseif v.Instance:IsA("TextLabel") then v:Tween(nil,{TextTransparency=1}) end
             end
+            Items["Frame"]:Tween(nil,{Size=U2(0,0,0,0)})
+            task.wait(0.5); Items["Frame"]:Clean()
         end)
     end)
-    UserInputService.InputChanged:Connect(function(input)
-        if not dragging then return end
-        if input.UserInputType ~= Enum.UserInputType.MouseMovement
-        and input.UserInputType ~= Enum.UserInputType.Touch then return end
-        local d = input.Position - dragStart
-        local nx = math.clamp(startPos.X.Offset + d.X, 0, frame.Parent.AbsoluteSize.X - frame.AbsoluteSize.X)
-        local ny = math.clamp(startPos.Y.Offset + d.Y, 0, frame.Parent.AbsoluteSize.Y - frame.AbsoluteSize.Y)
-        tw(frame, { Position = U2(0,nx,0,ny) }, 0.08)
-    end)
+end
+
+-- ─── Watermark ───────────────────────────────────────────────────────────────
+Library.Watermark = function(self, Name)
+    local WM={}; local Items={}
+    Items["Frame"]=Instances:Create("Frame",{
+        Parent=Library.Holder.Instance, Name="\0",
+        AnchorPoint=V2(0.5,0), Position=U2(0.5,0,0,10),
+        Size=U2(0,180,0,22), BorderSizePixel=0, ZIndex=5,
+        BackgroundColor3=T.Surface})
+    Corner(Items["Frame"].Instance,4)
+    Stroke(Items["Frame"].Instance,T.Border,1)
+    local acLine=Instances:Create("Frame",{Parent=Items["Frame"].Instance,Name="\0",
+        Size=U2(0,3,0.6,0),AnchorPoint=V2(0,0.5),Position=U2(0,5,0.5,0),
+        BorderSizePixel=0,BackgroundColor3=T.Accent})
+    Corner(acLine.Instance,2)
+    Items["Text"]=Instances:Create("TextLabel",{
+        Parent=Items["Frame"].Instance, Name="\0",
+        FontFace=Library.Font, TextColor3=T.Text, Text=Name,
+        AnchorPoint=V2(0,0.5), Size=U2(1,-18,0,12),
+        BackgroundTransparency=1, Position=U2(0,14,0.5,0),
+        BorderSizePixel=0, ZIndex=5,
+        AutomaticSize=Enum.AutomaticSize.X,
+        TextSize=11, TextXAlignment=Enum.TextXAlignment.Left,
+        BackgroundColor3=FromRGB(255,255,255)})
+    function WM:SetText(Text)
+        Items["Text"].Instance.Text=tostring(Text)
+        Items["Frame"]:Tween(nil,{Size=U2(0,Items["Text"].Instance.TextBounds.X+24,0,22)})
+    end
+    function WM:SetVisibility(Bool) Items["Frame"].Instance.Visible=Bool end
+    WM:SetText(Name); return WM
 end
 
 -- ─── Colorpicker ─────────────────────────────────────────────────────────────
 Library.CreateColorpicker = function(self, Data)
-    local CP = { Hue=0,Sat=0,Val=0,Alpha=0,Color=RGB(64,208,128),HexValue="40d080",IsOpen=false,IsOpen2=false,Flag=Data.Flag }
-    local btnSz = IsMobile and 22 or 16
+    local CP={Hue=0,Saturation=0,Value=0,Alpha=0,IsOpen=false,IsOpen2=false,
+               Color=FromRGB(0,0,0),HexValue="000000",Flag=Data.Flag}
+    local Items={}
+    local btnSize=IsMobile and 22 or 16
 
-    local btn = I("TextButton"); btn.Parent = Data.Parent; btn.Name = "\0"
-    btn.Size = U2(0,btnSz,0,btnSz); btn.BackgroundColor3 = RGB(64,208,128)
-    btn.AutoButtonColor = false; btn.BorderSizePixel = 0; btn.Text = ""
-    Corner(btn, 3)
+    Items["ColorpickerButton"]=Instances:Create("TextButton",{
+        Parent=Data.Parent.Instance, Name="\0", FontFace=Library.Font,
+        TextColor3=FromRGB(0,0,0), Text="", AutoButtonColor=false,
+        Size=U2(0,btnSize,0,btnSize), BorderSizePixel=0,
+        TextSize=13, BackgroundColor3=T.Accent})
+    Corner(Items["ColorpickerButton"].Instance,3)
 
-    local cpW = IsMobile and math.min(GetScreenSize().X-20,290) or 238
-    local cpH = IsMobile and 300 or 260
+    local cpW=IsMobile and math.min(GetScreenSize().X-20,290) or 238
+    local cpH=IsMobile and 300 or 260
 
-    local win = I("Frame"); win.Parent = Library.UnusedHolder; win.Name = "\0"
-    win.Visible = false; win.Size = U2(0,0,0,0)
-    win.BackgroundColor3 = T.Surface; win.BorderSizePixel = 0
-    Corner(win, 6); Stroke(win, T.Border, 1)
+    Items["ColorpickerWindow"]=Instances:Create("Frame",{
+        Parent=Library.UnusedHolder.Instance, Name="\0", Visible=false,
+        Position=U2(0,0,0,0), Size=U2(0,0,0,0),
+        BorderSizePixel=0, BackgroundColor3=T.Surface})
+    Corner(Items["ColorpickerWindow"].Instance,6)
+    Stroke(Items["ColorpickerWindow"].Instance,T.Border,1)
 
-    local palette = I("TextButton"); palette.Parent = win; palette.Name = "\0"
-    palette.Text = ""; palette.AutoButtonColor = false
-    palette.Position = U2(0,8,0,8); palette.Size = U2(1,-32,1,-56)
-    palette.BackgroundColor3 = RGB(64,208,128); palette.BorderSizePixel = 0; palette.ZIndex = 2
-    Corner(palette, 3)
+    Items["Palette"]=Instances:Create("TextButton",{Parent=Items["ColorpickerWindow"].Instance,Name="\0",Text="",AutoButtonColor=false,Position=U2(0,8,0,8),Size=U2(1,-32,1,-56),BorderSizePixel=0,ZIndex=2,BackgroundColor3=FromRGB(255,0,0)})
+    Corner(Items["Palette"].Instance,3)
+    Items["Saturation"]=Instances:Create("Frame",{Parent=Items["Palette"].Instance,Name="\0",Size=U2(1,0,1,0),BorderSizePixel=0,ZIndex=2,BackgroundColor3=FromRGB(255,255,255)})
+    Corner(Items["Saturation"].Instance,3)
+    Instances:Create("UIGradient",{Parent=Items["Saturation"].Instance,Name="\0",Transparency=NumSeq{NumSeqKP(0,1),NumSeqKP(1,0)}})
+    Items["Value"]=Instances:Create("Frame",{Parent=Items["Palette"].Instance,Name="\0",Size=U2(1,0,1,0),BorderSizePixel=0,ZIndex=2,BackgroundColor3=FromRGB(0,0,0)})
+    Corner(Items["Value"].Instance,3)
+    Instances:Create("UIGradient",{Parent=Items["Value"].Instance,Name="\0",Rotation=90,Transparency=NumSeq{NumSeqKP(0,1),NumSeqKP(1,0)}})
+    local drSz=IsMobile and 14 or 10
+    Items["PaletteDragger"]=Instances:Create("Frame",{Parent=Items["Palette"].Instance,Name="\0",Size=U2(0,drSz,0,drSz),AnchorPoint=V2(0.5,0.5),Position=U2(0,8,0,8),BorderSizePixel=0,ZIndex=4,BackgroundColor3=FromRGB(255,255,255)})
+    Corner(Items["PaletteDragger"].Instance,99); Stroke(Items["PaletteDragger"].Instance,FromRGB(0,0,0),1.5)
+    local hueW=IsMobile and 18 or 12
+    Items["Hue"]=Instances:Create("TextButton",{Parent=Items["ColorpickerWindow"].Instance,Name="\0",Text="",AutoButtonColor=false,AnchorPoint=V2(1,0),Position=U2(1,-8,0,8),Size=U2(0,hueW,1,-56),ZIndex=2,BorderSizePixel=0,BackgroundColor3=FromRGB(255,255,255)})
+    Corner(Items["Hue"].Instance,3)
+    Items["HueInline"]=Instances:Create("TextButton",{Parent=Items["Hue"].Instance,Name="\0",Text="",AutoButtonColor=false,Size=U2(1,0,1,0),ZIndex=2,BorderSizePixel=0,BackgroundColor3=FromRGB(255,255,255)})
+    Corner(Items["HueInline"].Instance,3)
+    Instances:Create("UIGradient",{Parent=Items["HueInline"].Instance,Name="\0",Rotation=90,Color=RGBSeq{RGBSeqKP(0,FromRGB(255,0,0)),RGBSeqKP(0.17,FromRGB(255,255,0)),RGBSeqKP(0.33,FromRGB(0,255,0)),RGBSeqKP(0.5,FromRGB(0,255,255)),RGBSeqKP(0.67,FromRGB(0,0,255)),RGBSeqKP(0.83,FromRGB(255,0,255)),RGBSeqKP(1,FromRGB(255,0,0))}})
+    Items["HueDragger"]=Instances:Create("Frame",{Parent=Items["Hue"].Instance,Name="\0",Size=U2(1,0,0,IsMobile and 5 or 3),AnchorPoint=V2(0,0.5),Position=U2(0,0,0,0),ZIndex=3,BorderSizePixel=0,BackgroundColor3=FromRGB(255,255,255)})
+    Corner(Items["HueDragger"].Instance,2); Stroke(Items["HueDragger"].Instance,FromRGB(0,0,0),1)
+    Items["Alpha"]=Instances:Create("TextButton",{Parent=Items["ColorpickerWindow"].Instance,Name="\0",Text="",AutoButtonColor=false,AnchorPoint=V2(0,1),Position=U2(0,8,1,-28),Size=U2(1,-28,0,IsMobile and 14 or 10),ZIndex=2,BorderSizePixel=0,BackgroundColor3=T.Accent})
+    Corner(Items["Alpha"].Instance,3)
+    Items["AlphaDragger"]=Instances:Create("Frame",{Parent=Items["Alpha"].Instance,Name="\0",Size=U2(0,IsMobile and 5 or 3,1,0),AnchorPoint=V2(0.5,0),Position=U2(0,8,0,0),ZIndex=3,BorderSizePixel=0,BackgroundColor3=FromRGB(255,255,255)})
+    Corner(Items["AlphaDragger"].Instance,2); Stroke(Items["AlphaDragger"].Instance,FromRGB(0,0,0),1)
+    Items["HexInput"]=Instances:Create("TextBox",{Parent=Items["ColorpickerWindow"].Instance,Name="\0",FontFace=Library.Font,ClearTextOnFocus=false,TextColor3=T.Text,Text="",AnchorPoint=V2(0,1),Size=U2(1,-16,0,IsMobile and 26 or 20),PlaceholderColor3=T.TextMuted,Position=U2(0,8,1,-4),BorderSizePixel=0,TextSize=IsMobile and 14 or 12,BackgroundColor3=T.Surface3})
+    Corner(Items["HexInput"].Instance,3); Stroke(Items["HexInput"].Instance,T.Border,1); Pad(Items["HexInput"].Instance,0,0,6,0)
 
-    local sat = I("Frame"); sat.Parent = palette; sat.Size = U2(1,0,1,0)
-    sat.BackgroundColor3 = RGB(255,255,255); sat.BorderSizePixel = 0; sat.ZIndex = 2
-    Corner(sat, 3)
-    local sg = I("UIGradient"); sg.Transparency = NS{NSK(0,1),NSK(1,0)}; sg.Parent = sat
+    local SlidingPalette,SlidingHue,SlidingAlpha=false,false,false
+    local Debounce=false; local RS,RS2
 
-    local val = I("Frame"); val.Parent = palette; val.Size = U2(1,0,1,0)
-    val.BackgroundColor3 = RGB(0,0,0); val.BorderSizePixel = 0; val.ZIndex = 2
-    Corner(val, 3)
-    local vg = I("UIGradient"); vg.Rotation = 90; vg.Transparency = NS{NSK(0,1),NSK(1,0)}; vg.Parent = val
-
-    local drSz = IsMobile and 14 or 10
-    local pDrag = I("Frame"); pDrag.Parent = palette; pDrag.Name = "\0"
-    pDrag.Size = U2(0,drSz,0,drSz); pDrag.AnchorPoint = V2(0.5,0.5)
-    pDrag.Position = U2(0,8,0,8); pDrag.BackgroundColor3 = RGB(255,255,255)
-    pDrag.BorderSizePixel = 0; pDrag.ZIndex = 4
-    Corner(pDrag, 99); Stroke(pDrag, RGB(0,0,0), 1.5)
-
-    local hueW = IsMobile and 18 or 12
-    local hue = I("TextButton"); hue.Parent = win; hue.Name = "\0"
-    hue.Text = ""; hue.AutoButtonColor = false
-    hue.AnchorPoint = V2(1,0); hue.Position = U2(1,-8,0,8)
-    hue.Size = U2(0,hueW,1,-56); hue.BackgroundColor3 = RGB(255,255,255)
-    hue.BorderSizePixel = 0; hue.ZIndex = 2
-    Corner(hue, 3)
-    local hueInline = I("TextButton"); hueInline.Parent = hue; hueInline.Name = "\0"
-    hueInline.Text = ""; hueInline.AutoButtonColor = false
-    hueInline.Size = U2(1,0,1,0); hueInline.BackgroundColor3 = RGB(255,255,255)
-    hueInline.BorderSizePixel = 0; hueInline.ZIndex = 2
-    Corner(hueInline, 3)
-    local hg = I("UIGradient"); hg.Rotation = 90
-    hg.Color = CS{CSK(0,RGB(255,0,0)),CSK(0.17,RGB(255,255,0)),CSK(0.33,RGB(0,255,0)),CSK(0.5,RGB(0,255,255)),CSK(0.67,RGB(0,0,255)),CSK(0.83,RGB(255,0,255)),CSK(1,RGB(255,0,0))}
-    hg.Parent = hueInline
-    local hDrag = I("Frame"); hDrag.Parent = hue; hDrag.Name = "\0"
-    hDrag.Size = U2(1,0,0,IsMobile and 5 or 3); hDrag.AnchorPoint = V2(0,0.5)
-    hDrag.Position = U2(0,0,0,0); hDrag.BackgroundColor3 = RGB(255,255,255)
-    hDrag.BorderSizePixel = 0; hDrag.ZIndex = 3
-    Corner(hDrag, 2); Stroke(hDrag, RGB(0,0,0), 1)
-
-    local alpha = I("TextButton"); alpha.Parent = win; alpha.Name = "\0"
-    alpha.Text = ""; alpha.AutoButtonColor = false
-    alpha.AnchorPoint = V2(0,1); alpha.Position = U2(0,8,1,-28)
-    alpha.Size = U2(1,-28,0,IsMobile and 14 or 10)
-    alpha.BackgroundColor3 = RGB(64,208,128); alpha.BorderSizePixel = 0; alpha.ZIndex = 2
-    Corner(alpha, 3)
-    local checker = I("ImageLabel"); checker.Parent = alpha; checker.Name = "\0"
-    checker.ScaleType = Enum.ScaleType.Tile; checker.TileSize = U2(0,6,0,6)
-    checker.Image = "http://www.roblox.com/asset/?id=18274452449"
-    checker.BackgroundTransparency = 1; checker.Size = U2(1,0,1,0); checker.ZIndex = 2
-    local cg = I("UIGradient"); cg.Transparency = NS{NSK(0,1),NSK(0.37,0.5),NSK(1,0)}; cg.Parent = checker
-    local aDrag = I("Frame"); aDrag.Parent = alpha; aDrag.Name = "\0"
-    aDrag.Size = U2(0,IsMobile and 5 or 3,1,0); aDrag.AnchorPoint = V2(0.5,0)
-    aDrag.Position = U2(0,8,0,0); aDrag.BackgroundColor3 = RGB(255,255,255)
-    aDrag.BorderSizePixel = 0; aDrag.ZIndex = 3
-    Corner(aDrag, 2); Stroke(aDrag, RGB(0,0,0), 1)
-
-    local hexBox = I("TextBox"); hexBox.Parent = win; hexBox.Name = "\0"
-    hexBox.FontFace = Library.Fonts["Mono"] or Library.Font
-    hexBox.ClearTextOnFocus = false; hexBox.TextColor3 = T.Text; hexBox.Text = ""
-    hexBox.AnchorPoint = V2(0,1); hexBox.Size = U2(1,-16,0,IsMobile and 26 or 20)
-    hexBox.PlaceholderColor3 = T.TextMuted; hexBox.Position = U2(0,8,1,-4)
-    hexBox.BorderSizePixel = 0; hexBox.TextSize = IsMobile and 14 or 12
-    hexBox.BackgroundColor3 = T.Surface3; hexBox.TextXAlignment = Enum.TextXAlignment.Left
-    Corner(hexBox, 3); Stroke(hexBox, T.Border, 1); Pad(hexBox,0,0,6,0)
-
-    -- context menu
-    local ctxMenu = I("Frame"); ctxMenu.Parent = Library.UnusedHolder; ctxMenu.Name = "\0"
-    ctxMenu.Visible = false; ctxMenu.Size = U2(0,0,0,0)
-    ctxMenu.BackgroundColor3 = T.Surface; ctxMenu.BorderSizePixel = 0; ctxMenu.AutomaticSize = Enum.AutomaticSize.None
-    Corner(ctxMenu, 5); Stroke(ctxMenu, T.Border, 1)
-    List(ctxMenu, Enum.FillDirection.Vertical, 1)
-    Pad(ctxMenu, 4, 4, 4, 4)
-
-    local function AddCtxBtn(name, cb)
-        local b = I("TextButton"); b.Parent = ctxMenu; b.Name = "\0"
-        b.FontFace = Library.Font; b.TextColor3 = T.Text; b.Text = name
-        b.AutoButtonColor = false; b.BackgroundTransparency = 1
-        b.Size = U2(1,0,0,IsMobile and 28 or 20); b.TextSize = IsMobile and 14 or 12
-        b.BorderSizePixel = 0; b.BackgroundColor3 = T.Surface3
-        b.MouseButton1Down:Connect(function() cb(); CP:SetOpen2(false) end)
-    end
-    AddCtxBtn("Copy", function()
-        local r,g,b2 = math.floor(CP.Color.R*255), math.floor(CP.Color.G*255), math.floor(CP.Color.B*255)
-        setclipboard(r..","..g..","..b2); Library.CopiedColor = r..","..g..","..b2
-    end)
-    AddCtxBtn("Paste", function()
-        if Library.CopiedColor then
-            local r,g,b2 = Library.CopiedColor:match("(%d+),%s*(%d+),%s*(%d+)")
-            CP:Set({tonumber(r),tonumber(g),tonumber(b2)}, CP.Alpha)
-        end
-    end)
-
-    local slidingPal, slidingHue, slidingAlpha = false, false, false
-    local rs1, rs2
-
-    function CP:SetOpen(bool)
-        CP.IsOpen = bool
-        if bool then
-            win.Size = U2(0,cpW,0,cpH)
-            win.Visible = true; win.Parent = Library.Holder
-            rs1 = RunService.RenderStepped:Connect(function()
-                if IsMobile then
-                    local sc = GetScreenSize()
-                    win.Position = U2(0, math.clamp(btn.AbsolutePosition.X,10,sc.X-cpW-10), 0, math.clamp(btn.AbsolutePosition.Y+btn.AbsoluteSize.Y+8,10,sc.Y-cpH-10))
-                else
-                    win.Position = U2(0, btn.AbsolutePosition.X, 0, btn.AbsolutePosition.Y+btn.AbsoluteSize.Y+4)
-                end
+    function CP:Get() return CP.Color,CP.Alpha end
+    function CP:SetOpen(Bool)
+        if Debounce then return end; CP.IsOpen=Bool; Debounce=true
+        if CP.IsOpen then
+            Items["ColorpickerWindow"].Instance.Size=U2(0,cpW,0,cpH)
+            Items["ColorpickerWindow"].Instance.Visible=true
+            Items["ColorpickerWindow"].Instance.Parent=Library.Holder.Instance
+            RS=RunService.RenderStepped:Connect(function()
+                local bp=Items["ColorpickerButton"].Instance.AbsolutePosition
+                local bs=Items["ColorpickerButton"].Instance.AbsoluteSize
+                Items["ColorpickerWindow"].Instance.Position=U2(0,bp.X,0,bp.Y+bs.Y+4)
             end)
-            for _,v in Library.OpenFrames do if v ~= CP then v:SetOpen(false) end end
-            Library.OpenFrames[CP] = CP
+            for _,v in Library.OpenFrames do if v~=CP then v:SetOpen(false) end end
+            Library.OpenFrames[CP]=CP
         else
-            Library.OpenFrames[CP] = nil
-            if rs1 then rs1:Disconnect(); rs1 = nil end
-            win.Visible = false; win.Parent = Library.UnusedHolder
+            Library.OpenFrames[CP]=nil
+            if RS then RS:Disconnect(); RS=nil end
         end
-    end
-    function CP:SetOpen2(bool)
-        CP.IsOpen2 = bool
-        if bool then
-            ctxMenu.Size = U2(0,IsMobile and 110 or 80,0,0)
-            ctxMenu.AutomaticSize = Enum.AutomaticSize.Y
-            ctxMenu.Visible = true; ctxMenu.Parent = Library.Holder
-            rs2 = RunService.RenderStepped:Connect(function()
-                ctxMenu.Position = U2(0, btn.AbsolutePosition.X+btn.AbsoluteSize.X+4, 0, btn.AbsolutePosition.Y)
-            end)
-        else
-            if rs2 then rs2:Disconnect(); rs2 = nil end
-            ctxMenu.Visible = false; ctxMenu.Parent = Library.UnusedHolder
+        local desc=Items["ColorpickerWindow"].Instance:GetDescendants()
+        TIns(desc,Items["ColorpickerWindow"].Instance)
+        local nt
+        for _,v in desc do
+            local tp=Tween:GetProperty(v); if not tp then continue end
+            if not v.ClassName:find("UI") then v.ZIndex=CP.IsOpen and 104 or 1 end
+            if type(tp)=="table" then for _,p in tp do nt=Tween:FadeItem(v,p,Bool,Library.FadeSpeed) end
+            else nt=Tween:FadeItem(v,tp,Bool,Library.FadeSpeed) end
         end
+        nt.Tween.Completed:Connect(function()
+            Debounce=false
+            Items["ColorpickerWindow"].Instance.Visible=CP.IsOpen
+            task.wait(0.2)
+            if not CP.IsOpen then
+                Items["ColorpickerWindow"].Instance.Size=U2(0,0,0,0)
+                Items["ColorpickerWindow"].Instance.Parent=Library.UnusedHolder.Instance
+            end
+        end)
     end
-    function CP:Update(fromAlpha)
-        CP.Color = HSV(CP.Hue, CP.Sat, CP.Val)
-        CP.HexValue = CP.Color:ToHex()
-        Library.Flags[CP.Flag] = {Alpha=CP.Alpha,Color=CP.Color,HexValue=CP.HexValue,Transparency=1-CP.Alpha}
-        tw(btn, {BackgroundColor3=CP.Color})
-        tw(palette, {BackgroundColor3=HSV(CP.Hue,1,1)})
-        hexBox.Text = "#"..CP.HexValue
-        if not fromAlpha then tw(alpha, {BackgroundColor3=CP.Color}) end
-        if Data.Callback then Library:SafeCall(Data.Callback, CP.Color, CP.Alpha) end
-    end
-    function CP:SlidePal(input)
-        if not slidingPal then return end
-        CP.Sat = math.clamp(1-(input.Position.X-palette.AbsolutePosition.X)/palette.AbsoluteSize.X,0,1)
-        CP.Val = math.clamp(1-(input.Position.Y-palette.AbsolutePosition.Y)/palette.AbsoluteSize.Y,0,1)
-        local dx = math.clamp((input.Position.X-palette.AbsolutePosition.X)/palette.AbsoluteSize.X,0,0.99)
-        local dy = math.clamp((input.Position.Y-palette.AbsolutePosition.Y)/palette.AbsoluteSize.Y,0,0.99)
-        tw(pDrag, {Position=U2(dx,0,dy,0)}, 0.06)
+    function CP:SlidePalette(Input)
+        if not Input or not SlidingPalette then return end
+        local px=Items["Palette"].Instance.AbsolutePosition; local ps=Items["Palette"].Instance.AbsoluteSize
+        CP.Saturation=Clamp(1-(Input.Position.X-px.X)/ps.X,0,1)
+        CP.Value=Clamp(1-(Input.Position.Y-px.Y)/ps.Y,0,1)
+        local dx=Clamp((Input.Position.X-px.X)/ps.X,0,0.99); local dy=Clamp((Input.Position.Y-px.Y)/ps.Y,0,0.99)
+        Items["PaletteDragger"]:Tween(TweenInfo.new(0.08,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Position=U2(dx,0,dy,0)})
         CP:Update()
     end
-    function CP:SlideHue(input)
-        if not slidingHue then return end
-        CP.Hue = math.clamp((input.Position.Y-hue.AbsolutePosition.Y)/hue.AbsoluteSize.Y,0,1)
-        local dy = math.clamp((input.Position.Y-hue.AbsolutePosition.Y)/hue.AbsoluteSize.Y,0,0.99)
-        tw(hDrag, {Position=U2(0,0,dy,0)}, 0.06)
+    function CP:SlideHue(Input)
+        if not Input or not SlidingHue then return end
+        local hp=Items["Hue"].Instance.AbsolutePosition; local hs=Items["Hue"].Instance.AbsoluteSize
+        CP.Hue=Clamp((Input.Position.Y-hp.Y)/hs.Y,0,1)
+        Items["HueDragger"]:Tween(TweenInfo.new(0.08,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Position=U2(0,0,Clamp((Input.Position.Y-hp.Y)/hs.Y,0,0.99),0)})
         CP:Update()
     end
-    function CP:SlideAlpha(input)
-        if not slidingAlpha then return end
-        CP.Alpha = math.clamp((input.Position.X-alpha.AbsolutePosition.X)/alpha.AbsoluteSize.X,0,1)
-        local dx = math.clamp((input.Position.X-alpha.AbsolutePosition.X)/alpha.AbsoluteSize.X,0,0.99)
-        tw(aDrag, {Position=U2(dx,0,0,0)}, 0.06)
+    function CP:SlideAlpha(Input)
+        if not Input or not SlidingAlpha then return end
+        local ap=Items["Alpha"].Instance.AbsolutePosition; local as2=Items["Alpha"].Instance.AbsoluteSize
+        CP.Alpha=Clamp((Input.Position.X-ap.X)/as2.X,0,1)
+        Items["AlphaDragger"]:Tween(TweenInfo.new(0.08,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Position=U2(Clamp((Input.Position.X-ap.X)/as2.X,0,0.99),0,0,0)})
         CP:Update(true)
     end
-    function CP:Set(color, a)
-        if type(color)=="table" then color=RGB(color[1],color[2],color[3])
-        elseif type(color)=="string" then color=HEX(color) end
-        CP.Hue, CP.Sat, CP.Val = color:ToHSV(); CP.Alpha = a or 0
-        tw(pDrag,{Position=U2(math.clamp(1-CP.Sat,0,0.99),0,math.clamp(1-CP.Val,0,0.99),0)},0.08)
-        tw(hDrag,{Position=U2(0,0,math.clamp(CP.Hue,0,0.99),0)},0.08)
-        tw(aDrag,{Position=U2(math.clamp(CP.Alpha,0,0.99),0,0,0)},0.08)
+    function CP:Update(IsFromAlpha)
+        CP.Color=FromHSV(CP.Hue,CP.Saturation,CP.Value)
+        CP.HexValue=CP.Color:ToHex()
+        Library.Flags[CP.Flag]={Alpha=CP.Alpha,Color=CP.Color,HexValue=CP.HexValue,Transparency=1-CP.Alpha}
+        Items["ColorpickerButton"]:Tween(nil,{BackgroundColor3=CP.Color})
+        Items["Palette"]:Tween(nil,{BackgroundColor3=FromHSV(CP.Hue,1,1)})
+        Items["HexInput"].Instance.Text="#"..CP.HexValue
+        if not IsFromAlpha then Items["Alpha"]:Tween(nil,{BackgroundColor3=CP.Color}) end
+        if Data.Callback then Library:SafeCall(Data.Callback,CP.Color,CP.Alpha) end
+    end
+    function CP:Set(Color,Alpha)
+        if type(Color)=="table" then Color=FromRGB(Color[1],Color[2],Color[3])
+        elseif type(Color)=="string" then Color=FromHex(Color) end
+        CP.Hue,CP.Saturation,CP.Value=Color:ToHSV(); CP.Alpha=Alpha or 0
+        Items["PaletteDragger"]:Tween(TweenInfo.new(0.1,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Position=U2(Clamp(1-CP.Saturation,0,0.99),0,Clamp(1-CP.Value,0,0.99),0)})
+        Items["HueDragger"]:Tween(TweenInfo.new(0.1,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Position=U2(0,0,Clamp(CP.Hue,0,0.99),0)})
+        Items["AlphaDragger"]:Tween(TweenInfo.new(0.1,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Position=U2(Clamp(CP.Alpha,0,0.99),0,0,0)})
         CP:Update(false)
     end
-    function CP:Get() return CP.Color, CP.Alpha end
 
     local function isSI(i) return i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch end
     local function isMV(i) return i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch end
 
-    palette.InputBegan:Connect(function(i) if isSI(i) then slidingPal=true; CP:SlidePal(i) end end)
-    palette.InputEnded:Connect(function(i) if isSI(i) then slidingPal=false end end)
-    hueInline.InputBegan:Connect(function(i) if isSI(i) then slidingHue=true; CP:SlideHue(i) end end)
-    hueInline.InputEnded:Connect(function(i) if isSI(i) then slidingHue=false end end)
-    alpha.InputBegan:Connect(function(i) if isSI(i) then slidingAlpha=true; CP:SlideAlpha(i) end end)
-    alpha.InputEnded:Connect(function(i) if isSI(i) then slidingAlpha=false end end)
-    hexBox.FocusLost:Connect(function() CP:Set(hexBox.Text, CP.Alpha) end)
-    btn.MouseButton1Down:Connect(function() CP:SetOpen(not CP.IsOpen) end)
-    if IsMobile then MakeLongPress(btn, function() CP:SetOpen2(not CP.IsOpen2) end)
-    else btn.MouseButton2Down:Connect(function() CP:SetOpen2(not CP.IsOpen2) end) end
-
-    Library:Connect(UserInputService.InputChanged, function(inp)
-        if not isMV(inp) then return end
-        if slidingPal then CP:SlidePal(inp)
-        elseif slidingHue then CP:SlideHue(inp)
-        elseif slidingAlpha then CP:SlideAlpha(inp) end
+    Items["Palette"]:Connect("InputBegan",function(i) if isSI(i) then SlidingPalette=true; CP:SlidePalette(i) end end)
+    Items["Palette"]:Connect("InputEnded",function(i) if isSI(i) then SlidingPalette=false end end)
+    Items["HueInline"]:Connect("InputBegan",function(i) if isSI(i) then SlidingHue=true; CP:SlideHue(i) end end)
+    Items["HueInline"]:Connect("InputEnded",function(i) if isSI(i) then SlidingHue=false end end)
+    Items["Alpha"]:Connect("InputBegan",function(i) if isSI(i) then SlidingAlpha=true; CP:SlideAlpha(i) end end)
+    Items["Alpha"]:Connect("InputEnded",function(i) if isSI(i) then SlidingAlpha=false end end)
+    Items["HexInput"]:Connect("FocusLost",function() CP:Set(tostring(Items["HexInput"].Instance.Text),CP.Alpha) end)
+    Items["ColorpickerButton"]:Connect("MouseButton1Down",function() CP:SetOpen(not CP.IsOpen) end)
+    Library:Connect(UserInputService.InputChanged,function(Input)
+        if not isMV(Input) then return end
+        if SlidingPalette then CP:SlidePalette(Input)
+        elseif SlidingHue then CP:SlideHue(Input)
+        elseif SlidingAlpha then CP:SlideAlpha(Input) end
     end)
-    Library:Connect(UserInputService.InputBegan, function(inp)
-        if not isSI(inp) then return end
+    Library:Connect(UserInputService.InputBegan,function(Input)
+        if not isSI(Input) then return end
         task.defer(function()
             if not CP.IsOpen then return end
-            if Library:IsOverFrame(win) or Library:IsOverFrame(ctxMenu) then return end
-            CP:SetOpen(false); CP:SetOpen2(false)
+            if Library:IsMouseOverFrame(Items["ColorpickerWindow"]) then return end
+            CP:SetOpen(false)
         end)
     end)
-
-    if Data.Default then CP:Set(Data.Default, Data.Alpha or 0) end
-    Library.SetFlags[CP.Flag] = function(c,a) CP:Set(c,a) end
-    return CP
+    if Data.Default then CP:Set(Data.Default,Data.Alpha) end
+    Library.SetFlags[CP.Flag]=function(c,a) CP:Set(c,a) end
+    return CP,Items
 end
 
--- ─── Keybind ──────────────────────────────────────────────────────────────────
+-- ─── Keybind ─────────────────────────────────────────────────────────────────
 Library.CreateKeybind = function(self, Data)
-    local KB = { IsOpen=false, Key="", Toggled=false, Mode="Toggle", Flag=Data.Flag, Picking=false, Value="" }
-    if Library.KeyList then Library.KeyList:Add("", "") end
+    local KB={IsOpen=false,Key="",Toggled=false,Mode="",Flag=Data.Flag,Picking=false,Value=""}
+    local Items={}
+    local kbTextSize=IsMobile and 13 or 11; local kbHeight=IsMobile and 22 or 16
 
-    local kbH = IsMobile and 22 or 16
-    local kbBtn = I("TextButton"); kbBtn.Parent = Data.Parent; kbBtn.Name = "\0"
-    kbBtn.FontFace = Library.Font; kbBtn.TextColor3 = T.TextMuted
-    kbBtn.Text = "[ Unbound ]"; kbBtn.AutoButtonColor = false
-    kbBtn.Size = U2(0,0,0,kbH); kbBtn.BorderSizePixel = 0
-    kbBtn.TextSize = IsMobile and 13 or 11
-    kbBtn.AutomaticSize = Enum.AutomaticSize.X
-    kbBtn.BackgroundColor3 = T.Surface3
-    Corner(kbBtn, 3); Pad(kbBtn,0,0,6,6); Stroke(kbBtn, T.Border, 1)
+    Items["KeyButton"]=Instances:Create("TextButton",{
+        Parent=Data.Parent.Instance, Name="\0", FontFace=Library.Font,
+        TextColor3=T.TextMuted, Text="[ Unbound ]", AutoButtonColor=false,
+        Size=U2(0,0,0,kbHeight), BorderSizePixel=0,
+        TextSize=kbTextSize, AutomaticSize=Enum.AutomaticSize.X,
+        BackgroundColor3=T.Surface3})
+    Corner(Items["KeyButton"].Instance,3); Stroke(Items["KeyButton"].Instance,T.Border,1)
+    Pad(Items["KeyButton"].Instance,0,0,6,6)
 
-    local kbWin = I("Frame"); kbWin.Parent = Library.UnusedHolder; kbWin.Name = "\0"
-    kbWin.Visible = false; kbWin.ZIndex = 5
-    kbWin.Size = U2(0,0,0,0)
-    kbWin.BackgroundColor3 = T.Surface; kbWin.BorderSizePixel = 0
-    Corner(kbWin, 5); Stroke(kbWin, T.Border, 1); Pad(kbWin,4,4,4,4)
-    List(kbWin, Enum.FillDirection.Vertical, 2)
+    Items["KeybindWindow"]=Instances:Create("Frame",{
+        Parent=Library.UnusedHolder.Instance, Name="\0", Visible=false, ZIndex=5,
+        Size=U2(0,0,0,0), BorderSizePixel=0, BackgroundColor3=T.Surface})
+    Corner(Items["KeybindWindow"].Instance,5); Stroke(Items["KeybindWindow"].Instance,T.Border,1)
+    Pad(Items["KeybindWindow"].Instance,4,4,4,4)
+    List(Items["KeybindWindow"].Instance,Enum.FillDirection.Vertical,2)
 
-    local mH = IsMobile and 26 or 20
+    local modeH=IsMobile and 26 or 20; local modeFSize=IsMobile and 13 or 12
     local function MakeMode(name)
-        local row = I("TextButton"); row.Parent = kbWin; row.Name = "\0"
-        row.FontFace = Library.Font; row.TextColor3 = T.TextMuted; row.Text = name
-        row.AutoButtonColor = false; row.BackgroundTransparency = 1
-        row.Size = U2(1,0,0,mH); row.TextSize = IsMobile and 13 or 12
-        row.BorderSizePixel = 0; row.BackgroundColor3 = T.Surface3
-        Corner(row, 3)
-        local liner = I("Frame"); liner.Parent = row; liner.Name = "\0"
-        liner.BackgroundTransparency = 1; liner.Size = U2(0,2,0.6,0)
-        liner.AnchorPoint = V2(0,0.5); liner.Position = U2(0,2,0.5,0)
-        liner.BackgroundColor3 = T.Accent; liner.BorderSizePixel = 0
-        Corner(liner, 2)
-        return row, liner
+        local btn=Instances:Create("TextButton",{Parent=Items["KeybindWindow"].Instance,Name="\0",FontFace=Library.Font,TextColor3=T.TextMuted,Text=name,AutoButtonColor=false,BackgroundTransparency=1,Size=U2(1,0,0,modeH),BorderSizePixel=0,TextSize=modeFSize,BackgroundColor3=T.Surface3})
+        Corner(btn.Instance,3)
+        local liner=Instances:Create("Frame",{Parent=btn.Instance,Name="\0",BackgroundTransparency=1,Size=U2(0,2,0.6,0),AnchorPoint=V2(0,0.5),Position=U2(0,2,0.5,0),BorderSizePixel=0,BackgroundColor3=T.Accent})
+        Corner(liner.Instance,2)
+        return btn,liner
     end
-    local togBtn, togLiner = MakeMode("Toggle")
-    local holdBtn, holdLiner = MakeMode("Hold")
-    local alwBtn, alwLiner = MakeMode("Always On")
-    local Modes = {["Toggle"]={togBtn,togLiner},["Hold"]={holdBtn,holdLiner},["Always On"]={alwBtn,alwLiner}}
+    local ToggleBtn,ToggleLiner=MakeMode("Toggle")
+    local HoldBtn,HoldLiner=MakeMode("Hold")
+    local AlwaysBtn,AlwaysLiner=MakeMode("Always On")
+    local Modes={["Toggle"]={ToggleBtn,ToggleLiner},["Hold"]={HoldBtn,HoldLiner},["Always On"]={AlwaysBtn,AlwaysLiner}}
 
-    local kbRS
-    function KB:SetOpen(bool)
-        KB.IsOpen = bool
-        if bool then
-            kbWin.Size = U2(0,IsMobile and 120 or 90,0,IsMobile and 90 or 72)
-            kbWin.Visible = true; kbWin.Parent = Library.Holder
-            kbRS = RunService.RenderStepped:Connect(function()
-                if IsMobile then
-                    local sc = GetScreenSize(); local ww = kbWin.AbsoluteSize.X
-                    kbWin.Position = U2(0, math.clamp(kbBtn.AbsolutePosition.X,10,sc.X-ww-10), 0, kbBtn.AbsolutePosition.Y+kbBtn.AbsoluteSize.Y+4)
-                else
-                    kbWin.Position = U2(0, kbBtn.AbsolutePosition.X, 0, kbBtn.AbsolutePosition.Y+kbBtn.AbsoluteSize.Y+4)
-                end
+    function KB:Get() return KB.Mode,KB.Key,KB.Toggled end
+    local KbDebounce=false; local KbRS
+    function KB:SetOpen(Bool)
+        if KbDebounce then return end; KB.IsOpen=Bool; KbDebounce=true
+        if KB.IsOpen then
+            Items["KeybindWindow"].Instance.Size=U2(0,IsMobile and 120 or 90,0,IsMobile and 90 or 72)
+            Items["KeybindWindow"].Instance.Visible=true
+            Items["KeybindWindow"].Instance.Parent=Library.Holder.Instance
+            KbRS=RunService.RenderStepped:Connect(function()
+                local bp=Items["KeyButton"].Instance.AbsolutePosition; local bs=Items["KeyButton"].Instance.AbsoluteSize
+                Items["KeybindWindow"].Instance.Position=U2(0,bp.X,0,bp.Y+bs.Y+4)
             end)
         else
-            if kbRS then kbRS:Disconnect(); kbRS = nil end
-            kbWin.Visible = false; kbWin.Parent = Library.UnusedHolder
+            if KbRS then KbRS:Disconnect(); KbRS=nil end
         end
-    end
-    function KB:SetMode(mode)
-        for idx, v in Modes do
-            v[1].BackgroundTransparency = idx==mode and 0 or 1
-            v[2].BackgroundTransparency = idx==mode and 0 or 1
+        local desc=Items["KeybindWindow"].Instance:GetDescendants()
+        TIns(desc,Items["KeybindWindow"].Instance)
+        local nt
+        for _,v in desc do
+            local tp=Tween:GetProperty(v); if not tp then continue end
+            if type(tp)=="table" then for _,p in tp do nt=Tween:FadeItem(v,p,Bool,Library.FadeSpeed) end
+            else nt=Tween:FadeItem(v,tp,Bool,Library.FadeSpeed) end
         end
-        Library.Flags[KB.Flag] = {Mode=KB.Mode,Key=KB.Key,Toggled=KB.Toggled,active=KB.Toggled}
-        if Data.Callback then Library:SafeCall(Data.Callback, KB.Toggled) end
+        nt.Tween.Completed:Connect(function()
+            KbDebounce=false; Items["KeybindWindow"].Instance.Visible=KB.IsOpen
+            task.wait(0.2)
+            if not KB.IsOpen then
+                Items["KeybindWindow"].Instance.Size=U2(0,0,0,0)
+                Items["KeybindWindow"].Instance.Parent=Library.UnusedHolder.Instance
+            end
+        end)
     end
-    function KB:Press(bool)
-        if KB.Mode=="Toggle" then KB.Toggled = not KB.Toggled
-        elseif KB.Mode=="Hold" then KB.Toggled = bool
-        elseif KB.Mode=="Always" then KB.Toggled = true end
-        Library.Flags[KB.Flag] = {Mode=KB.Mode,Key=KB.Key,Toggled=KB.Toggled,active=KB.Toggled}
-        if Data.Callback then Library:SafeCall(Data.Callback, KB.Toggled) end
+    local Keys={Backspace="Back",Tab="Tab",Return="Enter",Escape="Esc",Space="Space",Delete="Del",RightShift="RShift",LeftShift="LShift",RightControl="RCtrl",LeftControl="LCtrl",LeftAlt="LAlt",RightAlt="RAlt"}
+    function KB:Set(Key)
+        if SFind(tostring(Key),"Enum") then
+            KB.Key=tostring(Key)
+            local kname=Key.Name=="Backspace" and "None" or Key.Name
+            local ks=Keys[KB.Key] or SGSub(kname,"Enum.","") or "None"
+            local td=SGSub(SGSub(ks,"KeyCode.",""),"UserInputType.","")
+            KB.Value=td; Items["KeyButton"].Instance.Text="[ "..td.." ]"
+            Library.Flags[KB.Flag]={Mode=KB.Mode,Key=KB.Key,Toggled=KB.Toggled,active=KB.Toggled}
+            if Data.Callback then Library:SafeCall(Data.Callback,KB.Toggled) end
+        elseif type(Key)=="table" then
+            local rk=Key.Key=="Backspace" and "None" or Key.Key; KB.Key=tostring(Key.Key)
+            KB.Mode=Key.Mode or "Toggle"; KB:SetMode(KB.Mode)
+            local ks=Keys[KB.Key] or SGSub(tostring(rk),"Enum.","") or rk
+            local td=SGSub(SGSub(ks,"KeyCode.",""),"UserInputType.","")
+            KB.Value=td; Items["KeyButton"].Instance.Text="[ "..td.." ]"
+            if Key.Toggled then KB:Press(Key.Toggled,true) end
+            if Data.Callback then Library:SafeCall(Data.Callback,KB.Toggled) end
+        elseif type(Key)=="boolean" then KB:Press(Key) end
+        KB.Picking=false
     end
-    local Keys = {Backspace="Back",Tab="Tab",Return="Enter",Escape="Esc",Space="Space",Delete="Del",RightShift="RShift",LeftShift="LShift",RightControl="RCtrl",LeftControl="LCtrl"}
-    function KB:Set(key)
-        if type(key)=="table" then
-            KB.Key=tostring(key.Key); KB.Mode=key.Mode or "Toggle"; KB:SetMode(KB.Mode)
-            local n = key.Key=="Backspace" and "None" or tostring(key.Key)
-            n = string.gsub(string.gsub(n,"Enum.KeyCode.",""),"Enum.UserInputType.","")
-            KB.Value = Keys[n] or n
-            kbBtn.Text = "[ "..(KB.Value).." ]"
-            if key.Toggled then KB:Press(key.Toggled) end
-        elseif tostring(key):find("Enum") then
-            KB.Key = tostring(key)
-            local n = key.Name=="Backspace" and "None" or key.Name
-            KB.Value = Keys[n] or n
-            kbBtn.Text = "[ "..KB.Value.." ]"
-            Library.Flags[KB.Flag] = {Mode=KB.Mode,Key=KB.Key,Toggled=KB.Toggled,active=KB.Toggled}
-            if Data.Callback then Library:SafeCall(Data.Callback, KB.Toggled) end
+    function KB:Press(Bool)
+        if KB.Mode=="Toggle" then KB.Toggled=not KB.Toggled
+        elseif KB.Mode=="Hold" then KB.Toggled=Bool
+        elseif KB.Mode=="Always" then KB.Toggled=true end
+        Library.Flags[KB.Flag]={Mode=KB.Mode,Key=KB.Key,Toggled=KB.Toggled,active=KB.Toggled}
+        if Data.Callback then Library:SafeCall(Data.Callback,KB.Toggled) end
+    end
+    function KB:SetMode(Mode)
+        for idx,v in Modes do
+            if idx==Mode then v[1]:Tween(nil,{BackgroundTransparency=0}); v[2]:Tween(nil,{BackgroundTransparency=0})
+            else v[1]:Tween(nil,{BackgroundTransparency=1}); v[2]:Tween(nil,{BackgroundTransparency=1}) end
         end
-        KB.Picking = false
+        Library.Flags[KB.Flag]={Mode=KB.Mode,Key=KB.Key,Toggled=KB.Toggled,active=KB.Toggled}
+        if Data.Callback then Library:SafeCall(Data.Callback,KB.Toggled) end
     end
-    function KB:Get() return KB.Mode, KB.Key, KB.Toggled end
-
-    kbBtn.MouseButton1Click:Connect(function()
-        KB.Picking = true; kbBtn.Text = "[ ... ]"
+    Items["KeyButton"]:Connect("MouseButton1Click",function()
+        KB.Picking=true; Items["KeyButton"].Instance.Text="[ ... ]"
         local ib
-        ib = UserInputService.InputBegan:Connect(function(inp)
-            if inp.UserInputType == Enum.UserInputType.Keyboard then KB:Set(inp.KeyCode)
-            elseif inp.UserInputType == Enum.UserInputType.Touch then
-                KB.Picking=false; kbBtn.Text="[ Touch ]"; KB.Key="Touch"; KB.Value="Touch"
-            else KB:Set(inp.UserInputType) end
+        ib=UserInputService.InputBegan:Connect(function(Input)
+            if Input.UserInputType==Enum.UserInputType.Keyboard then KB:Set(Input.KeyCode)
+            else KB:Set(Input.UserInputType) end
             if ib then ib:Disconnect(); ib=nil end
         end)
     end)
-    if IsMobile then MakeLongPress(kbBtn, function() KB:SetOpen(not KB.IsOpen) end)
-    else kbBtn.MouseButton2Down:Connect(function() KB:SetOpen(not KB.IsOpen) end) end
-
-    Library:Connect(UserInputService.InputBegan, function(inp)
+    Items["KeyButton"]:Connect("MouseButton2Down",function() KB:SetOpen(not KB.IsOpen) end)
+    Library:Connect(UserInputService.InputBegan,function(Input)
         if KB.Value~="None" and KB.Value~="" then
-            if tostring(inp.KeyCode)==KB.Key or tostring(inp.UserInputType)==KB.Key then
+            if tostring(Input.KeyCode)==KB.Key or tostring(Input.UserInputType)==KB.Key then
                 if KB.Mode=="Toggle" then KB:Press()
                 elseif KB.Mode=="Hold" then KB:Press(true)
                 elseif KB.Mode=="Always" then KB:Press(true) end
             end
         end
-        if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
-            task.defer(function()
-                if KB.IsOpen and not Library:IsOverFrame(kbWin) then KB:SetOpen(false) end
-            end)
-        end
     end)
-    Library:Connect(UserInputService.InputEnded, function(inp)
+    Library:Connect(UserInputService.InputEnded,function(Input)
         if KB.Value~="None" and KB.Value~="" then
-            if tostring(inp.KeyCode)==KB.Key or tostring(inp.UserInputType)==KB.Key then
+            if tostring(Input.KeyCode)==KB.Key or tostring(Input.UserInputType)==KB.Key then
                 if KB.Mode=="Hold" then KB:Press(false) end
             end
         end
     end)
-
-    togBtn.MouseButton1Down:Connect(function() KB.Mode="Toggle"; KB:SetMode("Toggle") end)
-    holdBtn.MouseButton1Down:Connect(function() KB.Mode="Hold"; KB:SetMode("Hold") end)
-    alwBtn.MouseButton1Down:Connect(function() KB.Mode="Always"; KB:SetMode("Always On") end)
-
+    ToggleBtn:Connect("MouseButton1Down",function() KB.Mode="Toggle"; KB:SetMode("Toggle") end)
+    HoldBtn:Connect("MouseButton1Down",function() KB.Mode="Hold"; KB:SetMode("Hold") end)
+    AlwaysBtn:Connect("MouseButton1Down",function() KB.Mode="Always"; KB:SetMode("Always On") end)
     if Data.Default then KB:Set({Key=Data.Default,Mode=Data.Mode or "Toggle",Toggled=Data.Toggled}) end
-    Library.SetFlags[KB.Flag] = function(v) KB:Set(v) end
-    return KB
+    Library.SetFlags[KB.Flag]=function(v) KB:Set(v) end
+    return KB,Items
 end
 
--- ─── Watermark ────────────────────────────────────────────────────────────────
-Library.Watermark = function(self, name)
-    local wm = {}
-    local frame = I("Frame"); frame.Parent = Library.Holder; frame.Name = "\0"
-    frame.AnchorPoint = V2(0.5,0); frame.Position = IsMobile and U2(0.5,0,0,60) or U2(0.5,0,0,10)
-    frame.Size = U2(0,180,0,24); frame.BackgroundColor3 = T.Surface
-    frame.BorderSizePixel = 0; frame.ZIndex = 5
-    Corner(frame, 4); Stroke(frame, T.Border, 1)
-    local acLine = I("Frame"); acLine.Parent = frame; acLine.Name = "\0"
-    acLine.Size = U2(0,3,0.6,0); acLine.AnchorPoint = V2(0,0.5)
-    acLine.Position = U2(0,6,0.5,0); acLine.BackgroundColor3 = T.Accent
-    acLine.BorderSizePixel = 0
-    Corner(acLine, 2)
-    local lbl = I("TextLabel"); lbl.Parent = frame; lbl.Name = "\0"
-    lbl.FontFace = Library.Font; lbl.TextColor3 = T.Text; lbl.Text = name
-    lbl.AnchorPoint = V2(0,0.5); lbl.Size = U2(1,-22,0,12)
-    lbl.BackgroundTransparency = 1; lbl.Position = U2(0,16,0.5,0)
-    lbl.BorderSizePixel = 0; lbl.ZIndex = 5; lbl.AutomaticSize = Enum.AutomaticSize.X
-    lbl.TextSize = 11; lbl.TextXAlignment = Enum.TextXAlignment.Left
-    function wm:SetText(t) lbl.Text = tostring(t); tw(frame,{Size=U2(0,lbl.TextBounds.X+28,0,24)}) end
-    function wm:SetVisibility(v) frame.Visible = v end
-    wm:SetText(name); return wm
-end
-
--- ─── KeybindList ──────────────────────────────────────────────────────────────
-Library.KeybindList = function(self)
-    local KL = {}; self.KeyList = KL
-    local frame = I("Frame"); frame.Parent = Library.Holder; frame.Name = "\0"
-    frame.AnchorPoint = IsMobile and V2(1,0) or V2(0,0.5)
-    frame.Position = IsMobile and U2(1,-10,0.7,0) or U2(0,10,0.5,0)
-    frame.BackgroundColor3 = T.Surface; frame.BorderSizePixel = 0
-    frame.AutomaticSize = Enum.AutomaticSize.XY
-    Corner(frame, 4); Stroke(frame, T.Border, 1); Pad(frame,8,8,10,10)
-    local acTop = I("Frame"); acTop.Parent = frame; acTop.Name = "\0"
-    acTop.Position = U2(0,-10,0,-8); acTop.Size = U2(1,20,0,2)
-    acTop.BackgroundColor3 = T.Accent; acTop.BorderSizePixel = 0
-    local title = Label(frame,"Keybinds",11,T.Text,true)
-    local sep = I("Frame"); sep.Parent = frame; sep.Name = "\0"
-    sep.Position = U2(0,0,0,20); sep.Size = U2(1,0,0,1)
-    sep.BackgroundColor3 = T.Border; sep.BorderSizePixel = 0
-    local content = I("Frame"); content.Parent = frame; content.Name = "\0"
-    content.BackgroundTransparency = 1; content.Position = U2(0,0,0,26)
-    content.AutomaticSize = Enum.AutomaticSize.XY; content.BorderSizePixel = 0
-    List(content, Enum.FillDirection.Vertical, 4)
-    function KL:SetVisibility(v) frame.Visible = v end
-    function KL:Add(name, key)
-        local lbl = I("TextLabel"); lbl.Parent = content; lbl.Name = "\0"
-        lbl.FontFace = Library.Font; lbl.TextColor3 = T.TextMuted
-        lbl.Text = name.." ["..key.."]"; lbl.Size = U2(0,0,0,13)
-        lbl.BackgroundTransparency = 1; lbl.BorderSizePixel = 0
-        lbl.AutomaticSize = Enum.AutomaticSize.X; lbl.TextSize = 11
-        local item = {}
-        function item:SetText(n,k) lbl.Text = n.." ["..k.."]" end
-        function item:SetStatus(v)
-            if lbl.Text:find("Menu Keybind") then lbl.Visible=false; return end
-            lbl.Visible = v
-        end
-        return item
-    end
-    return KL
-end
-
--- ─── Notification ─────────────────────────────────────────────────────────────
-Library.Notification = function(self, text, duration)
-    local frame = I("Frame"); frame.Parent = Library.NotifHolder; frame.Name = "\0"
-    frame.Size = U2(0,20,0,20); frame.BackgroundColor3 = T.Surface
-    frame.BorderSizePixel = 0; frame.AutomaticSize = Enum.AutomaticSize.XY
-    Corner(frame, 4); Stroke(frame, T.Border, 1)
-    local acBar = I("Frame"); acBar.Parent = frame; acBar.Name = "\0"
-    acBar.Size = U2(0,3,0.7,0); acBar.AnchorPoint = V2(0,0.5)
-    acBar.Position = U2(0,7,0.5,0); acBar.BackgroundColor3 = T.Accent; acBar.BorderSizePixel = 0
-    Corner(acBar, 2)
-    Pad(frame,7,7,18,10)
-    local lbl = I("TextLabel"); lbl.Parent = frame; lbl.Name = "\0"
-    lbl.FontFace = Library.Font; lbl.TextColor3 = T.Text; lbl.Text = text
-    lbl.Size = U2(0,0,0,13); lbl.BackgroundTransparency = 1
-    lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.BorderSizePixel = 0
-    lbl.AutomaticSize = Enum.AutomaticSize.XY; lbl.TextSize = IsMobile and 13 or 11
-    frame.BackgroundTransparency = 1; lbl.TextTransparency = 1
-    frame.AutomaticSize = Enum.AutomaticSize.None
-    local sz = frame.AbsoluteSize
-    Library:Thread(function()
-        tw(frame,{BackgroundTransparency=0}); tw(lbl,{TextTransparency=0})
-        tw(frame,{Size=U2(0,sz.X,0,sz.Y)})
-        task.delay(duration+0.1,function()
-            tw(frame,{BackgroundTransparency=1}); tw(lbl,{TextTransparency=1})
-            tw(frame,{Size=U2(0,0,0,0)})
-            task.wait(0.5); frame:Destroy()
-        end)
-    end)
-end
-
--- ─── Window ───────────────────────────────────────────────────────────────────
+-- ─── Window ──────────────────────────────────────────────────────────────────
 Library.Window = function(self, Data)
-    Data = Data or {}
-    local Win = { Name=Data.Name or "Window", Pages={}, Items={}, IsOpen=false }
-    local WW, WH = GetWindowSize()
-    local SIDEBAR_W = IsMobile and 90 or 110
+    Data=Data or {}
+    local Window={Name=Data.Name or "Window",Pages={},Items={},IsOpen=false}
+    local Items={}
+    local WW,WH=GetWindowSize()
+    local SIDEBAR_W=IsMobile and 90 or 108
 
     -- Main frame
-    local main = I("Frame"); main.Parent = Library.Holder; main.Name = "\0"
-    main.AnchorPoint = V2(0.5,0.5); main.Position = U2(0.5,0,0.5,0)
-    main.Size = U2(0,WW,0,WH); main.BackgroundColor3 = T.Background
-    main.BorderSizePixel = 0
-    Corner(main, 8); Stroke(main, T.Border, 1)
-    MakeDraggable(main)
+    Items["MainFrame"]=Instances:Create("Frame",{
+        Parent=Library.Holder.Instance, Name="\0",
+        AnchorPoint=V2(0.5,0.5), Position=U2(0.5,0,0.5,0),
+        Size=U2(0,WW,0,WH), BorderSizePixel=0,
+        BackgroundColor3=T.Background})
+    Corner(Items["MainFrame"].Instance,8)
+    -- red border
+    local mainStroke=Stroke(Items["MainFrame"].Instance,T.Border,1)
+    Items["MainFrame"]:MakeDraggable()
 
     -- Top bar
-    local topH = IsMobile and 40 or 32
-    local topbar = I("Frame"); topbar.Parent = main; topbar.Name = "\0"
-    topbar.Size = U2(1,0,0,topH); topbar.BackgroundColor3 = T.TopBar
-    topbar.BorderSizePixel = 0
-    Corner(topbar, 8)
-    -- fill bottom half of topbar corners
-    local topFill = I("Frame"); topFill.Parent = topbar; topFill.Name = "\0"
-    topFill.Position = U2(0,0,0.5,0); topFill.Size = U2(1,0,0.5,0)
-    topFill.BackgroundColor3 = T.TopBar; topFill.BorderSizePixel = 0
-    -- separator line
-    local topSep = I("Frame"); topSep.Parent = topbar; topSep.Name = "\0"
-    topSep.Size = U2(1,0,0,1); topSep.Position = U2(0,0,1,0)
-    topSep.BackgroundColor3 = T.Border; topSep.BorderSizePixel = 0
+    local topH=IsMobile and 40 or 30
+    Items["TopBar"]=Instances:Create("Frame",{
+        Parent=Items["MainFrame"].Instance, Name="\0",
+        Size=U2(1,0,0,topH), BorderSizePixel=0,
+        BackgroundColor3=T.TopBar})
+    Corner(Items["TopBar"].Instance,8)
+    -- cover bottom corners of topbar
+    Instances:Create("Frame",{Parent=Items["TopBar"].Instance,Name="\0",Position=U2(0,0,0.5,0),Size=U2(1,0,0.5,0),BorderSizePixel=0,BackgroundColor3=T.TopBar})
+    -- separator
+    Instances:Create("Frame",{Parent=Items["TopBar"].Instance,Name="\0",Size=U2(1,0,0,1),Position=U2(0,0,1,-1),BorderSizePixel=0,BackgroundColor3=T.Border})
 
-    -- Title dot + text
-    local dot = I("Frame"); dot.Parent = topbar; dot.Name = "\0"
-    dot.Size = U2(0,6,0,6); dot.AnchorPoint = V2(0,0.5)
-    dot.Position = U2(0,12,0.5,0); dot.BackgroundColor3 = T.Accent; dot.BorderSizePixel = 0
-    Corner(dot, 99)
-    local titleLbl = I("TextLabel"); titleLbl.Parent = topbar; titleLbl.Name = "\0"
-    titleLbl.FontFace = Library.Fonts["GothamBold"]; titleLbl.TextColor3 = T.Text
-    titleLbl.Text = Win.Name; titleLbl.TextSize = IsMobile and 14 or 12
-    titleLbl.AnchorPoint = V2(0,0.5); titleLbl.Position = U2(0,24,0.5,0)
-    titleLbl.BackgroundTransparency = 1; titleLbl.BorderSizePixel = 0
-    titleLbl.AutomaticSize = Enum.AutomaticSize.X; titleLbl.Size = U2(0,0,0,14)
-
-    -- Close button (mobile)
-    if IsMobile then
-        local closeBtn = I("TextButton"); closeBtn.Parent = topbar; closeBtn.Name = "\0"
-        closeBtn.Text = "✕"; closeBtn.FontFace = Library.Fonts["GothamBold"]
-        closeBtn.TextColor3 = T.TextMuted; closeBtn.TextSize = 13
-        closeBtn.Size = U2(0,34,0,34); closeBtn.AnchorPoint = V2(1,0.5)
-        closeBtn.Position = U2(1,-4,0.5,0); closeBtn.BackgroundTransparency = 1
-        closeBtn.AutoButtonColor = false; closeBtn.BorderSizePixel = 0
-        closeBtn.MouseButton1Down:Connect(function() Win:SetOpen(false) end)
-    end
+    -- Red accent dot + title
+    local titleDot=Instances:Create("Frame",{
+        Parent=Items["TopBar"].Instance, Name="\0",
+        Size=U2(0,5,0,5), AnchorPoint=V2(0,0.5),
+        Position=U2(0,12,0.5,0), BorderSizePixel=0,
+        BackgroundColor3=T.Accent})
+    Corner(titleDot.Instance,99)
+    Items["Title"]=Instances:Create("TextLabel",{
+        Parent=Items["TopBar"].Instance, Name="\0",
+        FontFace=Library.Fonts["GothamBold"],
+        TextColor3=T.Text, Text=Window.Name,
+        Size=U2(0,0,0,12), AnchorPoint=V2(0,0.5),
+        BackgroundTransparency=1, Position=U2(0,22,0.5,0),
+        BorderSizePixel=0, AutomaticSize=Enum.AutomaticSize.X,
+        TextSize=IsMobile and 13 or 11,
+        BackgroundColor3=FromRGB(255,255,255)})
 
     -- Sidebar
-    local sidebar = I("Frame"); sidebar.Parent = main; sidebar.Name = "\0"
-    sidebar.Position = U2(0,0,0,topH); sidebar.Size = U2(0,SIDEBAR_W,1,-topH)
-    sidebar.BackgroundColor3 = T.Sidebar; sidebar.BorderSizePixel = 0
-    -- sidebar round bottom-left
-    Corner(sidebar, 8)
-    local sidebarFill = I("Frame"); sidebarFill.Parent = sidebar; sidebarFill.Name = "\0"
-    sidebarFill.Position = U2(0,0,0,0); sidebarFill.Size = U2(1,0,0,10)
-    sidebarFill.BackgroundColor3 = T.Sidebar; sidebarFill.BorderSizePixel = 0
-    -- sidebar right border
-    local sidebarBorder = I("Frame"); sidebarBorder.Parent = sidebar; sidebarBorder.Name = "\0"
-    sidebarBorder.Position = U2(1,0,0,0); sidebarBorder.Size = U2(0,1,1,0)
-    sidebarBorder.BackgroundColor3 = T.Border; sidebarBorder.BorderSizePixel = 0
+    local sidebar=Instances:Create("Frame",{
+        Parent=Items["MainFrame"].Instance, Name="\0",
+        Position=U2(0,0,0,topH), Size=U2(0,SIDEBAR_W,1,-topH),
+        BorderSizePixel=0, BackgroundColor3=T.Sidebar})
+    Corner(sidebar.Instance,8)
+    Instances:Create("Frame",{Parent=sidebar.Instance,Name="\0",Position=U2(0,0,0,0),Size=U2(1,0,0,10),BorderSizePixel=0,BackgroundColor3=T.Sidebar})
+    -- right border on sidebar
+    Instances:Create("Frame",{Parent=sidebar.Instance,Name="\0",Position=U2(1,-1,0,0),Size=U2(0,1,1,0),BorderSizePixel=0,BackgroundColor3=T.Border})
 
-    local navContainer = I("Frame"); navContainer.Parent = sidebar; navContainer.Name = "\0"
-    navContainer.BackgroundTransparency = 1; navContainer.Position = U2(0,0,0,8)
-    navContainer.Size = U2(1,0,1,-16); navContainer.BorderSizePixel = 0
-    navContainer.AutomaticSize = Enum.AutomaticSize.Y
-    List(navContainer, Enum.FillDirection.Vertical, 2)
-
-    -- Search box at bottom of sidebar
-    local searchFrame = I("Frame"); searchFrame.Parent = sidebar; searchFrame.Name = "\0"
-    searchFrame.AnchorPoint = V2(0,1); searchFrame.Position = U2(0,6,1,-8)
-    searchFrame.Size = U2(1,-12,0,20); searchFrame.BackgroundColor3 = T.Surface2
-    searchFrame.BorderSizePixel = 0
-    Corner(searchFrame, 3); Stroke(searchFrame, T.Border, 1)
-    local searchIcon = I("TextLabel"); searchIcon.Parent = searchFrame; searchIcon.Name = "\0"
-    searchIcon.Text = "⌕"; searchIcon.FontFace = Library.Font; searchIcon.TextSize = 11
-    searchIcon.TextColor3 = T.TextDim; searchIcon.BackgroundTransparency = 1
-    searchIcon.Size = U2(0,16,1,0); searchIcon.Position = U2(0,3,0,0); searchIcon.BorderSizePixel = 0
-    local searchBox = I("TextBox"); searchBox.Parent = searchFrame; searchBox.Name = "\0"
-    searchBox.FontFace = Library.Font; searchBox.TextSize = 10
-    searchBox.TextColor3 = T.TextMuted; searchBox.PlaceholderColor3 = T.TextDim
-    searchBox.PlaceholderText = "search..."; searchBox.Text = ""
-    searchBox.BackgroundTransparency = 1; searchBox.BorderSizePixel = 0
-    searchBox.Position = U2(0,18,0,0); searchBox.Size = U2(1,-20,1,0)
-    searchBox.TextXAlignment = Enum.TextXAlignment.Left; searchBox.ClearTextOnFocus = false
+    local navContainer=Instances:Create("Frame",{
+        Parent=sidebar.Instance, Name="\0",
+        BackgroundTransparency=1, Position=U2(0,4,0,8),
+        Size=U2(1,-8,1,-16), BorderSizePixel=0,
+        AutomaticSize=Enum.AutomaticSize.Y})
+    List(navContainer.Instance,Enum.FillDirection.Vertical,2)
 
     -- Content area
-    local content = I("Frame"); content.Parent = main; content.Name = "\0"
-    content.Position = U2(0,SIDEBAR_W+1,0,topH); content.BackgroundTransparency = 1
-    content.Size = U2(1,-SIDEBAR_W-1,1,-topH); content.BorderSizePixel = 0
-    content.ClipsDescendants = true
+    Items["Content"]=Instances:Create("Frame",{
+        Parent=Items["MainFrame"].Instance, Name="\0",
+        Position=U2(0,SIDEBAR_W,0,topH),
+        BackgroundTransparency=1,
+        Size=U2(1,-SIDEBAR_W,1,-topH),
+        BorderSizePixel=0, ClipsDescendants=true})
 
-    Win.Items = { Main=main, Topbar=topbar, Sidebar=sidebar, NavContainer=navContainer, Content=content, SearchBox=searchBox }
+    Items["NavContainer"]=navContainer
+    Window.Items=Items
 
-    local debounce = false
-    function Win:SetOpen(bool)
+    local Debounce=false
+    function Window:SetCenter()
+        local cp=Items["MainFrame"].Instance.AbsolutePosition; task.wait()
+        Items["MainFrame"].Instance.AnchorPoint=V2(0,0)
+        Items["MainFrame"].Instance.Position=U2(0,cp.X,0,cp.Y)
+    end
+    function Window:SetOpen(Bool)
         for _,v in Library.OpenFrames do v:SetOpen(false) end
-        if debounce then return end
-        Win.IsOpen = bool; debounce = true
-        if bool then
-            main.Visible = true; main.Size = U2(0,0,0,0); main.BackgroundTransparency = 1
-            local t = TweenService:Create(main, TweenInfo.new(0.3,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Size=U2(0,WW,0,WH),BackgroundTransparency=0})
-            t:Play(); t.Completed:Connect(function() main.Size=U2(0,WW,0,WH); debounce=false end)
+        if Debounce then return end; Window.IsOpen=Bool; Debounce=true
+        local frame=Items["MainFrame"].Instance
+        if Bool then
+            frame.Visible=true; frame.Size=U2(0,0,0,0); frame.BackgroundTransparency=1
+            local t=TweenService:Create(frame,TweenInfo.new(0.25,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=U2(0,WW,0,WH),BackgroundTransparency=0})
+            t:Play(); t.Completed:Connect(function() frame.Size=U2(0,WW,0,WH); frame.BackgroundTransparency=0; Debounce=false end)
         else
-            local t = TweenService:Create(main, TweenInfo.new(0.2,Enum.EasingStyle.Quart,Enum.EasingDirection.In), {Size=U2(0,0,0,0),BackgroundTransparency=1})
-            t:Play(); t.Completed:Connect(function() main.Visible=false; main.Size=U2(0,WW,0,WH); debounce=false end)
+            local t=TweenService:Create(frame,TweenInfo.new(0.18,Enum.EasingStyle.Quart,Enum.EasingDirection.In),{Size=U2(0,0,0,0),BackgroundTransparency=1})
+            t:Play(); t.Completed:Connect(function() frame.Visible=false; frame.Size=U2(0,WW,0,WH); frame.BackgroundTransparency=0; Debounce=false end)
         end
     end
-
-    if not IsMobile then
-        Library:Connect(UserInputService.InputBegan, function(inp)
-            if tostring(inp.KeyCode)==Library.MenuKeybind then
-                if not debounce then Win:SetOpen(not Win.IsOpen) end
-            end
-        end)
-    else
-        -- Mobile hamburger
-        local ham = I("TextButton"); ham.Parent = Library.Holder; ham.Name = "\0"
-        ham.Text = "☰"; ham.FontFace = Library.Fonts["GothamBold"]; ham.TextSize = 17
-        ham.TextColor3 = T.Text; ham.Size = U2(0,40,0,40); ham.Position = U2(0,8,0,8)
-        ham.BackgroundColor3 = T.Surface; ham.AutoButtonColor = false; ham.BorderSizePixel = 0; ham.ZIndex = 20
-        Corner(ham, 6); Stroke(ham, T.Border, 1)
-        MakeDraggable(ham)
-        ham.MouseButton1Down:Connect(function() Win:SetOpen(not Win.IsOpen) end)
-        Library.MobileHam = ham
-    end
-
-    -- Position fix
-    task.wait()
-    local cp = main.AbsolutePosition
-    main.AnchorPoint = V2(0,0); main.Position = U2(0,cp.X,0,cp.Y)
-    Win.IsOpen = true; main.Visible = true; main.Size = U2(0,WW,0,WH); main.BackgroundTransparency = 0
-
-    return setmetatable(Win, Library)
+    Library:Connect(UserInputService.InputBegan,function(Input)
+        if tostring(Input.KeyCode)==Library.MenuKeybind then
+            if not Debounce then Window:SetOpen(not Window.IsOpen) end
+        end
+    end)
+    Window:SetCenter(); task.wait()
+    Window.IsOpen=true
+    Items["MainFrame"].Instance.Visible=true
+    Items["MainFrame"].Instance.Size=U2(0,WW,0,WH)
+    Items["MainFrame"].Instance.BackgroundTransparency=0
+    return setmetatable(Window,Library)
 end
 
 -- ─── Page ─────────────────────────────────────────────────────────────────────
 Library.Page = function(self, Data)
-    Data = Data or {}
-    local Page = { Window=self, Name=Data.Name or "Page", Columns=Data.Columns or (IsMobile and 1 or 2), Items={}, ColumnsData={}, Active=false }
-    local nav = self.Items.NavContainer
+    Data=Data or {}
+    local Page={Window=self,Name=Data.Name or "Page",
+                Columns=Data.Columns or (IsMobile and 1 or 2),
+                Items={},ColumnsData={},Active=false}
+    local Items={}
+    local nav=Page.Window.Items["NavContainer"]
 
-    -- Nav item in sidebar
-    local navItem = I("TextButton"); navItem.Parent = nav; navItem.Name = "\0"
-    navItem.Text = ""; navItem.AutoButtonColor = false; navItem.BackgroundTransparency = 1
-    navItem.Size = U2(1,0,0,IsMobile and 32 or 26); navItem.BorderSizePixel = 0
-    navItem.BackgroundColor3 = T.Surface2
-    Corner(navItem, 4)
+    -- Sidebar nav button
+    Items["Tab"]=Instances:Create("TextButton",{
+        Parent=nav.Instance, Name="\0", Text="",
+        AutoButtonColor=false, BackgroundTransparency=1,
+        Size=U2(1,0,0,IsMobile and 32 or 26),
+        BorderSizePixel=0, BackgroundColor3=T.Surface2})
+    Corner(Items["Tab"].Instance,4)
 
-    -- accent line
-    local navAccent = I("Frame"); navAccent.Parent = navItem; navAccent.Name = "\0"
-    navAccent.Size = U2(0,2,0.55,0); navAccent.AnchorPoint = V2(0,0.5)
-    navAccent.Position = U2(0,6,0.5,0); navAccent.BackgroundColor3 = T.Accent
-    navAccent.BackgroundTransparency = 1; navAccent.BorderSizePixel = 0
-    Corner(navAccent, 2)
+    -- Active indicator: red left bar
+    local navAccent=Instances:Create("Frame",{
+        Parent=Items["Tab"].Instance, Name="\0",
+        Size=U2(0,2,0.5,0), AnchorPoint=V2(0,0.5),
+        Position=U2(0,4,0.5,0), BackgroundColor3=T.Accent,
+        BackgroundTransparency=1, BorderSizePixel=0})
+    Corner(navAccent.Instance,2)
 
-    -- nav dot
-    local navDot = I("Frame"); navDot.Parent = navItem; navDot.Name = "\0"
-    navDot.Size = U2(0,4,0,4); navDot.AnchorPoint = V2(0,0.5)
-    navDot.Position = U2(0,10,0.5,0); navDot.BackgroundColor3 = T.TextDim; navDot.BorderSizePixel = 0
-    Corner(navDot, 99)
+    local navDot=Instances:Create("Frame",{
+        Parent=Items["Tab"].Instance, Name="\0",
+        Size=U2(0,3,0,3), AnchorPoint=V2(0,0.5),
+        Position=U2(0,9,0.5,0), BackgroundColor3=T.TextDim,
+        BorderSizePixel=0})
+    Corner(navDot.Instance,99)
 
-    local navLbl = I("TextLabel"); navLbl.Parent = navItem; navLbl.Name = "\0"
-    navLbl.FontFace = Library.Font; navLbl.TextColor3 = T.TextMuted; navLbl.Text = Page.Name
-    navLbl.TextSize = IsMobile and 12 or 11; navLbl.BackgroundTransparency = 1; navLbl.BorderSizePixel = 0
-    navLbl.AnchorPoint = V2(0,0.5); navLbl.Position = U2(0,20,0.5,0)
-    navLbl.AutomaticSize = Enum.AutomaticSize.XY; navLbl.Size = U2(0,0,0,0)
-    navLbl.TextXAlignment = Enum.TextXAlignment.Left
+    local navLbl=Instances:Create("TextLabel",{
+        Parent=Items["Tab"].Instance, Name="\0",
+        FontFace=Library.Font, TextColor3=T.TextMuted,
+        Text=Page.Name, TextSize=IsMobile and 12 or 11,
+        BackgroundTransparency=1, BorderSizePixel=0,
+        AnchorPoint=V2(0,0.5), Position=U2(0,17,0.5,0),
+        AutomaticSize=Enum.AutomaticSize.XY,
+        Size=U2(0,0,0,0), TextXAlignment=Enum.TextXAlignment.Left})
 
-    -- Page content frame
-    local pageFrame = I("Frame"); pageFrame.Parent = Library.UnusedHolder; pageFrame.Name = "\0"
-    pageFrame.BackgroundTransparency = 1; pageFrame.Size = U2(1,0,1,0)
-    pageFrame.Position = U2(0,0,0,0); pageFrame.Visible = false; pageFrame.BorderSizePixel = 0
-    local pageList = I("UIListLayout"); pageList.FillDirection = Enum.FillDirection.Horizontal
-    pageList.HorizontalFlex = Enum.UIFlexAlignment.Fill; pageList.VerticalFlex = Enum.UIFlexAlignment.Fill
-    pageList.SortOrder = Enum.SortOrder.LayoutOrder; pageList.Parent = pageFrame
+    -- Page frame
+    Items["Page"]=Instances:Create("Frame",{
+        Parent=Library.UnusedHolder.Instance, Name="\0",
+        BackgroundTransparency=1, Position=U2(0,0,0,0),
+        Visible=false, Size=U2(1,0,1,0), BorderSizePixel=0,
+        BackgroundColor3=FromRGB(255,255,255)})
+    Instances:Create("UIListLayout",{
+        Parent=Items["Page"].Instance, Name="\0",
+        FillDirection=Enum.FillDirection.Horizontal,
+        HorizontalFlex=Enum.UIFlexAlignment.Fill,
+        SortOrder=Enum.SortOrder.LayoutOrder,
+        VerticalFlex=Enum.UIFlexAlignment.Fill})
 
-    for i = 1, Page.Columns do
-        local col = I("ScrollingFrame"); col.Parent = pageFrame; col.Name = "\0"
-        col.ScrollBarImageColor3 = T.BorderLight; col.Active = true
-        col.AutomaticCanvasSize = Enum.AutomaticSize.Y; col.BorderSizePixel = 0
-        col.ScrollBarThickness = IsMobile and 3 or 2; col.BackgroundTransparency = 1
-        col.Size = U2(0,100,0,100); col.CanvasSize = U2(0,0,0,0)
-        col.ElasticBehavior = IsMobile and Enum.ElasticBehavior.Always or Enum.ElasticBehavior.WhenScrollable
-        local padV = IsMobile and 8 or 6
-        Pad(col, padV, padV+2, padV, padV)
-        List(col, Enum.FillDirection.Vertical, IsMobile and 10 or 8)
-        Page.ColumnsData[i] = col
+    for i=1,Page.Columns do
+        local col=Instances:Create("ScrollingFrame",{
+            Parent=Items["Page"].Instance, Name="\0",
+            ScrollBarImageColor3=T.Border, Active=true,
+            AutomaticCanvasSize=Enum.AutomaticSize.Y,
+            BorderSizePixel=0, ScrollBarThickness=IsMobile and 3 or 2,
+            BackgroundTransparency=1, Size=U2(0,100,0,100),
+            CanvasSize=U2(0,0,0,0)})
+        local padV=IsMobile and 8 or 6
+        Instances:Create("UIPadding",{Parent=col.Instance,Name="\0",PaddingTop=UD(0,padV),PaddingBottom=UD(0,padV+2),PaddingLeft=UD(0,padV),PaddingRight=UD(0,padV)})
+        Instances:Create("UIListLayout",{Parent=col.Instance,Name="\0",Padding=UD(0,IsMobile and 10 or 7),SortOrder=Enum.SortOrder.LayoutOrder})
+        Page.ColumnsData[i]=col
     end
 
-    Page.Items = { NavItem=navItem, NavAccent=navAccent, NavDot=navDot, NavLbl=navLbl, PageFrame=pageFrame }
+    Page.Items=Items
+    local Debounce=false
 
-    function Page:Turn(bool)
-        Page.Active = bool
-        pageFrame.Visible = bool
-        pageFrame.Parent = bool and Page.Window.Items.Content or Library.UnusedHolder
-        if bool then
-            tw(navItem, {BackgroundTransparency=0})
-            tw(navAccent, {BackgroundTransparency=0})
-            tw(navDot, {BackgroundColor3=T.Accent})
-            navLbl.TextColor3 = T.Text
+    function Page:Turn(Bool)
+        if Debounce then return end; Page.Active=Bool; Debounce=true
+        Items["Page"].Instance.Visible=Bool
+        Items["Page"].Instance.Parent=Bool and Page.Window.Items["Content"].Instance or Library.UnusedHolder.Instance
+        if Page.Active then
+            Items["Tab"]:Tween(nil,{BackgroundTransparency=0})
+            navAccent:Tween(nil,{BackgroundTransparency=0})
+            tw(navDot.Instance,{BackgroundColor3=T.Accent})
+            navLbl.Instance.TextColor3=T.Text
         else
-            tw(navItem, {BackgroundTransparency=1})
-            tw(navAccent, {BackgroundTransparency=1})
-            tw(navDot, {BackgroundColor3=T.TextDim})
-            navLbl.TextColor3 = T.TextMuted
+            Items["Tab"]:Tween(nil,{BackgroundTransparency=1})
+            navAccent:Tween(nil,{BackgroundTransparency=1})
+            tw(navDot.Instance,{BackgroundColor3=T.TextDim})
+            navLbl.Instance.TextColor3=T.TextMuted
         end
+        Debounce=false
     end
 
-    navItem.MouseButton1Down:Connect(function()
-        for _, v in Page.Window.Pages do
-            if v == Page and Page.Active then return end
-            v:Turn(v == Page)
+    Items["Tab"]:Connect("MouseButton1Down",function()
+        for _,v in Page.Window.Pages do
+            if v==Page and Page.Active then return end
+            v:Turn(v==Page)
         end
     end)
 
-    -- Search filter
-    Library:Connect(self.Items.SearchBox:GetPropertyChangedSignal("Text"), function()
-        local q = string.lower(self.Items.SearchBox.Text)
-        for _, section in Library.Sections do
-            if section.Page == Page then
-                -- show/hide individual rows based on search
-                for _, item in (section.SearchItems or {}) do
-                    if q == "" then item.Visible = true
-                    else item.Visible = string.find(string.lower(item.Name), Library:EscapePattern(q)) and true or false end
-                end
-            end
-        end
-    end)
-
-    if #Page.Window.Pages == 0 then Page:Turn(true) end
-    table.insert(Page.Window.Pages, Page)
-    return setmetatable(Page, Library.Pages)
+    if #Page.Window.Pages==0 then Page:Turn(true) end
+    TIns(Page.Window.Pages,Page)
+    return setmetatable(Page,Library.Pages)
 end
 
 -- ─── Section ──────────────────────────────────────────────────────────────────
 Library.Pages.Section = function(self, Data)
-    Data = Data or {}
-    local Section = { Window=self.Window, Page=self, Name=Data.Name or "Section", Side=Data.Side or 1, Items={}, SearchItems={} }
-    table.insert(Library.Sections, Section)
+    Data=Data or {}
+    local Section={Window=self.Window,Page=self,
+                   Name=Data.Name or "Section",
+                   Side=Data.Side or 1,Items={}}
+    local Items={}
+    local parent=Section.Page.ColumnsData[Section.Side]
 
-    local parent = Section.Page.ColumnsData[Section.Side]
+    Items["Section"]=Instances:Create("Frame",{
+        Parent=parent.Instance, Name="\0",
+        Size=U2(1,0,0,30), BorderSizePixel=0,
+        AutomaticSize=Enum.AutomaticSize.Y,
+        BackgroundColor3=T.Surface})
+    Corner(Items["Section"].Instance,6)
+    Stroke(Items["Section"].Instance,T.Border,1)
+    Pad(Items["Section"].Instance,0,IsMobile and 12 or 8,0,0)
 
-    local frame = I("Frame"); frame.Parent = parent; frame.Name = "\0"
-    frame.Size = U2(1,0,0,30); frame.BorderSizePixel = 0
-    frame.AutomaticSize = Enum.AutomaticSize.Y; frame.BackgroundColor3 = T.Surface
-    Corner(frame, 6); Stroke(frame, T.Border, 1)
-    Pad(frame, 0, IsMobile and 12 or 8, 0, 0)
+    local hdrH=IsMobile and 30 or 24
+    Items["Header"]=Instances:Create("Frame",{
+        Parent=Items["Section"].Instance, Name="\0",
+        Size=U2(1,0,0,hdrH), BorderSizePixel=0,
+        BackgroundColor3=T.Surface2})
+    Corner(Items["Header"].Instance,6)
+    Instances:Create("Frame",{Parent=Items["Header"].Instance,Name="\0",Position=U2(0,0,0.5,0),Size=U2(1,0,0.5,0),BorderSizePixel=0,BackgroundColor3=T.Surface2})
 
-    -- Header
-    local hdrH = IsMobile and 32 or 26
-    local header = I("Frame"); header.Parent = frame; header.Name = "\0"
-    header.Size = U2(1,0,0,hdrH); header.BackgroundColor3 = T.Surface2; header.BorderSizePixel = 0
-    Corner(header, 6)
-    -- fill bottom half
-    local hdrFill = I("Frame"); hdrFill.Parent = header; hdrFill.Name = "\0"
-    hdrFill.Position = U2(0,0,0.5,0); hdrFill.Size = U2(1,0,0.5,0)
-    hdrFill.BackgroundColor3 = T.Surface2; hdrFill.BorderSizePixel = 0
-    -- accent bar
-    local hAccent = I("Frame"); hAccent.Parent = header; hAccent.Name = "\0"
-    hAccent.Size = U2(0,3,0.5,0); hAccent.AnchorPoint = V2(0,0.5); hAccent.Position = U2(0,8,0.5,0)
-    hAccent.BackgroundColor3 = T.Accent; hAccent.BorderSizePixel = 0
-    Corner(hAccent, 2)
-    -- title
-    local hTitle = I("TextLabel"); hTitle.Parent = header; hTitle.Name = "\0"
-    hTitle.FontFace = Library.Fonts["GothamBold"]; hTitle.TextColor3 = T.Text; hTitle.Text = Section.Name
-    hTitle.AnchorPoint = V2(0,0.5); hTitle.Size = U2(1,-22,0,12); hTitle.BackgroundTransparency = 1
-    hTitle.Position = U2(0,17,0.5,0); hTitle.BorderSizePixel = 0; hTitle.AutomaticSize = Enum.AutomaticSize.X
-    hTitle.TextSize = IsMobile and 12 or 10; hTitle.TextXAlignment = Enum.TextXAlignment.Left
+    -- Red accent bar on section header
+    local hAccent=Instances:Create("Frame",{
+        Parent=Items["Header"].Instance, Name="\0",
+        Size=U2(0,2,0.45,0), AnchorPoint=V2(0,0.5),
+        Position=U2(0,7,0.5,0), BorderSizePixel=0,
+        BackgroundColor3=T.Accent})
+    Corner(hAccent.Instance,2)
 
-    -- separator
-    local sep = I("Frame"); sep.Parent = frame; sep.Name = "\0"
-    sep.Position = U2(0,8,0,hdrH+1); sep.Size = U2(1,-16,0,1)
-    sep.BackgroundColor3 = T.Border; sep.BorderSizePixel = 0
+    Items["Text"]=Instances:Create("TextLabel",{
+        Parent=Items["Header"].Instance, Name="\0",
+        FontFace=Library.Fonts["GothamBold"],
+        TextColor3=T.Text, Text=Section.Name,
+        AnchorPoint=V2(0,0.5),
+        Size=U2(1,-20,0,10), BackgroundTransparency=1,
+        Position=U2(0,14,0.5,0), BorderSizePixel=0,
+        AutomaticSize=Enum.AutomaticSize.X,
+        TextSize=IsMobile and 11 or 10,
+        TextXAlignment=Enum.TextXAlignment.Left,
+        BackgroundColor3=FromRGB(255,255,255)})
 
-    -- content
-    local content = I("Frame"); content.Parent = frame; content.Name = "\0"
-    content.BorderSizePixel = 0; content.BackgroundTransparency = 1
-    content.Position = U2(0,10,0,hdrH+8); content.Size = U2(1,-20,0,0)
-    content.AutomaticSize = Enum.AutomaticSize.Y
-    List(content, Enum.FillDirection.Vertical, IsMobile and 9 or 6)
+    Instances:Create("Frame",{
+        Parent=Items["Section"].Instance, Name="\0",
+        Position=U2(0,8,0,hdrH), Size=U2(1,-16,0,1),
+        BorderSizePixel=0, BackgroundColor3=T.Border})
 
-    Section.Items = { Frame=frame, Content=content }
-    return setmetatable(Section, Library.Sections)
+    Items["Content"]=Instances:Create("Frame",{
+        Parent=Items["Section"].Instance, Name="\0",
+        BorderSizePixel=0, BackgroundTransparency=1,
+        Position=U2(0,10,0,hdrH+7),
+        Size=U2(1,-20,0,0),
+        AutomaticSize=Enum.AutomaticSize.Y,
+        BackgroundColor3=FromRGB(255,255,255)})
+    List(Items["Content"].Instance,Enum.FillDirection.Vertical,IsMobile and 9 or 6)
+    Section.Items=Items
+    return setmetatable(Section,Library.Sections)
 end
 
--- ─── Toggle (pill style) ──────────────────────────────────────────────────────
+-- ─── Toggle ──────────────────────────────────────────────────────────────────
 Library.Sections.Toggle = function(self, Data)
-    Data = Data or {}
-    local Toggle = { Window=self.Window, Page=self.Page, Section=self, Name=Data.Name or "Toggle", Flag=Data.Flag or Library:NextFlag(), Default=Data.Default or false, Callback=Data.Callback or function() end, Value=false }
-    local rowH = IsMobile and 24 or 18
-    local pillW = IsMobile and 32 or 26; local pillH = IsMobile and 16 or 12
-    local thumbSz = IsMobile and 10 or 8
+    Data=Data or {}
+    local Toggle={Window=self.Window,Page=self.Page,Section=self,
+                  Name=Data.Name or "Toggle",
+                  Flag=Data.Flag or Library:NextFlag(),
+                  Default=Data.Default or false,
+                  Callback=Data.Callback or function() end,
+                  Value=false}
+    local rowH=IsMobile and 24 or 18
+    local pillW=IsMobile and 32 or 26; local pillH=IsMobile and 16 or 12
+    local thumbSz=IsMobile and 10 or 8
+    local Items={}
 
-    local row = I("TextButton"); row.Parent = Toggle.Section.Items.Content; row.Name = "\0"
-    row.Text = ""; row.AutoButtonColor = false; row.BackgroundTransparency = 1
-    row.Size = U2(1,0,0,rowH); row.BorderSizePixel = 0
-    row.ClipsDescendants = true
+    Items["Row"]=Instances:Create("TextButton",{
+        Parent=Toggle.Section.Items["Content"].Instance, Name="\0",
+        Text="", AutoButtonColor=false, BackgroundTransparency=1,
+        Size=U2(1,0,0,rowH), BorderSizePixel=0,
+        BackgroundColor3=FromRGB(255,255,255)})
+    Items["Text"]=Instances:Create("TextLabel",{
+        Parent=Items["Row"].Instance, Name="\0",
+        FontFace=Library.Font, TextColor3=T.TextMuted,
+        Text=Toggle.Name, AnchorPoint=V2(0,0.5),
+        Position=U2(0,0,0.5,0), Size=U2(0,0,0,12),
+        BackgroundTransparency=1, BorderSizePixel=0,
+        AutomaticSize=Enum.AutomaticSize.X,
+        TextSize=IsMobile and 13 or 11,
+        TextXAlignment=Enum.TextXAlignment.Left,
+        BackgroundColor3=FromRGB(255,255,255)})
 
-    local rowLbl = I("TextLabel"); rowLbl.Parent = row; rowLbl.Name = "\0"
-    rowLbl.FontFace = Library.Font; rowLbl.TextColor3 = T.TextMuted; rowLbl.Text = Toggle.Name
-    rowLbl.AnchorPoint = V2(0,0.5); rowLbl.Position = U2(0,0,0.5,0)
-    rowLbl.Size = U2(0,0,0,12); rowLbl.BackgroundTransparency = 1; rowLbl.BorderSizePixel = 0
-    rowLbl.AutomaticSize = Enum.AutomaticSize.X; rowLbl.TextSize = IsMobile and 13 or 11
-    rowLbl.TextXAlignment = Enum.TextXAlignment.Left
+    Items["SubElements"]=Instances:Create("Frame",{
+        Parent=Items["Row"].Instance, Name="\0",
+        AnchorPoint=V2(1,0.5), Position=U2(1,0,0.5,0),
+        Size=U2(0,0,1,0), ZIndex=2,
+        AutomaticSize=Enum.AutomaticSize.X,
+        BackgroundTransparency=1, BorderSizePixel=0,
+        BackgroundColor3=FromRGB(255,255,255)})
+    Instances:Create("UIListLayout",{
+        Parent=Items["SubElements"].Instance, Name="\0",
+        VerticalAlignment=Enum.VerticalAlignment.Center,
+        FillDirection=Enum.FillDirection.Horizontal,
+        HorizontalAlignment=Enum.HorizontalAlignment.Right,
+        Padding=UD(0,IsMobile and 8 or 6),
+        SortOrder=Enum.SortOrder.LayoutOrder})
 
-    -- sub-elements (colorpicker, keybind)
-    local sub = I("Frame"); sub.Parent = row; sub.Name = "\0"
-    sub.AnchorPoint = V2(1,0.5); sub.Position = U2(1,0,0.5,0)
-    sub.Size = U2(0,0,1,0); sub.AutomaticSize = Enum.AutomaticSize.X
-    sub.BackgroundTransparency = 1; sub.BorderSizePixel = 0
-    local subList = I("UIListLayout"); subList.FillDirection = Enum.FillDirection.Horizontal
-    subList.VerticalAlignment = Enum.VerticalAlignment.Center
-    subList.HorizontalAlignment = Enum.HorizontalAlignment.Right
-    subList.Padding = UD(0, IsMobile and 8 or 6); subList.SortOrder = Enum.SortOrder.LayoutOrder; subList.Parent = sub
-
-    -- pill track
-    local pillTrack = I("Frame"); pillTrack.Parent = sub; pillTrack.Name = "\0"
-    pillTrack.Size = U2(0,pillW,0,pillH); pillTrack.BackgroundColor3 = T.Surface3
-    pillTrack.BorderSizePixel = 0; pillTrack.LayoutOrder = 999
-    Corner(pillTrack, 99)
-    local pillStroke = Stroke(pillTrack, T.Border, 1)
-
-    -- pill thumb
-    local thumb = I("Frame"); thumb.Parent = pillTrack; thumb.Name = "\0"
-    thumb.Size = U2(0,thumbSz,0,thumbSz); thumb.AnchorPoint = V2(0,0.5)
-    thumb.Position = U2(0,2,0.5,0); thumb.BackgroundColor3 = T.TextMuted; thumb.BorderSizePixel = 0
-    Corner(thumb, 99)
-
-    -- hover
-    local function onHover() if not Toggle.Value then tw(pillTrack,{BackgroundColor3=Library:GetLighterColor(T.Surface3,1.5)}) end end
-    local function onLeave() if not Toggle.Value then tw(pillTrack,{BackgroundColor3=T.Surface3}) end end
-    if not IsMobile then
-        row.MouseEnter:Connect(onHover); row.MouseLeave:Connect(onLeave)
-    end
+    -- Pill toggle
+    local pillTrack=Instances:Create("Frame",{
+        Parent=Items["SubElements"].Instance, Name="\0",
+        Size=U2(0,pillW,0,pillH), BorderSizePixel=0,
+        BackgroundColor3=T.Surface3, LayoutOrder=999})
+    Corner(pillTrack.Instance,99)
+    local pillStroke=Stroke(pillTrack.Instance,T.Border,1)
+    local thumb=Instances:Create("Frame",{
+        Parent=pillTrack.Instance, Name="\0",
+        Size=U2(0,thumbSz,0,thumbSz), AnchorPoint=V2(0,0.5),
+        Position=U2(0,2,0.5,0), BackgroundColor3=T.TextMuted,
+        BorderSizePixel=0})
+    Corner(thumb.Instance,99)
+    Items["Box"]=pillTrack; Items["Check"]=thumb
 
     function Toggle:Get() return Toggle.Value end
-    function Toggle:Set(v)
-        Toggle.Value = v; Library.Flags[Toggle.Flag] = v
-        if v then
-            tw(pillTrack,{BackgroundColor3=T.AccentDim}); tw(pillStroke,{Color=T.Accent})
-            tw(thumb,{Position=U2(1,-(thumbSz+2),0.5,0),BackgroundColor3=T.Accent})
-            tw(rowLbl,{TextColor3=T.Text})
+    function Toggle:Set(Value)
+        Toggle.Value=Value; Library.Flags[Toggle.Flag]=Value
+        if Toggle.Value then
+            pillTrack:Tween(nil,{BackgroundColor3=T.AccentDim})
+            tw(pillStroke,{Color=T.Accent})
+            thumb:Tween(TweenInfo.new(0.18,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
+                {Position=U2(1,-(thumbSz+2),0.5,0),BackgroundColor3=T.Accent})
+            Items["Text"].Instance.TextColor3=T.Text
         else
-            tw(pillTrack,{BackgroundColor3=T.Surface3}); tw(pillStroke,{Color=T.Border})
-            tw(thumb,{Position=U2(0,2,0.5,0),BackgroundColor3=T.TextMuted})
-            tw(rowLbl,{TextColor3=T.TextMuted})
+            pillTrack:Tween(nil,{BackgroundColor3=T.Surface3})
+            tw(pillStroke,{Color=T.Border})
+            thumb:Tween(TweenInfo.new(0.18,Enum.EasingStyle.Back,Enum.EasingDirection.In),
+                {Position=U2(0,2,0.5,0),BackgroundColor3=T.TextMuted})
+            Items["Text"].Instance.TextColor3=T.TextMuted
         end
-        if Toggle.Callback then Library:SafeCall(Toggle.Callback, v) end
+        if Toggle.Callback then Library:SafeCall(Toggle.Callback,Toggle.Value) end
     end
     function Toggle:Colorpicker(d)
-        d = d or {}
+        d=d or {}
         return Library:CreateColorpicker({
-            Parent = sub, Flag = d.Flag or Library:NextFlag(),
-            Default = d.Default or RGB(64,208,128), Alpha = d.Alpha or 0,
-            Callback = d.Callback or function() end
-        })
+            Parent=Items["SubElements"], Page=Toggle.Page,
+            Flag=d.Flag or Library:NextFlag(), Section=Toggle.Section,
+            Default=d.Default or Color3.fromRGB(220,40,40),
+            Alpha=d.Alpha or 0,
+            Callback=d.Callback or function() end})
     end
     function Toggle:Keybind(d)
-        d = d or {}
+        d=d or {}
         return Library:CreateKeybind({
-            Name = Toggle.Name, Parent = sub, Flag = d.Flag or Library:NextFlag(),
-            Default = d.Default or Enum.KeyCode.RightShift, Mode = d.Mode or "Toggle",
-            Callback = d.Callback or function() end
-        })
+            Name=Toggle.Name, Parent=Items["SubElements"],
+            Flag=d.Flag or Library:NextFlag(), Section=Toggle.Section,
+            Default=d.Default or Enum.KeyCode.RightShift,
+            Mode=d.Mode or "Toggle",
+            Callback=d.Callback or function() end})
     end
-    function Toggle:SetVisibility(v) row.Visible = v end
+    function Toggle:SetVisibility(Bool) Items["Row"].Instance.Visible=Bool end
 
-    row.MouseButton1Down:Connect(function() Toggle:Set(not Toggle.Value) end)
+    Items["Row"]:OnHover(function()
+        if not Toggle.Value then pillTrack:Tween(nil,{BackgroundColor3=Library:GetLighterColor(T.Surface3,1.4)}) end
+    end)
+    Items["Row"]:OnHoverLeave(function()
+        if not Toggle.Value then pillTrack:Tween(nil,{BackgroundColor3=T.Surface3}) end
+    end)
+    Items["Row"]:Connect("MouseButton1Down",function() Toggle:Set(not Toggle.Value) end)
     Toggle:Set(Toggle.Default)
-    Library.SetFlags[Toggle.Flag] = function(v) Toggle:Set(v) end
-
-    table.insert(Toggle.Section.SearchItems, {Visible=true, Name=Toggle.Name, Instance=row})
+    Library.SetFlags[Toggle.Flag]=function(v) Toggle:Set(v) end
     return Toggle
 end
 
 -- ─── Button ───────────────────────────────────────────────────────────────────
 Library.Sections.Button = function(self, Data)
-    Data = Data or {}
-    local Button = { Window=self.Window, Page=self.Page, Section=self, Name=Data.Name or "Button", Callback=Data.Callback or function() end }
-    local btnH = IsMobile and 30 or 22
-
-    local b = I("TextButton"); b.Parent = Button.Section.Items.Content; b.Name = "\0"
-    b.FontFace = Library.Font; b.TextColor3 = T.Text; b.Text = Button.Name
-    b.AutoButtonColor = false; b.Size = U2(1,0,0,btnH); b.BorderSizePixel = 0
-    b.TextSize = IsMobile and 13 or 11; b.BackgroundColor3 = T.Surface3
-    Corner(b, 4); Stroke(b, T.Border, 1)
-
-    if not IsMobile then
-        b.MouseEnter:Connect(function() tw(b,{BackgroundColor3=Library:GetLighterColor(T.Surface3,1.5)}) end)
-        b.MouseLeave:Connect(function() tw(b,{BackgroundColor3=T.Surface3}) end)
-    end
+    Data=Data or {}
+    local Button={Window=self.Window,Page=self.Page,Section=self,
+                  Name=Data.Name or "Button",
+                  Callback=Data.Callback or function() end}
+    local Items={}; local btnH=IsMobile and 30 or 22
+    Items["Button"]=Instances:Create("TextButton",{
+        Parent=Button.Section.Items["Content"].Instance, Name="\0",
+        FontFace=Library.Font, TextColor3=T.Text, Text=Button.Name,
+        AutoButtonColor=false, Size=U2(1,0,0,btnH),
+        BorderSizePixel=0, TextSize=IsMobile and 13 or 11,
+        BackgroundColor3=T.Surface3})
+    Corner(Items["Button"].Instance,4); Stroke(Items["Button"].Instance,T.Border,1)
+    Items["Button"]:OnHover(function()
+        Items["Button"]:Tween(nil,{BackgroundColor3=T.Surface2,TextColor3=T.AccentGlow})
+    end)
+    Items["Button"]:OnHoverLeave(function()
+        Items["Button"]:Tween(nil,{BackgroundColor3=T.Surface3,TextColor3=T.Text})
+    end)
+    function Button:SetVisibility(Bool) Items["Button"].Instance.Visible=Bool end
     function Button:Press()
-        tw(b,{BackgroundColor3=T.AccentDim,TextColor3=T.Accent}); Library:SafeCall(Button.Callback)
-        task.wait(0.12); tw(b,{BackgroundColor3=T.Surface3,TextColor3=T.Text})
+        Items["Button"]:Tween(nil,{BackgroundColor3=T.AccentDim,TextColor3=T.Accent})
+        Library:SafeCall(Button.Callback)
+        task.wait(0.12)
+        Items["Button"]:Tween(nil,{BackgroundColor3=T.Surface3,TextColor3=T.Text})
     end
-    function Button:SetVisibility(v) b.Visible = v end
-    b.MouseButton1Down:Connect(function() Button:Press() end)
+    Items["Button"]:Connect("MouseButton1Down",function() Button:Press() end)
     return Button
 end
 
 -- ─── Slider ───────────────────────────────────────────────────────────────────
 Library.Sections.Slider = function(self, Data)
-    Data = Data or {}
-    local Slider = { Window=self.Window, Page=self.Page, Section=self, Name=Data.Name or "Slider", Flag=Data.Flag or Library:NextFlag(), Min=Data.Min or 0, Max=Data.Max or 100, Default=Data.Default or 0, Decimals=Data.Decimals or 1, Suffix=Data.Suffix or "", Callback=Data.Callback or function() end, Value=0, Sliding=false }
-    local containerH = IsMobile and 40 or 32; local trackH = IsMobile and 14 or 9
+    Data=Data or {}
+    local Slider={Window=self.Window,Page=self.Page,Section=self,
+                  Name=Data.Name or "Slider",
+                  Flag=Data.Flag or Library:NextFlag(),
+                  Min=Data.Min or 0, Max=Data.Max or 100,
+                  Default=Data.Default or 0,
+                  Decimals=Data.Decimals or 1,
+                  Suffix=Data.Suffix or "",
+                  Callback=Data.Callback or function() end,
+                  Value=0, Sliding=false}
+    local Items={}
+    local containerH=IsMobile and 38 or 30; local trackH=IsMobile and 12 or 7
 
-    local container = I("Frame"); container.Parent = Slider.Section.Items.Content; container.Name = "\0"
-    container.BackgroundTransparency = 1; container.Size = U2(1,0,0,containerH); container.BorderSizePixel = 0
-
-    local topRow = I("Frame"); topRow.Parent = container; topRow.Name = "\0"
-    topRow.BackgroundTransparency = 1; topRow.Size = U2(1,0,0,13); topRow.BorderSizePixel = 0
-
-    local nameLbl = I("TextLabel"); nameLbl.Parent = topRow; nameLbl.Name = "\0"
-    nameLbl.FontFace = Library.Font; nameLbl.TextColor3 = T.TextMuted; nameLbl.Text = Slider.Name
-    nameLbl.BackgroundTransparency = 1; nameLbl.Size = U2(0,0,1,0)
-    nameLbl.AutomaticSize = Enum.AutomaticSize.X; nameLbl.BorderSizePixel = 0
-    nameLbl.TextSize = IsMobile and 12 or 11; nameLbl.TextXAlignment = Enum.TextXAlignment.Left
-
-    local valBox = I("TextBox"); valBox.Parent = topRow; valBox.Name = "\0"
-    valBox.FontFace = Library.Fonts["Mono"] or Library.Font; valBox.Active = false
-    valBox.TextColor3 = T.Accent; valBox.TextSize = IsMobile and 11 or 10
-    valBox.Size = U2(0,0,1,0); valBox.AnchorPoint = V2(1,0); valBox.Position = U2(1,0,0,0)
-    valBox.AutomaticSize = Enum.AutomaticSize.X; valBox.BackgroundTransparency = 1
-    valBox.BorderSizePixel = 0; valBox.Text = "0"; valBox.Selectable = false; valBox.ClearTextOnFocus = false
-    valBox.TextXAlignment = Enum.TextXAlignment.Right
-
-    local track = I("TextButton"); track.Parent = container; track.Name = "\0"
-    track.Text = ""; track.AutoButtonColor = false
-    track.AnchorPoint = V2(0,1); track.Position = U2(0,0,1,0)
-    track.Size = U2(1,0,0,trackH); track.BorderSizePixel = 0; track.BackgroundColor3 = T.Surface3
-    Corner(track, 99); Stroke(track, T.Border, 1)
-
-    local fill = I("Frame"); fill.Parent = track; fill.Name = "\0"
-    fill.Position = U2(0,1,0,1); fill.Size = U2(0.5,0,1,-2); fill.BorderSizePixel = 0
-    fill.BackgroundColor3 = T.Accent
-    Corner(fill, 99)
-
-    if not IsMobile then
-        track.MouseEnter:Connect(function() tw(track,{BackgroundColor3=Library:GetLighterColor(T.Surface3,1.5)}) end)
-        track.MouseLeave:Connect(function() tw(track,{BackgroundColor3=T.Surface3}) end)
-    end
+    Items["Container"]=Instances:Create("Frame",{
+        Parent=Slider.Section.Items["Content"].Instance, Name="\0",
+        BackgroundTransparency=1, Size=U2(1,0,0,containerH),
+        BorderSizePixel=0, BackgroundColor3=FromRGB(255,255,255)})
+    local topRow=Instances:Create("Frame",{
+        Parent=Items["Container"].Instance, Name="\0",
+        BackgroundTransparency=1, Size=U2(1,0,0,13),
+        BorderSizePixel=0, BackgroundColor3=FromRGB(255,255,255)})
+    Items["Text"]=Instances:Create("TextLabel",{
+        Parent=topRow.Instance, Name="\0",
+        FontFace=Library.Font, TextColor3=T.TextMuted,
+        Text=Slider.Name, BackgroundTransparency=1,
+        Size=U2(0,0,1,0), AutomaticSize=Enum.AutomaticSize.X,
+        BorderSizePixel=0, TextSize=IsMobile and 12 or 11,
+        BackgroundColor3=FromRGB(255,255,255)})
+    Items["Value"]=Instances:Create("TextBox",{
+        Parent=topRow.Instance, Name="\0",
+        FontFace=Library.Font, Active=false,
+        TextColor3=T.Accent, TextSize=IsMobile and 11 or 10,
+        Size=U2(0,0,1,0), AnchorPoint=V2(1,0), Position=U2(1,0,0,0),
+        AutomaticSize=Enum.AutomaticSize.X,
+        BackgroundTransparency=1, BorderSizePixel=0, Text="0",
+        Selectable=false, ClearTextOnFocus=false,
+        BackgroundColor3=FromRGB(255,255,255),
+        TextXAlignment=Enum.TextXAlignment.Right})
+    Items["Track"]=Instances:Create("TextButton",{
+        Parent=Items["Container"].Instance, Name="\0",
+        Text="", AutoButtonColor=false, AnchorPoint=V2(0,1),
+        Position=U2(0,0,1,0), Size=U2(1,0,0,trackH),
+        BorderSizePixel=0, BackgroundColor3=T.Surface3})
+    Corner(Items["Track"].Instance,99); Stroke(Items["Track"].Instance,T.Border,1)
+    Items["Fill"]=Instances:Create("Frame",{
+        Parent=Items["Track"].Instance, Name="\0",
+        Position=U2(0,1,0,1), Size=U2(0.5,0,1,-2),
+        BorderSizePixel=0, BackgroundColor3=T.Accent})
+    Corner(Items["Fill"].Instance,99)
 
     function Slider:Get() return Slider.Value end
-    function Slider:Set(v)
-        v = math.clamp(math.floor(v / (Slider.Decimals or 1) + 0.5) * (Slider.Decimals or 1), Slider.Min, Slider.Max)
-        Slider.Value = v; Library.Flags[Slider.Flag] = v
-        local pct = (v - Slider.Min) / (Slider.Max - Slider.Min)
-        tw(fill,{Size=U2(pct,-2,1,-2)},0.08)
-        valBox.Text = tostring(v)..Slider.Suffix
-        fill.Visible = v > Slider.Min
-        if Slider.Callback then Library:SafeCall(Slider.Callback, v) end
+    function Slider:Set(Value)
+        Slider.Value=Clamp(Library:Round(Value,Slider.Decimals),Slider.Min,Slider.Max)
+        Library.Flags[Slider.Flag]=Slider.Value
+        local pct=(Slider.Value-Slider.Min)/(Slider.Max-Slider.Min)
+        Items["Fill"]:Tween(TweenInfo.new(0.08,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Size=U2(pct,-2,1,-2)})
+        Items["Value"].Instance.Text=SFormat("%s%s",Slider.Value,Slider.Suffix)
+        Items["Fill"].Instance.Visible=Slider.Value>Slider.Min
+        if Slider.Callback then Library:SafeCall(Slider.Callback,Slider.Value) end
     end
-    local function slideX(inp) return (inp.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X end
-    track.InputBegan:Connect(function(inp)
-        if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
-            Slider.Sliding=true; Slider:Set((Slider.Max-Slider.Min)*slideX(inp)+Slider.Min)
+    local function GetSlideX(Input)
+        return (Input.Position.X-Items["Track"].Instance.AbsolutePosition.X)/Items["Track"].Instance.AbsoluteSize.X
+    end
+    Items["Track"]:Connect("InputBegan",function(Input)
+        if Input.UserInputType==Enum.UserInputType.MouseButton1 or Input.UserInputType==Enum.UserInputType.Touch then
+            Slider.Sliding=true; Slider:Set(((Slider.Max-Slider.Min)*GetSlideX(Input))+Slider.Min)
         end
     end)
-    track.InputEnded:Connect(function(inp)
-        if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then Slider.Sliding=false end
+    Items["Track"]:Connect("InputEnded",function(Input)
+        if Input.UserInputType==Enum.UserInputType.MouseButton1 or Input.UserInputType==Enum.UserInputType.Touch then
+            Slider.Sliding=false
+        end
     end)
-    Library:Connect(UserInputService.InputChanged, function(inp)
-        if Slider.Sliding and (inp.UserInputType==Enum.UserInputType.MouseMovement or inp.UserInputType==Enum.UserInputType.Touch) then
-            Slider:Set((Slider.Max-Slider.Min)*slideX(inp)+Slider.Min)
+    Library:Connect(UserInputService.InputChanged,function(Input)
+        if (Input.UserInputType==Enum.UserInputType.MouseMovement or Input.UserInputType==Enum.UserInputType.Touch) and Slider.Sliding then
+            Slider:Set(((Slider.Max-Slider.Min)*GetSlideX(Input))+Slider.Min)
         end
     end)
     if Slider.Default then Slider:Set(Slider.Default) end
-    Library.SetFlags[Slider.Flag] = function(v) Slider:Set(v) end
+    Library.SetFlags[Slider.Flag]=function(v) Slider:Set(v) end
     return Slider
 end
 
 -- ─── Dropdown ─────────────────────────────────────────────────────────────────
 Library.Sections.Dropdown = function(self, Data)
-    Data = Data or {}
-    local DD = { Window=self.Window, Page=self.Page, Section=self, Name=Data.Name or "Dropdown", Flag=Data.Flag or Library:NextFlag(), Items=Data.Items or Data.items or {}, Default=Data.Default or nil, MaxSize=Data.MaxSize or (IsMobile and 120 or 80), Callback=Data.Callback or function() end, Multi=Data.Multi or false, Options={}, Value=nil, IsOpen=false }
-    local btnH = IsMobile and 24 or 18
+    Data=Data or {}
+    local Dropdown={Window=self.Window,Page=self.Page,Section=self,
+                    Name=Data.Name or "Dropdown",
+                    Flag=Data.Flag or Library:NextFlag(),
+                    Items=Data.Items or {},
+                    Default=Data.Default or nil,
+                    Callback=Data.Callback or function() end,
+                    Multi=Data.Multi or false,
+                    Options={},Value={},IsOpen=false}
+    local Items={}; local btnH=IsMobile and 24 or 18
 
-    -- wrapper grows when open
-    local wrapper = I("Frame"); wrapper.Parent = DD.Section.Items.Content; wrapper.Name = "\0"
-    wrapper.BackgroundTransparency = 1; wrapper.Size = U2(1,0,0,0)
-    wrapper.BorderSizePixel = 0; wrapper.AutomaticSize = Enum.AutomaticSize.Y
-    wrapper.ClipsDescendants = false
+    local wrapper=Instances:Create("Frame",{
+        Parent=Dropdown.Section.Items["Content"].Instance, Name="\0",
+        BackgroundTransparency=1, Size=U2(1,0,0,0),
+        BorderSizePixel=0, AutomaticSize=Enum.AutomaticSize.Y})
+    Items["Container"]=wrapper
 
-    local nameLbl = I("TextLabel"); nameLbl.Parent = wrapper; nameLbl.Name = "\0"
-    nameLbl.FontFace = Library.Font; nameLbl.TextColor3 = T.TextMuted; nameLbl.Text = DD.Name
-    nameLbl.BackgroundTransparency = 1; nameLbl.Size = U2(1,0,0,13)
-    nameLbl.BorderSizePixel = 0; nameLbl.TextSize = IsMobile and 12 or 11
-    nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+    Items["Text"]=Instances:Create("TextLabel",{
+        Parent=wrapper.Instance, Name="\0",
+        FontFace=Library.Font, TextColor3=T.TextMuted,
+        Text=Dropdown.Name, BackgroundTransparency=1,
+        Size=U2(1,0,0,13), BorderSizePixel=0,
+        TextSize=IsMobile and 12 or 11,
+        BackgroundColor3=FromRGB(255,255,255),
+        TextXAlignment=Enum.TextXAlignment.Left})
 
-    local ddBtn = I("TextButton"); ddBtn.Parent = wrapper; ddBtn.Name = "\0"
-    ddBtn.Text = ""; ddBtn.AutoButtonColor = false
-    ddBtn.Position = U2(0,0,0,16); ddBtn.Size = U2(1,0,0,btnH)
-    ddBtn.BorderSizePixel = 0; ddBtn.BackgroundColor3 = T.Surface3
-    Corner(ddBtn, 4)
+    Items["Button"]=Instances:Create("TextButton",{
+        Parent=wrapper.Instance, Name="\0", Text="",
+        AutoButtonColor=false, Position=U2(0,0,0,16),
+        Size=U2(1,0,0,btnH), BorderSizePixel=0,
+        BackgroundColor3=T.Surface3})
+    Corner(Items["Button"].Instance,4); Stroke(Items["Button"].Instance,T.Border,1)
 
-    local selLbl = I("TextLabel"); selLbl.Parent = ddBtn; selLbl.Name = "\0"
-    selLbl.FontFace = Library.Font; selLbl.TextColor3 = T.TextMuted; selLbl.Text = "-"
-    selLbl.AnchorPoint = V2(0,0.5); selLbl.Size = U2(1,-8,0,btnH); selLbl.BackgroundTransparency = 1
-    selLbl.TextXAlignment = Enum.TextXAlignment.Left; selLbl.Position = U2(0,8,0.5,0)
-    selLbl.BorderSizePixel = 0; selLbl.TextSize = IsMobile and 12 or 10
+    Items["Selected"]=Instances:Create("TextLabel",{
+        Parent=Items["Button"].Instance, Name="\0",
+        FontFace=Library.Font, TextColor3=T.TextMuted, Text="-",
+        AnchorPoint=V2(0,0.5), Size=U2(1,-8,0,btnH),
+        BackgroundTransparency=1,
+        TextXAlignment=Enum.TextXAlignment.Left,
+        Position=U2(0,8,0.5,0), BorderSizePixel=0,
+        TextSize=IsMobile and 12 or 10,
+        BackgroundColor3=FromRGB(255,255,255)})
 
-    -- inline list frame directly under button
-    local listFrame = I("Frame"); listFrame.Parent = wrapper; listFrame.Name = "\0"
-    listFrame.BackgroundColor3 = T.Surface2; listFrame.BorderSizePixel = 0
-    listFrame.Position = U2(0,0,0,16+btnH+2); listFrame.Size = U2(1,0,0,0)
-    listFrame.Visible = false; listFrame.AutomaticSize = Enum.AutomaticSize.Y
-    listFrame.BackgroundTransparency = 1
-    Pad(listFrame, 4, 4, 4, 4)
-    List(listFrame, Enum.FillDirection.Vertical, 2)
+    local listFrame=Instances:Create("Frame",{
+        Parent=wrapper.Instance, Name="\0",
+        BackgroundColor3=T.Surface2, BorderSizePixel=0,
+        Position=U2(0,0,0,16+btnH+2), Size=U2(1,0,0,0),
+        Visible=false, AutomaticSize=Enum.AutomaticSize.Y,
+        BackgroundTransparency=1})
+    Corner(listFrame.Instance,4)
+    Pad(listFrame.Instance,4,4,4,4)
+    List(listFrame.Instance,Enum.FillDirection.Vertical,2)
+    Items["OptionHolder"]=listFrame; Items["Holder"]=listFrame
 
-    if not IsMobile then
-        ddBtn.MouseEnter:Connect(function() tw(ddBtn,{BackgroundColor3=Library:GetLighterColor(T.Surface3,1.5)}) end)
-        ddBtn.MouseLeave:Connect(function() tw(ddBtn,{BackgroundColor3=T.Surface3}) end)
-    end
+    Items["Button"]:OnHover(function() Items["Button"]:Tween(nil,{BackgroundColor3=T.Surface2}) end)
+    Items["Button"]:OnHoverLeave(function() Items["Button"]:Tween(nil,{BackgroundColor3=T.Surface3}) end)
 
-    function DD:Get() return DD.Value end
-
-    function DD:Set(opt)
-        if DD.Multi then
-            if type(opt)~="table" then return end
-            DD.Value=opt; Library.Flags[DD.Flag]=opt
-            for _,v in opt do local o=DD.Options[v]; if o then o.Selected=true; o:Toggle("Active") end end
-            selLbl.Text = #opt>0 and table.concat(opt,", ") or "-"
+    function Dropdown:Get() return Dropdown.Value end
+    function Dropdown:Set(Option)
+        if Data.Multi then
+            if type(Option)~="table" then return end
+            Dropdown.Value=Option; Library.Flags[Dropdown.Flag]=Option
+            for _,v in Option do local od=Dropdown.Options[v]; if od then od.Selected=true; od:Toggle("Active") end end
+            Items["Selected"].Instance.Text=#Option>0 and TConcat(Option,", ") or "-"
         else
-            if not DD.Options[opt] then return end
-            DD.Value=opt; Library.Flags[DD.Flag]=opt
-            for _,v in DD.Options do v.Selected=(v.Name==opt); v:Toggle(v.Name==opt and "Active" or "Inactive") end
-            selLbl.Text = opt
+            if not Dropdown.Options[Option] then return end
+            Dropdown.Value=Option; Library.Flags[Dropdown.Flag]=Option
+            for _,v in Dropdown.Options do v.Selected=(v.Name==Option); v:Toggle(v.Name==Option and "Active" or "Inactive") end
+            Items["Selected"].Instance.Text=Option
         end
-        if DD.Callback then Library:SafeCall(DD.Callback, DD.Value) end
+        if Dropdown.Callback then Library:SafeCall(Dropdown.Callback,Dropdown.Value) end
     end
-
-    function DD:SetOpen(bool)
-        DD.IsOpen = bool
-        listFrame.Visible = bool
-        listFrame.BackgroundTransparency = bool and 0 or 1
-        if bool then
-            for _,v in Library.OpenFrames do if v~=DD then v:SetOpen(false) end end
-            Library.OpenFrames[DD] = DD
-        else
-            Library.OpenFrames[DD] = nil
-        end
+    function Dropdown:SetOpen(Bool)
+        Dropdown.IsOpen=Bool
+        listFrame.Instance.Visible=Bool
+        listFrame.Instance.BackgroundTransparency=Bool and 0 or 1
+        if Bool then
+            for _,v in Library.OpenFrames do if v~=Dropdown then v:SetOpen(false) end end
+            Library.OpenFrames[Dropdown]=Dropdown
+        else Library.OpenFrames[Dropdown]=nil end
     end
-
-    function DD:Add(opt)
-        local first = (next(DD.Options)==nil)
-        local optH = IsMobile and 24 or 18
-        local ob = I("TextButton"); ob.Parent = listFrame; ob.Name = "\0"
-        ob.Text=""; ob.AutoButtonColor=false; ob.BackgroundTransparency=1
-        ob.Size=U2(1,0,0,optH); ob.BorderSizePixel=0; ob.BackgroundColor3=T.Surface3
-        Corner(ob,3)
-        local liner = I("Frame"); liner.Parent=ob; liner.Name="\0"
-        liner.BackgroundTransparency=1; liner.Size=U2(0,2,0.55,0)
-        liner.AnchorPoint=V2(0,0.5); liner.Position=U2(0,3,0.5,0)
-        liner.BackgroundColor3=T.Accent; liner.BorderSizePixel=0
-        Corner(liner,2)
-        local txt = I("TextLabel"); txt.Parent=ob; txt.Name="\0"
-        txt.FontFace=Library.Font; txt.TextColor3=T.TextMuted; txt.Text=opt
-        txt.Size=U2(1,-12,0,optH); txt.AnchorPoint=V2(0,0.5)
-        txt.BackgroundTransparency=1; txt.Position=U2(0,10,0.5,0)
-        txt.BorderSizePixel=0; txt.TextSize=IsMobile and 12 or 10
-        txt.TextXAlignment=Enum.TextXAlignment.Left
-
-        local od = { Button=ob, Selected=false, Name=opt, Liner=liner, Text=txt, IsFirst=first }
-        function od:Toggle(s)
-            if s=="Active" then
-                liner.BackgroundTransparency=0
-                txt.TextColor3=T.Accent; txt.TextTransparency=0
-                ob.BackgroundTransparency=0
+    function Dropdown:Add(Option)
+        local first=next(Dropdown.Options)==nil
+        local optionH=IsMobile and 24 or 17
+        local btn=Instances:Create("TextButton",{
+            Parent=listFrame.Instance, Name="\0",
+            FontFace=Library.Font, Text="", AutoButtonColor=false,
+            BackgroundTransparency=1, Size=U2(1,0,0,optionH),
+            BorderSizePixel=0, BackgroundColor3=T.Surface3})
+        Corner(btn.Instance,3)
+        local liner=Instances:Create("Frame",{
+            Parent=btn.Instance, Name="\0", BackgroundTransparency=1,
+            Size=U2(0,2,0.6,0), AnchorPoint=V2(0,0.5),
+            Position=U2(0,3,0.5,0), BorderSizePixel=0,
+            BackgroundColor3=T.Accent})
+        Corner(liner.Instance,2)
+        local txt=Instances:Create("TextLabel",{
+            Parent=btn.Instance, Name="\0",
+            FontFace=Library.Font, TextColor3=T.TextMuted,
+            Text=Option, Size=U2(1,-12,0,optionH),
+            AnchorPoint=V2(0,0.5), BackgroundTransparency=1,
+            Position=U2(0,10,0.5,0), AutomaticSize=Enum.AutomaticSize.X,
+            BorderSizePixel=0, TextSize=IsMobile and 12 or 10,
+            BackgroundColor3=FromRGB(255,255,255),
+            TextXAlignment=Enum.TextXAlignment.Left})
+        local od={Button=btn,Selected=false,Name=Option,Text=txt,Liner=liner,IsFirstOption=first}
+        function od:Toggle(Status)
+            if Status=="Active" then
+                liner.Instance.BackgroundTransparency=0
+                txt.Instance.TextColor3=T.Accent
+                txt.Instance.TextTransparency=0
+                btn.Instance.BackgroundTransparency=0
             else
-                liner.BackgroundTransparency=1
-                txt.TextColor3=T.TextMuted; txt.TextTransparency=0.3
-                ob.BackgroundTransparency=1
+                liner.Instance.BackgroundTransparency=1
+                txt.Instance.TextColor3=T.TextMuted
+                txt.Instance.TextTransparency=0.3
+                btn.Instance.BackgroundTransparency=1
             end
         end
-
-        ob.MouseButton1Click:Connect(function()
-            if not DD.Multi then
-                for _,v in DD.Options do v.Selected=false; v:Toggle("Inactive") end
+        btn:Connect("MouseButton1Click",function()
+            if not Data.Multi then
+                for _,v in Dropdown.Options do v.Selected=false; v:Toggle("Inactive") end
                 od.Selected=true; od:Toggle("Active")
-                DD.Value=od.Name; Library.Flags[DD.Flag]=od.Name
-                selLbl.Text=od.Name
-                DD:SetOpen(false)
+                Dropdown.Value=od.Name; Library.Flags[Dropdown.Flag]=od.Name
+                Items["Selected"].Instance.Text=od.Name
+                Dropdown:SetOpen(false)
             else
-                od.Selected = not od.Selected
-                local idx = table.find(DD.Value or {}, od.Name)
-                if idx then
-                    table.remove(DD.Value, idx); od:Toggle("Inactive")
-                else
-                    DD.Value = DD.Value or {}
-                    table.insert(DD.Value, od.Name); od:Toggle("Active")
-                end
-                Library.Flags[DD.Flag]=DD.Value
-                selLbl.Text = #(DD.Value or {})>0 and table.concat(DD.Value,", ") or "-"
+                od.Selected=not od.Selected
+                local idx=TFind(Dropdown.Value or {},od.Name)
+                if idx then TRem(Dropdown.Value,idx); od:Toggle("Inactive")
+                else Dropdown.Value=Dropdown.Value or {}; TIns(Dropdown.Value,od.Name); od:Toggle("Active") end
+                Library.Flags[Dropdown.Flag]=Dropdown.Value
+                Items["Selected"].Instance.Text=#(Dropdown.Value or {})>0 and TConcat(Dropdown.Value,", ") or "-"
             end
-            if DD.Callback then Library:SafeCall(DD.Callback, DD.Value) end
+            if Dropdown.Callback then Library:SafeCall(Dropdown.Callback,Dropdown.Value) end
         end)
-
-        DD.Options[od.Name] = od; return od
+        Dropdown.Options[od.Name]=od; return od
+    end
+    function Dropdown:Remove(Option) local od=Dropdown.Options[Option]; if od then od.Button:Clean(); Dropdown.Options[Option]=nil end end
+    function Dropdown:Refresh(List2)
+        for _,v in Dropdown.Options do Dropdown:Remove(v.Name) end
+        for _,v in List2 do Dropdown:Add(v) end
     end
 
-    function DD:Remove(opt) local o=DD.Options[opt]; if o then o.Button:Destroy(); DD.Options[opt]=nil end end
-    function DD:Refresh(list) for _,v in DD.Options do DD:Remove(v.Name) end; for _,v in list do DD:Add(v) end end
+    for _,v in Dropdown.Items do Dropdown:Add(v) end
+    Items["Button"]:Connect("MouseButton1Click",function() Dropdown:SetOpen(not Dropdown.IsOpen) end)
 
-    for _, v in DD.Items do DD:Add(v) end
-
-    ddBtn.MouseButton1Click:Connect(function() DD:SetOpen(not DD.IsOpen) end)
-
-    Library.SetFlags[DD.Flag] = function(v) DD:Set(v) end
-    if DD.Default then DD:Set(DD.Default)
-    else for _,v in DD.Options do if v.IsFirst then DD:Set(v.Name); break end end end
-    return DD
+    Library.SetFlags[Dropdown.Flag]=function(v) Dropdown:Set(v) end
+    if Dropdown.Default then Dropdown:Set(Dropdown.Default)
+    else for _,v in Dropdown.Options do if v.IsFirstOption then Dropdown:Set(v.Name); break end end end
+    return Dropdown
 end
 
-Library.Sections.Label = function(self, name)
-    local Lbl = { Window=self.Window, Page=self.Page, Section=self, Name=name or "Label" }
-    local row = I("Frame"); row.Parent = Lbl.Section.Items.Content; row.Name = "\0"
-    row.BackgroundTransparency = 1; row.Size = U2(1,0,0,IsMobile and 20 or 15); row.BorderSizePixel = 0
-    local lbl = I("TextLabel"); lbl.Parent = row; lbl.Name = "\0"
-    lbl.FontFace = Library.Font; lbl.TextColor3 = T.TextMuted; lbl.Text = Lbl.Name
-    lbl.BackgroundTransparency = 1; lbl.Size = U2(0,0,1,0); lbl.AutomaticSize = Enum.AutomaticSize.X
-    lbl.BorderSizePixel = 0; lbl.TextSize = IsMobile and 12 or 11; lbl.TextXAlignment = Enum.TextXAlignment.Left
-    local sub = I("Frame"); sub.Parent = row; sub.Name = "\0"
-    sub.AnchorPoint = V2(1,0.5); sub.Position = U2(1,0,0.5,0)
-    sub.Size = U2(0,0,1,0); sub.AutomaticSize = Enum.AutomaticSize.X
-    sub.BackgroundTransparency = 1; sub.BorderSizePixel = 0
-    local subList = I("UIListLayout"); subList.FillDirection=Enum.FillDirection.Horizontal
-    subList.VerticalAlignment=Enum.VerticalAlignment.Center; subList.HorizontalAlignment=Enum.HorizontalAlignment.Right
-    subList.Padding=UD(0,IsMobile and 8 or 6); subList.SortOrder=Enum.SortOrder.LayoutOrder; subList.Parent=sub
-    function Lbl:SetText(t) lbl.Text = tostring(t) end
-    function Lbl:SetVisibility(v) row.Visible = v end
-    function Lbl:Colorpicker(d)
+-- ─── Label ────────────────────────────────────────────────────────────────────
+Library.Sections.Label = function(self, Name)
+    local Label={Window=self.Window,Page=self.Page,Section=self,Name=Name or "Label"}
+    local Items={}
+    Items["Row"]=Instances:Create("Frame",{
+        Parent=Label.Section.Items["Content"].Instance, Name="\0",
+        BackgroundTransparency=1, Size=U2(1,0,0,IsMobile and 20 or 15),
+        BorderSizePixel=0, BackgroundColor3=FromRGB(255,255,255)})
+    Items["Text"]=Instances:Create("TextLabel",{
+        Parent=Items["Row"].Instance, Name="\0",
+        FontFace=Library.Font, TextColor3=T.TextMuted, Text=Label.Name,
+        BackgroundTransparency=1, Size=U2(0,0,1,0),
+        AutomaticSize=Enum.AutomaticSize.X,
+        BorderSizePixel=0, TextSize=IsMobile and 12 or 11,
+        BackgroundColor3=FromRGB(255,255,255),
+        TextXAlignment=Enum.TextXAlignment.Left})
+    Items["SubElements"]=Instances:Create("Frame",{
+        Parent=Items["Row"].Instance, Name="\0",
+        AnchorPoint=V2(1,0.5), Position=U2(1,0,0.5,0),
+        Size=U2(0,0,1,0), ZIndex=2,
+        AutomaticSize=Enum.AutomaticSize.X,
+        BackgroundTransparency=1, BorderSizePixel=0,
+        BackgroundColor3=FromRGB(255,255,255)})
+    Instances:Create("UIListLayout",{
+        Parent=Items["SubElements"].Instance, Name="\0",
+        VerticalAlignment=Enum.VerticalAlignment.Center,
+        FillDirection=Enum.FillDirection.Horizontal,
+        HorizontalAlignment=Enum.HorizontalAlignment.Right,
+        Padding=UD(0,IsMobile and 8 or 6),
+        SortOrder=Enum.SortOrder.LayoutOrder})
+    function Label:SetText(Text) Items["Text"].Instance.Text=tostring(Text) end
+    function Label:SetVisibility(Bool) Items["Row"].Instance.Visible=Bool end
+    function Label:Colorpicker(d)
         d=d or {}
-        return Library:CreateColorpicker({Parent=sub,Flag=d.Flag or Library:NextFlag(),Default=d.Default or RGB(64,208,128),Alpha=d.Alpha or 0,Callback=d.Callback or function() end})
+        return Library:CreateColorpicker({
+            Parent=Items["SubElements"], Page=Label.Page,
+            Flag=d.Flag or Library:NextFlag(), Section=Label.Section,
+            Default=d.Default or Color3.fromRGB(220,40,40),
+            Alpha=d.Alpha or 0, Callback=d.Callback or function() end})
     end
-    function Lbl:Keybind(d)
+    function Label:Keybind(d)
         d=d or {}
-        return Library:CreateKeybind({Name=d.Name or "Keybind",Parent=sub,Flag=d.Flag or Library:NextFlag(),Default=d.Default or Enum.KeyCode.RightShift,Mode=d.Mode or "Toggle",Callback=d.Callback or function() end})
+        return Library:CreateKeybind({
+            Name=d.Name or "Keybind", Parent=Items["SubElements"],
+            Flag=d.Flag or Library:NextFlag(), Section=Label.Section,
+            Default=d.Default or Enum.KeyCode.RightShift,
+            Mode=d.Mode or "Toggle", Callback=d.Callback or function() end})
     end
-    return Lbl
+    return Label
 end
 
 -- ─── Textbox ──────────────────────────────────────────────────────────────────
 Library.Sections.Textbox = function(self, Data)
-    Data = Data or {}
-    local TB = { Window=self.Window, Page=self.Page, Section=self, Name=Data.Name or "Textbox", Flag=Data.Flag or Library:NextFlag(), Default=Data.Default or "", Callback=Data.Callback or function() end, Placeholder=Data.Placeholder or "...", Finished=Data.Finished or false, Numeric=Data.Numeric or false, Value="" }
-    local rowH = IsMobile and 26 or 19
-    local row = I("Frame"); row.Parent = TB.Section.Items.Content; row.Name = "\0"
-    row.BackgroundTransparency = 1; row.Size = U2(1,0,0,rowH); row.BorderSizePixel = 0
-    local input = I("TextBox"); input.Parent = row; input.Name = "\0"
-    input.FontFace = Library.Font; input.CursorPosition = -1; input.TextColor3 = T.Text
-    input.Size = U2(0.58,0,1,0); input.BorderSizePixel = 0
-    input.PlaceholderColor3 = T.TextMuted; input.TextXAlignment = Enum.TextXAlignment.Left
-    input.PlaceholderText = TB.Placeholder; input.TextSize = IsMobile and 12 or 10
-    input.BackgroundColor3 = T.Surface3
-    Corner(input,4); Stroke(input, T.Border, 1); Pad(input,0,0,6,0)
-    local lbl = I("TextLabel"); lbl.Parent = row; lbl.Name = "\0"
-    lbl.FontFace = Library.Font; lbl.TextColor3 = T.TextMuted; lbl.Text = TB.Name
-    lbl.AnchorPoint = V2(1,0.5); lbl.Size = U2(0,0,0,13); lbl.BackgroundTransparency = 1
-    lbl.Position = U2(1,0,0.5,0); lbl.AutomaticSize = Enum.AutomaticSize.X
-    lbl.BorderSizePixel = 0; lbl.TextSize = IsMobile and 12 or 11
-    function TB:Get() return TB.Value end
-    function TB:SetVisibility(v) row.Visible = v end
-    function TB:Set(v)
-        if TB.Numeric then if (not tonumber(v)) and string.len(tostring(v))>0 then v=TB.Value end end
-        TB.Value=v; input.Text=v; Library.Flags[TB.Flag]=v
-        if TB.Callback then Library:SafeCall(TB.Callback, v) end
+    Data=Data or {}
+    local Textbox={Window=self.Window,Page=self.Page,Section=self,
+                   Name=Data.Name or "Textbox",
+                   Flag=Data.Flag or Library:NextFlag(),
+                   Default=Data.Default or "",
+                   Callback=Data.Callback or function() end,
+                   Placeholder=Data.Placeholder or "...",
+                   Finished=Data.Finished or false,
+                   Value=""}
+    local Items={}; local rowH=IsMobile and 26 or 19
+    Items["Row"]=Instances:Create("Frame",{
+        Parent=Textbox.Section.Items["Content"].Instance, Name="\0",
+        BackgroundTransparency=1, Size=U2(1,0,0,rowH),
+        BorderSizePixel=0, BackgroundColor3=FromRGB(255,255,255)})
+    Items["Input"]=Instances:Create("TextBox",{
+        Parent=Items["Row"].Instance, Name="\0",
+        FontFace=Library.Font, CursorPosition=-1,
+        TextColor3=T.Text, Size=U2(0.58,0,1,0),
+        BorderSizePixel=0, PlaceholderColor3=T.TextMuted,
+        TextXAlignment=Enum.TextXAlignment.Left,
+        PlaceholderText=Textbox.Placeholder,
+        TextSize=IsMobile and 12 or 10,
+        BackgroundColor3=T.Surface3})
+    Corner(Items["Input"].Instance,4); Stroke(Items["Input"].Instance,T.Border,1)
+    Pad(Items["Input"].Instance,0,0,6,0)
+    Items["Label"]=Instances:Create("TextLabel",{
+        Parent=Items["Row"].Instance, Name="\0",
+        FontFace=Library.Font, TextColor3=T.TextMuted,
+        Text=Textbox.Name, AnchorPoint=V2(1,0.5),
+        Size=U2(0,0,0,13), BackgroundTransparency=1,
+        Position=U2(1,0,0.5,0), AutomaticSize=Enum.AutomaticSize.X,
+        BorderSizePixel=0, TextSize=IsMobile and 12 or 11,
+        BackgroundColor3=FromRGB(255,255,255)})
+    function Textbox:Get() return Textbox.Value end
+    function Textbox:SetVisibility(Bool) Items["Row"].Instance.Visible=Bool end
+    function Textbox:Set(Value)
+        Textbox.Value=Value; Items["Input"].Instance.Text=Value
+        Library.Flags[Textbox.Flag]=Value
+        if Textbox.Callback then Library:SafeCall(Textbox.Callback,Textbox.Value) end
     end
-    if TB.Finished then
-        input.FocusLost:Connect(function(enter) if enter then TB:Set(input.Text) end end)
+    if Textbox.Finished then
+        Items["Input"]:Connect("FocusLost",function(enter)
+            if enter then Textbox:Set(Items["Input"].Instance.Text) end
+        end)
     else
-        input:GetPropertyChangedSignal("Text"):Connect(function() TB:Set(input.Text) end)
+        Items["Input"].Instance:GetPropertyChangedSignal("Text"):Connect(function()
+            Textbox:Set(Items["Input"].Instance.Text)
+        end)
     end
-    if TB.Default then TB:Set(TB.Default) end
-    Library.SetFlags[TB.Flag] = function(v) TB:Set(v) end
-    return TB
+    if Textbox.Default then Textbox:Set(Textbox.Default) end
+    Library.SetFlags[Textbox.Flag]=function(v) Textbox:Set(v) end
+    return Textbox
 end
 
--- ─── Settings page ────────────────────────────────────────────────────────────
-Library.CreateSettingsPage = function(self, Window, KeybindList, Watermark)
-    local cols = IsMobile and 1 or 2
-    local SP = Window:Page({Name="Settings", Columns=cols})
-    local s1 = 1; local s2 = IsMobile and 1 or 2
-
-    local SS = SP:Section({Name="Settings", Side=s1})
-    SS:Button({Name="Unload", Callback=function() Library:Unload() end})
-    SS:Toggle({Name="Watermark", Flag="wm_vis", Default=true, Callback=function(v) if Watermark then Watermark:SetVisibility(v) end end})
-    SS:Toggle({Name="Keybind List", Flag="kbl_vis", Default=true, Callback=function(v) if KeybindList then KeybindList:SetVisibility(v) end end})
-    if not IsMobile then
-        SS:Label("Menu Keybind"):Keybind({Name="Menu Keybind", Flag="menu_kb", Default=Library.MenuKeybind, Mode="Toggle", Callback=function() Library.MenuKeybind = Library.Flags["menu_kb"] and Library.Flags["menu_kb"].Key or Library.MenuKeybind end})
+-- ─── KeybindList ──────────────────────────────────────────────────────────────
+Library.KeybindList = function(self)
+    local KL={}; self.KeyList=KL; local Items={}
+    Items["Frame"]=Instances:Create("Frame",{
+        Parent=Library.Holder.Instance, Name="\0",
+        AnchorPoint=V2(0,0.5), Position=U2(0,10,0.5,0),
+        BorderSizePixel=0, AutomaticSize=Enum.AutomaticSize.XY,
+        BackgroundColor3=T.Surface})
+    Corner(Items["Frame"].Instance,4); Stroke(Items["Frame"].Instance,T.Border,1)
+    Pad(Items["Frame"].Instance,8,8,10,10)
+    Items["Title"]=Instances:Create("TextLabel",{
+        Parent=Items["Frame"].Instance, Name="\0",
+        FontFace=Library.Fonts["GothamBold"], TextColor3=T.Text,
+        Text="Keybinds", BackgroundTransparency=1,
+        TextXAlignment=Enum.TextXAlignment.Left,
+        Size=U2(0,80,0,14), BorderSizePixel=0, TextSize=12,
+        BackgroundColor3=FromRGB(255,255,255)})
+    Items["Content"]=Instances:Create("Frame",{
+        Parent=Items["Frame"].Instance, Name="\0",
+        BackgroundTransparency=1, Position=U2(0,0,0,20),
+        BorderSizePixel=0, AutomaticSize=Enum.AutomaticSize.XY,
+        BackgroundColor3=FromRGB(255,255,255)})
+    List(Items["Content"].Instance,Enum.FillDirection.Vertical,4)
+    function KL:SetVisibility(Bool) Items["Frame"].Instance.Visible=Bool end
+    function KL:Add(Name,Key)
+        local lbl=Instances:Create("TextLabel",{
+            Parent=Items["Content"].Instance, Name="\0",
+            FontFace=Library.Font, TextColor3=T.TextMuted,
+            Text=Name.." ["..Key.."]",
+            Size=U2(0,0,0,14), BackgroundTransparency=1,
+            BorderSizePixel=0, AutomaticSize=Enum.AutomaticSize.X,
+            TextSize=11, BackgroundColor3=FromRGB(255,255,255)})
+        function lbl:SetText(n,k) lbl.Instance.Text=n.." ["..k.."]" end
+        function lbl:SetStatus(Bool) lbl.Instance.Visible=Bool end
+        return lbl
     end
-    SS:Slider({Name="Tween Speed", Flag="tw_spd", Default=0.18, Min=0, Max=2, Decimals=0.01, Suffix="s", Callback=function(v) Library.Tween.Time=v end})
-    SS:Dropdown({Name="Tween Style", Flag="tw_style", MaxSize=200, Items={"Linear","Quad","Quart","Back","Bounce","Circular","Cubic","Elastic","Exponential","Sine","Quint"}, Default="Quart", Callback=function(v) if v then Library.Tween.Style=Enum.EasingStyle[v] end end})
-    SS:Dropdown({Name="Tween Direction", Flag="tw_dir", Items={"In","Out","InOut"}, Default="Out", Callback=function(v) if v then Library.Tween.Direction=Enum.EasingDirection[v] end end})
-
-    local CS2 = SP:Section({Name="Configs", Side=s2})
-    local configName, configSelected
-    local cDrop = CS2:Dropdown({Name="Profiles", Flag="cfg_list", Items={}, Callback=function(v) configSelected=v end})
-    CS2:Textbox({Name="Config name", Flag="cfg_name", Default="", Placeholder="...", Callback=function(v) configName=v end})
-    CS2:Button({Name="Create", Callback=function()
-        if configName and configName~="" and not isfile(Library.Folders.Configs.."/"..configName..".json") then
-            writefile(Library.Folders.Configs.."/"..configName..".json", Library:GetConfig())
-            Library:RefreshConfigsList(cDrop); Library:Notification("Created "..configName, 3)
-        end
-    end})
-    CS2:Button({Name="Delete", Callback=function()
-        if configSelected then delfile(Library.Folders.Configs.."/"..configSelected..".json"); Library:RefreshConfigsList(cDrop); Library:Notification("Deleted "..configSelected, 3) end
-    end})
-    CS2:Button({Name="Load", Callback=function()
-        if configSelected then
-            local ok = pcall(function() Library:LoadConfig(readfile(Library.Folders.Configs.."/"..configSelected..".json")) end)
-            Library:Notification(ok and "Loaded "..configSelected or "Load failed", 3)
-        end
-    end})
-    CS2:Button({Name="Save", Callback=function()
-        if configSelected then writefile(Library.Folders.Configs.."/"..configSelected..".json", Library:GetConfig()); Library:Notification("Saved "..configSelected, 3) end
-    end})
-    CS2:Button({Name="Refresh", Callback=function() Library:RefreshConfigsList(cDrop) end})
-    Library:RefreshConfigsList(cDrop)
-
-    local TS = SP:Section({Name="Theming", Side=s2})
-    for k, v in Library.Theme do
-        TS:Label(k):Colorpicker({Flag="theme_"..k, Default=v, Callback=function(col) Library:ChangeTheme(k,col) end})
-    end
+    return KL
 end
 
 return Library
