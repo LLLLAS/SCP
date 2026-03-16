@@ -21,6 +21,15 @@
         Lib:KeybindList()
 ]]
 
+-- FlowLib v3.0 helper bootstrap
+local function _crn(p,r) local c=Instance.new('UICorner');c.CornerRadius=UDim.new(0,r or 4);c.Parent=p;return c end
+local function _stk(p,col,t) local s=Instance.new('UIStroke');s.Color=col or Color3.fromRGB(28,22,34);s.Thickness=t or 1;s.Parent=p;return s end
+local function _pad(p,pt,pb,pl,pr) local pd=Instance.new('UIPadding');pd.PaddingTop=UDim.new(0,pt or 0);pd.PaddingBottom=UDim.new(0,pb or 0);pd.PaddingLeft=UDim.new(0,pl or 0);pd.PaddingRight=UDim.new(0,pr or 0);pd.Parent=p end
+local function _vl(p,sp) local l=Instance.new('UIListLayout');l.FillDirection=Enum.FillDirection.Vertical;l.Padding=UDim.new(0,sp or 0);l.SortOrder=Enum.SortOrder.LayoutOrder;l.Parent=p;return l end
+local function _hl(p,sp,ha,va) local l=Instance.new('UIListLayout');l.FillDirection=Enum.FillDirection.Horizontal;l.Padding=UDim.new(0,sp or 0);l.HorizontalAlignment=ha or Enum.HorizontalAlignment.Left;l.VerticalAlignment=va or Enum.VerticalAlignment.Center;l.SortOrder=Enum.SortOrder.LayoutOrder;l.Parent=p;return l end
+
+
+
 -- ══════════════════════════════════════════════════════════════════
 --  Services & locals
 -- ══════════════════════════════════════════════════════════════════
@@ -154,16 +163,16 @@ Lib.NotifHolder = nfHolder
 -- ══════════════════════════════════════════════════════════════════
 --  Primitive helpers
 -- ══════════════════════════════════════════════════════════════════
-function do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,r);_c.Parent=p end
+function _crn(p,r)
     local c = INew("UICorner"); c.CornerRadius = UD(0, r or 4); c.Parent = p; return c
 end
-function stk(p, col, t, li)
+function _stk_OLD(p, col, t, li)
     local s = INew("UIStroke")
     s.Color = col or T.Border; s.Thickness = t or 1
     if li then s.LineJoinMode = li end
     s.Parent = p; return s
 end
-function do local _p=Instance.new("UIPadding");_p.PaddingTop=UDim.new(0,t);_p.PaddingBottom=UDim.new(0,b);_p.PaddingLeft=UDim.new(0,l);_p.PaddingRight=UDim.new(0,r);_p.Parent=p end
+function _pad(p,t,b,l,r)
     local pd = INew("UIPadding")
     pd.PaddingTop    = UD(0, t or 0)
     pd.PaddingBottom = UD(0, b or 0)
@@ -171,12 +180,12 @@ function do local _p=Instance.new("UIPadding");_p.PaddingTop=UDim.new(0,t);_p.Pa
     pd.PaddingRight  = UD(0, r or 0)
     pd.Parent = p
 end
-function do local _l=Instance.new("UIListLayout");_l.FillDirection=Enum.FillDirection.Vertical;_l.Padding=UDim.new(0,sp);_l.SortOrder=Enum.SortOrder.LayoutOrder;_l.Parent=p end
+function _vl(p,sp)
     local l = INew("UIListLayout"); l.FillDirection = Enum.FillDirection.Vertical
     l.Padding = UD(0, sp or 0); l.SortOrder = Enum.SortOrder.LayoutOrder
     l.Parent = p; return l
 end
-function do local _l=Instance.new("UIListLayout");_l.FillDirection=Enum.FillDirection.Horizontal;_l.Padding=UDim.new(0,sp);_l.HorizontalAlignment=ha;_l.VerticalAlignment=va;_l.SortOrder=Enum.SortOrder.LayoutOrder;_l.Parent=p end
+function _hl(p,sp,ha,va)
     local l = INew("UIListLayout"); l.FillDirection = Enum.FillDirection.Horizontal
     l.Padding = UD(0, sp or 0)
     l.HorizontalAlignment = ha or Enum.HorizontalAlignment.Left
@@ -277,15 +286,15 @@ function Lib:Notification(text, dur, sub_text)
 
     local f = INew("Frame"); f.Parent = Lib.NotifHolder
     f.Size = U2(0, W, 0, H); f.BackgroundColor3 = T.Bg2; f.BorderSizePixel = 0
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,6);_c.Parent=f end; stk(f, T.Border, 1)
+    _crn(f,6); _stk(f, T.Border, 1)
     mkShadow(f, 30, 6, 0.48)
 
     -- left crimson bar with glow
     local bar = INew("Frame"); bar.Parent = f
     bar.Size = U2(0, 3, 1, -8); bar.AnchorPoint = V2(0, 0.5)
     bar.Position = U2(0, 6, 0.5, 0); bar.BackgroundColor3 = T.Accent
-    bar.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,2);_c.Parent=bar end
-    stk(bar, T.AccentGlow, 1.5).Transparency = 0.4
+    bar.BorderSizePixel = 0; _crn(bar,2)
+    _stk(bar, T.AccentGlow, 1.5).Transparency = 0.4
 
     -- top red accent line
     local topLine = INew("Frame"); topLine.Parent = f
@@ -346,14 +355,14 @@ function Lib:Watermark(text)
     local f = INew("Frame"); f.Parent = Lib.Holder
     f.AnchorPoint = V2(0.5, 0); f.Position = U2(0.5, 0, 0, 10)
     f.Size = U2(0, 200, 0, 22); f.BackgroundColor3 = T.Bg2; f.BorderSizePixel = 0; f.ZIndex = 5
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,4);_c.Parent=f end; stk(f, T.Border, 1)
+    _crn(f,4); _stk(f, T.Border, 1)
     mkShadow(f, 20, 3, 0.6)
 
     local acLine = INew("Frame"); acLine.Parent = f
     acLine.Size = U2(0, 2, 0.44, 0); acLine.AnchorPoint = V2(0, 0.5)
     acLine.Position = U2(0, 5, 0.5, 0); acLine.BackgroundColor3 = T.Accent
-    acLine.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,2);_c.Parent=acLine end
-    stk(acLine, T.AccentGlow, 2).Transparency = 0.5
+    acLine.BorderSizePixel = 0; _crn(acLine,2)
+    _stk(acLine, T.AccentGlow, 2).Transparency = 0.5
 
     local lbl = INew("TextLabel"); lbl.Parent = f
     lbl.AnchorPoint = V2(0, 0.5); lbl.Position = U2(0, 11, 0.5, 0)
@@ -379,8 +388,8 @@ function Lib:KeybindList()
     f.AnchorPoint = V2(0, 0.5); f.Position = U2(0, 10, 0.5, 0)
     f.BackgroundColor3 = T.Bg2; f.BorderSizePixel = 0
     f.AutomaticSize = Enum.AutomaticSize.XY
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,5);_c.Parent=f end; stk(f, T.Border, 1)
-    mkShadow(f, 24, 4, 0.55); do local _p=Instance.new("UIPadding");_p.PaddingTop=UDim.new(0,8);_p.PaddingBottom=UDim.new(0,8);_p.PaddingLeft=UDim.new(0,10);_p.PaddingRight=UDim.new(0,10);_p.Parent=f end
+    _crn(f,5); _stk(f, T.Border, 1)
+    mkShadow(f, 24, 4, 0.55); _pad(f,8,8,10,10)
 
     -- header
     local hdr = INew("TextLabel"); hdr.Parent = f
@@ -396,7 +405,7 @@ function Lib:KeybindList()
     local cont = INew("Frame"); cont.Parent = f
     cont.Position = U2(0, 0, 0, 20); cont.BackgroundTransparency = 1
     cont.AutomaticSize = Enum.AutomaticSize.XY; cont.BorderSizePixel = 0
-    do local _l=Instance.new("UIListLayout");_l.FillDirection=Enum.FillDirection.Vertical;_l.Padding=UDim.new(0,3);_l.SortOrder=Enum.SortOrder.LayoutOrder;_l.Parent=cont end
+    _vl(cont,3)
 
     function KL:SetVisibility(b) f.Visible = b end
     function KL:Add(name, key)
@@ -407,7 +416,7 @@ function Lib:KeybindList()
         local dot = INew("Frame"); dot.Parent = row
         dot.Size = U2(0, 3, 0, 3); dot.AnchorPoint = V2(0, 0.5)
         dot.Position = U2(0, 0, 0.5, 0); dot.BackgroundColor3 = T.Accent
-        dot.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=dot end
+        dot.BorderSizePixel = 0; _crn(dot,99)
 
         local lbl = INew("TextLabel"); lbl.Parent = row
         lbl.Position = U2(0, 8, 0, 0); lbl.Size = U2(0, 0, 1, 0)
@@ -435,40 +444,40 @@ function Lib:CreateColorpicker(Data)
     local btn = INew("TextButton"); btn.Parent = Data.Parent
     btn.Size = U2(0, bsz, 0, bsz); btn.Text = ""
     btn.AutoButtonColor = false; btn.BackgroundColor3 = T.Accent
-    btn.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,3);_c.Parent=btn end; stk(btn, T.Border, 1)
+    btn.BorderSizePixel = 0; _crn(btn,3); _stk(btn, T.Border, 1)
 
     -- picker window
     local win = INew("Frame"); win.Parent = Lib.UnusedHolder; win.Visible = false
     win.Size = U2(0, 0, 0, 0); win.BackgroundColor3 = T.Bg2; win.BorderSizePixel = 0
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,7);_c.Parent=win end; stk(win, T.Border, 1); mkShadow(win, 36, 8, 0.44)
+    _crn(win,7); _stk(win, T.Border, 1); mkShadow(win, 36, 8, 0.44)
 
     -- palette
     local pal = INew("TextButton"); pal.Parent = win; pal.Text = ""
     pal.AutoButtonColor = false; pal.BackgroundColor3 = FR(255, 0, 0)
     pal.Position = U2(0, 8, 0, 8); pal.Size = U2(1, -30, 1, -54)
-    pal.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,5);_c.Parent=pal end
+    pal.BorderSizePixel = 0; _crn(pal,5)
     -- white-to-transparent sat gradient
     local sg = INew("Frame"); sg.Parent = pal; sg.Size = U2(1,0,1,0)
-    sg.BackgroundColor3 = FR(255,255,255); sg.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,5);_c.Parent=sg end
+    sg.BackgroundColor3 = FR(255,255,255); sg.BorderSizePixel = 0; _crn(sg,5)
     gradTrans(sg, 1, 0, 0)
     -- black-to-transparent val gradient
     local vg = INew("Frame"); vg.Parent = pal; vg.Size = U2(1,0,1,0)
-    vg.BackgroundColor3 = FR(0,0,0); vg.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,5);_c.Parent=vg end
+    vg.BackgroundColor3 = FR(0,0,0); vg.BorderSizePixel = 0; _crn(vg,5)
     gradTrans(vg, 0, 1, 90)
     -- dragger circle
     local pd = INew("Frame"); pd.Parent = pal
     pd.Size = U2(0, 12, 0, 12); pd.AnchorPoint = V2(0.5, 0.5)
     pd.Position = U2(0, 8, 0, 8); pd.BackgroundColor3 = FR(255,255,255)
-    pd.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=pd end; stk(pd, FR(0,0,0), 1.5)
+    pd.BorderSizePixel = 0; _crn(pd,99); _stk(pd, FR(0,0,0), 1.5)
 
     -- hue bar
     local hb = INew("TextButton"); hb.Parent = win; hb.Text = ""
     hb.AutoButtonColor = false; hb.AnchorPoint = V2(1, 0)
     hb.Position = U2(1, -8, 0, 8); hb.Size = U2(0, 12, 1, -54)
-    hb.BackgroundColor3 = FR(255,255,255); hb.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,4);_c.Parent=hb end
+    hb.BackgroundColor3 = FR(255,255,255); hb.BorderSizePixel = 0; _crn(hb,4)
     local hi = INew("TextButton"); hi.Parent = hb; hi.Text = ""
     hi.AutoButtonColor = false; hi.Size = U2(1,0,1,0)
-    hi.BackgroundColor3 = FR(255,255,255); hi.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,4);_c.Parent=hi end
+    hi.BackgroundColor3 = FR(255,255,255); hi.BorderSizePixel = 0; _crn(hi,4)
     local hg = INew("UIGradient"); hg.Parent = hi; hg.Rotation = 90
     hg.Color = CS{CSK(0,FR(255,0,0)),CSK(0.17,FR(255,255,0)),CSK(0.33,FR(0,255,0)),
                   CSK(0.5,FR(0,255,255)),CSK(0.67,FR(0,0,255)),CSK(0.83,FR(255,0,255)),
@@ -477,7 +486,7 @@ function Lib:CreateColorpicker(Data)
     local hd = INew("Frame"); hd.Parent = hb
     hd.Size = U2(1, 2, 0, 4); hd.AnchorPoint = V2(0.5, 0.5)
     hd.Position = U2(0.5, 0, 0, 0); hd.BackgroundColor3 = FR(255,255,255)
-    hd.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,2);_c.Parent=hd end; stk(hd, FR(0,0,0), 1)
+    hd.BorderSizePixel = 0; _crn(hd,2); _stk(hd, FR(0,0,0), 1)
 
     -- hex input
     local hexBox = INew("TextBox"); hexBox.Parent = win
@@ -488,7 +497,7 @@ function Lib:CreateColorpicker(Data)
     hexBox.TextColor3 = T.Text; hexBox.PlaceholderColor3 = T.TextDim
     hexBox.ClearTextOnFocus = false; hexBox.Text = ""
     hexBox.TextXAlignment = Enum.TextXAlignment.Left
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,4);_c.Parent=hexBox end; stk(hexBox, T.Border, 1); do local _p=Instance.new("UIPadding");_p.PaddingTop=UDim.new(0,0);_p.PaddingBottom=UDim.new(0,0);_p.PaddingLeft=UDim.new(0,6);_p.PaddingRight=UDim.new(0,0);_p.Parent=hexBox end
+    _crn(hexBox,4); _stk(hexBox, T.Border, 1); _pad(hexBox,0,0,6,0)
 
     local sP, sH = false, false; local deb = false; local wRS
 
@@ -582,11 +591,11 @@ function Lib:CreateKeybind(Data)
     kBtn.Text = "[ — ]"; kBtn.AutoButtonColor = false
     kBtn.FontFace = Lib.Fonts.R; kBtn.TextSize = IsMobile and 11 or 10
     kBtn.TextColor3 = T.TextSub; kBtn.BackgroundColor3 = T.Bg4; kBtn.BorderSizePixel = 0
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,3);_c.Parent=kBtn end; stk(kBtn, T.Border, 1); do local _p=Instance.new("UIPadding");_p.PaddingTop=UDim.new(0,0);_p.PaddingBottom=UDim.new(0,0);_p.PaddingLeft=UDim.new(0,5);_p.PaddingRight=UDim.new(0,5);_p.Parent=kBtn end
+    _crn(kBtn,3); _stk(kBtn, T.Border, 1); _pad(kBtn,0,0,5,5)
 
     local kWin = INew("Frame"); kWin.Parent = Lib.UnusedHolder; kWin.Visible = false
     kWin.Size = U2(0, 0, 0, 0); kWin.BackgroundColor3 = T.Bg3; kWin.BorderSizePixel = 0
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,5);_c.Parent=kWin end; stk(kWin, T.Border, 1); do local _p=Instance.new("UIPadding");_p.PaddingTop=UDim.new(0,5);_p.PaddingBottom=UDim.new(0,5);_p.PaddingLeft=UDim.new(0,5);_p.PaddingRight=UDim.new(0,5);_p.Parent=kWin end; do local _l=Instance.new("UIListLayout");_l.FillDirection=Enum.FillDirection.Vertical;_l.Padding=UDim.new(0,2);_l.SortOrder=Enum.SortOrder.LayoutOrder;_l.Parent=kWin end
+    _crn(kWin,5); _stk(kWin, T.Border, 1); _pad(kWin,5,5,5,5); _vl(kWin,2)
     mkShadow(kWin, 20, 4, 0.5)
 
     local mH = IsMobile and 22 or 17
@@ -595,11 +604,11 @@ function Lib:CreateKeybind(Data)
         b.AutoButtonColor = false; b.BackgroundTransparency = 1
         b.Size = U2(1, 0, 0, mH); b.FontFace = Lib.Fonts.R
         b.TextSize = IsMobile and 11 or 10; b.TextColor3 = T.TextSub
-        b.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,3);_c.Parent=b end
+        b.BorderSizePixel = 0; _crn(b,3)
         local bar = INew("Frame"); bar.Parent = b; bar.BackgroundTransparency = 1
         bar.Size = U2(0, 2, 0.5, 0); bar.AnchorPoint = V2(0, 0.5)
         bar.Position = U2(0, 2, 0.5, 0); bar.BackgroundColor3 = T.Accent
-        bar.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,2);_c.Parent=bar end
+        bar.BorderSizePixel = 0; _crn(bar,2)
         return b, bar
     end
     local tB, tBar = mkMode("Toggle")
@@ -707,15 +716,15 @@ function Lib:Window(Data)
     local main = INew("Frame"); main.Parent = Lib.Holder
     main.AnchorPoint = V2(0.5, 0.5); main.Position = U2(0.5, 0, 0.5, 0)
     main.Size = U2(0, WW, 0, WH); main.BackgroundColor3 = T.Bg1; main.BorderSizePixel = 0
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,8);_c.Parent=main end
+    _crn(main,8)
     -- outer glow border (very subtle red)
-    stk(main, T.Border, 1)
+    _stk(main, T.Border, 1)
     -- deep shadow
     mkShadow(main, 60, 12, 0.35)
 
     -- ── topbar ──
     local top = INew("Frame"); top.Parent = main
-    top.Size = U2(1, 0, 0, TPH); top.BackgroundColor3 = T.TopBar; top.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,8);_c.Parent=top end
+    top.Size = U2(1, 0, 0, TPH); top.BackgroundColor3 = T.TopBar; top.BorderSizePixel = 0; _crn(top,8)
     -- cover bottom corners
     INew("Frame").Parent = top; top:FindFirstChildOfClass("Frame").Position = U2(0,0,0.5,0)
     top:FindFirstChildOfClass("Frame").Size = U2(1,0,0.5,0)
@@ -729,15 +738,15 @@ function Lib:Window(Data)
     -- subtle gradient on topbar (left darker → right slightly lighter)
     local topGrad = INew("Frame"); topGrad.Parent = top
     topGrad.Size = U2(1,0,1,0); topGrad.BackgroundTransparency = 0.85
-    topGrad.BackgroundColor3 = T.Accent; topGrad.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,8);_c.Parent=topGrad end
+    topGrad.BackgroundColor3 = T.Accent; topGrad.BorderSizePixel = 0; _crn(topGrad,8)
     gradTrans(topGrad, 0.95, 1, 0)
 
     -- title area
     local titleDot = INew("Frame"); titleDot.Parent = top
     titleDot.Size = U2(0, 6, 0, 6); titleDot.AnchorPoint = V2(0, 0.5)
     titleDot.Position = U2(0, 12, 0.5, 0); titleDot.BackgroundColor3 = T.Accent
-    titleDot.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=titleDot end
-    stk(titleDot, T.AccentGlow, 3).Transparency = 0.4  -- glow ring
+    titleDot.BorderSizePixel = 0; _crn(titleDot,99)
+    _stk(titleDot, T.AccentGlow, 3).Transparency = 0.4  -- glow ring
 
     local titleLbl = INew("TextLabel"); titleLbl.Parent = top
     titleLbl.AnchorPoint = V2(0, 0.5); titleLbl.Position = U2(0, 23, 0.5, 0)
@@ -757,7 +766,7 @@ function Lib:Window(Data)
     -- ── sidebar ──
     local sb = INew("Frame"); sb.Parent = main
     sb.Position = U2(0, 0, 0, TPH); sb.Size = U2(0, SBW, 1, -TPH)
-    sb.BackgroundColor3 = T.Sidebar; sb.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,8);_c.Parent=sb end
+    sb.BackgroundColor3 = T.Sidebar; sb.BorderSizePixel = 0; _crn(sb,8)
     -- fill top corners of sidebar
     INew("Frame").Parent = sb; sb:FindFirstChildOfClass("Frame").Size = U2(1,0,0,10)
     sb:FindFirstChildOfClass("Frame").BackgroundColor3 = T.Sidebar
@@ -771,7 +780,7 @@ function Lib:Window(Data)
     local nav = INew("Frame"); nav.Parent = sb
     nav.BackgroundTransparency = 1; nav.Position = U2(0, 4, 0, 8)
     nav.Size = U2(1, -8, 1, -16); nav.AutomaticSize = Enum.AutomaticSize.Y
-    nav.BorderSizePixel = 0; do local _l=Instance.new("UIListLayout");_l.FillDirection=Enum.FillDirection.Vertical;_l.Padding=UDim.new(0,2);_l.SortOrder=Enum.SortOrder.LayoutOrder;_l.Parent=nav end
+    nav.BorderSizePixel = 0; _vl(nav,2)
 
     -- ── content area ──
     local cont = INew("Frame"); cont.Parent = main
@@ -817,7 +826,7 @@ function Lib:Window(Data)
         hambg.Position = U2(0, 10, 1, -(hamSize + 80))
         hambg.BackgroundColor3 = T.Bg2
         hambg.BorderSizePixel = 0; hambg.ZIndex = 10
-        do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,10);_c.Parent=hambg end; stk(hambg, T.Accent, 1)
+        _crn(hambg,10); _stk(hambg, T.Accent, 1)
 
         -- three lines icon
         for li = 1, 3 do
@@ -826,14 +835,14 @@ function Lib:Window(Data)
             line.AnchorPoint = V2(0.5, 0.5)
             line.Position = U2(0.5, 0, 0, 10 + (li-1) * 9)
             line.BackgroundColor3 = T.Accent
-            line.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,2);_c.Parent=line end
+            line.BorderSizePixel = 0; _crn(line,2)
         end
 
         -- red dot accent corner
         local rdot = INew("Frame"); rdot.Parent = hambg
         rdot.Size = U2(0, 7, 0, 7)
         rdot.AnchorPoint = V2(1, 0); rdot.Position = U2(1, 1, 0, -1)
-        rdot.BackgroundColor3 = T.AccentHi; rdot.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=rdot end
+        rdot.BackgroundColor3 = T.AccentHi; rdot.BorderSizePixel = 0; _crn(rdot,99)
 
         -- tap to toggle
         local tapBtn = INew("TextButton"); tapBtn.Parent = hambg
@@ -885,25 +894,25 @@ function Lib:Page(Data)
     local tab = INew("TextButton"); tab.Parent = nav; tab.Text = ""
     tab.AutoButtonColor = false; tab.BackgroundTransparency = 1
     tab.Size = U2(1, 0, 0, IsMobile and 30 or 25)
-    tab.BorderSizePixel = 0; tab.BackgroundColor3 = T.Bg3; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,5);_c.Parent=tab end
+    tab.BorderSizePixel = 0; tab.BackgroundColor3 = T.Bg3; _crn(tab,5)
 
     -- active bg (filled when selected)
     local tabBg = INew("Frame"); tabBg.Parent = tab
     tabBg.Size = U2(1, 0, 1, 0); tabBg.BackgroundColor3 = T.Bg4
-    tabBg.BackgroundTransparency = 1; tabBg.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,5);_c.Parent=tabBg end
+    tabBg.BackgroundTransparency = 1; tabBg.BorderSizePixel = 0; _crn(tabBg,5)
 
     -- left accent bar
     local aBar = INew("Frame"); aBar.Parent = tab
     aBar.Size = U2(0, 2, 0.46, 0); aBar.AnchorPoint = V2(0, 0.5)
     aBar.Position = U2(0, 3, 0.5, 0); aBar.BackgroundColor3 = T.Accent
-    aBar.BackgroundTransparency = 1; aBar.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,2);_c.Parent=aBar end
-    stk(aBar, T.AccentGlow, 1.5).Transparency = 0.55
+    aBar.BackgroundTransparency = 1; aBar.BorderSizePixel = 0; _crn(aBar,2)
+    _stk(aBar, T.AccentGlow, 1.5).Transparency = 0.55
 
     -- small dot
     local aDot = INew("Frame"); aDot.Parent = tab
     aDot.Size = U2(0, 3, 0, 3); aDot.AnchorPoint = V2(0, 0.5)
     aDot.Position = U2(0, 8, 0.5, 0); aDot.BackgroundColor3 = T.TextDim
-    aDot.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=aDot end
+    aDot.BorderSizePixel = 0; _crn(aDot,99)
 
     -- label
     local lbl = INew("TextLabel"); lbl.Parent = tab
@@ -931,7 +940,7 @@ function Lib:Page(Data)
         col.Position = U2(colW * (i - 1), 0, 0, 0)
         col.ElasticBehavior = IsMobile and Enum.ElasticBehavior.Always or Enum.ElasticBehavior.WhenScrollable
         local pv = IsMobile and 8 or 6
-        do local _p=Instance.new("UIPadding");_p.PaddingTop=UDim.new(0,pv);_p.PaddingBottom=UDim.new(0,pv+2);_p.PaddingLeft=UDim.new(0,pv);_p.PaddingRight=UDim.new(0,pv);_p.Parent=col end; do local _l=Instance.new("UIListLayout");_l.FillDirection=Enum.FillDirection.Vertical;_l.Padding=UDim.new(0,IsMobile and 9 or 7);_l.SortOrder=Enum.SortOrder.LayoutOrder;_l.Parent=col end
+        _pad(col,pv,pv+2,pv,pv); _vl(col,IsMobile and 9 or 7)
         P.ColumnsData[i] = col
     end
 
@@ -984,13 +993,13 @@ function Lib.Pages:Section(Data)
 
     local box = INew("Frame"); box.Parent = parent
     box.Size = U2(1, 0, 0, 30); box.AutomaticSize = Enum.AutomaticSize.Y
-    box.BackgroundColor3 = T.Bg2; box.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,7);_c.Parent=box end
-    stk(box, T.Border, 1); do local _p=Instance.new("UIPadding");_p.PaddingTop=UDim.new(0,0);_p.PaddingBottom=UDim.new(0,IsMobile and 10 or 7);_p.PaddingLeft=UDim.new(0,0);_p.PaddingRight=UDim.new(0,0);_p.Parent=box end
+    box.BackgroundColor3 = T.Bg2; box.BorderSizePixel = 0; _crn(box,7)
+    _stk(box, T.Border, 1); _pad(box,0,IsMobile and 10 or 7,0,0)
     mkShadow(box, 16, 2, 0.7)
 
     -- header
     local hdr = INew("Frame"); hdr.Parent = box
-    hdr.Size = U2(1, 0, 0, hH); hdr.BackgroundColor3 = T.Bg3; hdr.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,7);_c.Parent=hdr end
+    hdr.Size = U2(1, 0, 0, hH); hdr.BackgroundColor3 = T.Bg3; hdr.BorderSizePixel = 0; _crn(hdr,7)
     -- fill bottom corners of header
     local hFill = INew("Frame"); hFill.Parent = hdr
     hFill.Position = U2(0, 0, 0.5, 0); hFill.Size = U2(1, 0, 0.5, 0)
@@ -1000,8 +1009,8 @@ function Lib.Pages:Section(Data)
     local acb = INew("Frame"); acb.Parent = hdr
     acb.Size = U2(0, 2, 0.42, 0); acb.AnchorPoint = V2(0, 0.5)
     acb.Position = U2(0, 6, 0.5, 0); acb.BackgroundColor3 = T.Accent
-    acb.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,2);_c.Parent=acb end
-    stk(acb, T.AccentGlow, 2).Transparency = 0.45  -- glow
+    acb.BorderSizePixel = 0; _crn(acb,2)
+    _stk(acb, T.AccentGlow, 2).Transparency = 0.45  -- glow
 
     -- section name
     local hl = INew("TextLabel"); hl.Parent = hdr
@@ -1020,7 +1029,7 @@ function Lib.Pages:Section(Data)
     local cont = INew("Frame"); cont.Parent = box
     cont.Position = U2(0, 9, 0, hH + 6); cont.Size = U2(1, -18, 0, 0)
     cont.AutomaticSize = Enum.AutomaticSize.Y; cont.BackgroundTransparency = 1
-    cont.BorderSizePixel = 0; do local _l=Instance.new("UIListLayout");_l.FillDirection=Enum.FillDirection.Vertical;_l.Padding=UDim.new(0,IsMobile and 7 or 5);_l.SortOrder=Enum.SortOrder.LayoutOrder;_l.Parent=cont end
+    cont.BorderSizePixel = 0; _vl(cont,IsMobile and 7 or 5)
 
     S.Items = {box=box, content=cont}
     return setmetatable(S, Lib.Sections)
@@ -1046,7 +1055,7 @@ function Lib.Sections:Toggle(Data)
     local rowBg = INew("Frame"); rowBg.Parent = row
     rowBg.Size = U2(1, 4, 1, 2); rowBg.AnchorPoint = V2(0.5, 0.5)
     rowBg.Position = U2(0.5, 0, 0.5, 0); rowBg.BackgroundColor3 = T.Bg4
-    rowBg.BackgroundTransparency = 1; rowBg.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,4);_c.Parent=rowBg end
+    rowBg.BackgroundTransparency = 1; rowBg.BorderSizePixel = 0; _crn(rowBg,4)
 
     local nl = INew("TextLabel"); nl.Parent = row
     nl.AnchorPoint = V2(0, 0.5); nl.Position = U2(0, 0, 0.5, 0)
@@ -1060,19 +1069,19 @@ function Lib.Sections:Toggle(Data)
     sub.AnchorPoint = V2(1, 0.5); sub.Position = U2(1, 0, 0.5, 0)
     sub.Size = U2(0, 0, 1, 0); sub.AutomaticSize = Enum.AutomaticSize.X
     sub.BackgroundTransparency = 1; sub.BorderSizePixel = 0; sub.ZIndex = 2
-    do local _l=Instance.new("UIListLayout");_l.FillDirection=Enum.FillDirection.Horizontal;_l.Padding=UDim.new(0,IsMobile and 6 or 5);_l.HorizontalAlignment=Enum.HorizontalAlignment.Right;_l.VerticalAlignment=Enum.VerticalAlignment.Center;_l.SortOrder=Enum.SortOrder.LayoutOrder;_l.Parent=sub end
+    _hl(sub,IsMobile and 6 or 5,Enum.HorizontalAlignment.Right,Enum.VerticalAlignment.Center)
 
     -- pill track
     local track = INew("Frame"); track.Parent = sub
     track.Size = U2(0, pW, 0, pH); track.BackgroundColor3 = T.Pill
-    track.BorderSizePixel = 0; track.LayoutOrder = 999; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=track end
-    local trkStk = stk(track, T.PillBorder, 1)
+    track.BorderSizePixel = 0; track.LayoutOrder = 999; _crn(track,99)
+    local trkStk = _stk(track, T.PillBorder, 1)
 
     -- pill thumb
     local thumb = INew("Frame"); thumb.Parent = track
     thumb.Size = U2(0, tSz, 0, tSz); thumb.AnchorPoint = V2(0, 0.5)
     thumb.Position = U2(0, 2, 0.5, 0); thumb.BackgroundColor3 = T.TextDim
-    thumb.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=thumb end
+    thumb.BorderSizePixel = 0; _crn(thumb,99)
 
     function TG:Get() return TG.Value end
     function TG:Set(v)
@@ -1133,7 +1142,7 @@ function Lib.Sections:Button(Data)
     btn.Size = U2(1, 0, 0, bH); btn.Text = B.Name; btn.AutoButtonColor = false
     btn.FontFace = Lib.Fonts.M; btn.TextSize = IsMobile and 12 or 10
     btn.TextColor3 = T.TextSub; btn.BackgroundColor3 = T.Bg3; btn.BorderSizePixel = 0
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,4);_c.Parent=btn end; stk(btn, T.Border, 1)
+    _crn(btn,4); _stk(btn, T.Border, 1)
 
     -- inner highlight line at top
     local btnLine = INew("Frame"); btnLine.Parent = btn
@@ -1199,19 +1208,19 @@ function Lib.Sections:Slider(Data)
     track.AutoButtonColor = false; track.AnchorPoint = V2(0, 1)
     track.Position = U2(0, 0, 1, 0); track.Size = U2(1, 0, 0, tH)
     track.BackgroundColor3 = T.Bg4; track.BorderSizePixel = 0
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=track end; stk(track, T.Border, 1)
+    _crn(track,99); _stk(track, T.Border, 1)
 
     -- fill bar with glow
     local fill = INew("Frame"); fill.Parent = track
     fill.Position = U2(0, 1, 0, 1); fill.Size = U2(0.5, 0, 1, -2)
-    fill.BackgroundColor3 = T.Accent; fill.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=fill end
-    stk(fill, T.AccentSoft, 1).Transparency = 0.45
+    fill.BackgroundColor3 = T.Accent; fill.BorderSizePixel = 0; _crn(fill,99)
+    _stk(fill, T.AccentSoft, 1).Transparency = 0.45
 
     -- thumb indicator on track
     local thumb2 = INew("Frame"); thumb2.Parent = track
     thumb2.Size = U2(0, tH+2, 0, tH+2); thumb2.AnchorPoint = V2(0.5, 0.5)
     thumb2.Position = U2(0.5, 0, 0.5, 0); thumb2.BackgroundColor3 = T.AccentHi
-    thumb2.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=thumb2 end; stk(thumb2, T.AccentGlow, 1.5).Transparency=0.4
+    thumb2.BorderSizePixel = 0; _crn(thumb2,99); _stk(thumb2, T.AccentGlow, 1.5).Transparency=0.4
 
     function SL:Get() return SL.Value end
     function SL:Set(v)
@@ -1271,7 +1280,7 @@ function Lib.Sections:Dropdown(Data)
     local selBtn = INew("TextButton"); selBtn.Parent = wrap; selBtn.Text = ""
     selBtn.AutoButtonColor = false; selBtn.Position = U2(0,0,0,13)
     selBtn.Size = U2(1,0,0,bH); selBtn.BackgroundColor3 = T.Bg3; selBtn.BorderSizePixel = 0
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,4);_c.Parent=selBtn end; stk(selBtn, T.Border, 1)
+    _crn(selBtn,4); _stk(selBtn, T.Border, 1)
 
     local selLbl = INew("TextLabel"); selLbl.Parent = selBtn
     selLbl.AnchorPoint = V2(0,0.5); selLbl.Position = U2(0,7,0.5,0)
@@ -1292,7 +1301,7 @@ function Lib.Sections:Dropdown(Data)
     lf.Position = U2(0,0,0,13+bH+2); lf.Size = U2(1,0,0,0)
     lf.AutomaticSize = Enum.AutomaticSize.Y; lf.Visible = false
     lf.BackgroundColor3 = T.Bg3; lf.BackgroundTransparency = 1; lf.BorderSizePixel = 0
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,4);_c.Parent=lf end; do local _p=Instance.new("UIPadding");_p.PaddingTop=UDim.new(0,3);_p.PaddingBottom=UDim.new(0,3);_p.PaddingLeft=UDim.new(0,4);_p.PaddingRight=UDim.new(0,4);_p.Parent=lf end; do local _l=Instance.new("UIListLayout");_l.FillDirection=Enum.FillDirection.Vertical;_l.Padding=UDim.new(0,2);_l.SortOrder=Enum.SortOrder.LayoutOrder;_l.Parent=lf end
+    _crn(lf,4); _pad(lf,3,3,4,4); _vl(lf,2)
     DD.Items_ = {OptionHolder=lf, Holder=lf}
 
     if not IsMobile then
@@ -1304,7 +1313,7 @@ function Lib.Sections:Dropdown(Data)
     function DD:SetOpen(bool)
         DD.IsOpen = bool; lf.Visible = bool; lf.BackgroundTransparency = bool and 0 or 1
         tw(arrow, {TextColor3 = bool and T.Accent or T.TextDim})
-        stk(selBtn, bool and T.Accent or T.Border, 1)
+        _stk(selBtn, bool and T.Accent or T.Border, 1)
         if bool then
             for _, v in Lib.OpenFrames do if v ~= DD then v:SetOpen(false) end end
             Lib.OpenFrames[DD] = DD
@@ -1329,13 +1338,13 @@ function Lib.Sections:Dropdown(Data)
         local oH = IsMobile and 21 or 16
         local ob = INew("TextButton"); ob.Parent = lf; ob.Text = ""
         ob.AutoButtonColor = false; ob.BackgroundTransparency = 1
-        ob.Size = U2(1, 0, 0, oH); ob.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,3);_c.Parent=ob end
+        ob.Size = U2(1, 0, 0, oH); ob.BorderSizePixel = 0; _crn(ob,3)
 
         -- left accent bar
         local oBar = INew("Frame"); oBar.Parent = ob; oBar.BackgroundTransparency = 1
         oBar.Size = U2(0, 2, 0.52, 0); oBar.AnchorPoint = V2(0, 0.5)
         oBar.Position = U2(0, 2, 0.5, 0); oBar.BackgroundColor3 = T.Accent
-        oBar.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,2);_c.Parent=oBar end
+        oBar.BorderSizePixel = 0; _crn(oBar,2)
 
         local otxt = INew("TextLabel"); otxt.Parent = ob
         otxt.AnchorPoint = V2(0, 0.5); otxt.Position = U2(0, 8, 0.5, 0)
@@ -1404,7 +1413,7 @@ function Lib.Sections:Label(text)
     sub.AnchorPoint = V2(1,0.5); sub.Position = U2(1,0,0.5,0)
     sub.Size = U2(0,0,1,0); sub.AutomaticSize = Enum.AutomaticSize.X
     sub.BackgroundTransparency = 1; sub.BorderSizePixel = 0; sub.ZIndex = 2
-    do local _l=Instance.new("UIListLayout");_l.FillDirection=Enum.FillDirection.Horizontal;_l.Padding=UDim.new(0,IsMobile and 6 or 5);_l.HorizontalAlignment=Enum.HorizontalAlignment.Right;_l.VerticalAlignment=Enum.VerticalAlignment.Center;_l.SortOrder=Enum.SortOrder.LayoutOrder;_l.Parent=sub end
+    _hl(sub,IsMobile and 6 or 5,Enum.HorizontalAlignment.Right,Enum.VerticalAlignment.Center)
 
     function L:SetText(t) lbl.Text = tostring(t) end
     function L:SetVisibility(b) row.Visible = b end
@@ -1444,11 +1453,11 @@ function Lib.Sections:Textbox(Data)
     inp.TextColor3 = T.Text; inp.PlaceholderColor3 = T.TextDim
     inp.PlaceholderText = TX.Placeholder; inp.ClearTextOnFocus = false
     inp.TextXAlignment = Enum.TextXAlignment.Left
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,4);_c.Parent=inp end; stk(inp, T.Border, 1); do local _p=Instance.new("UIPadding");_p.PaddingTop=UDim.new(0,0);_p.PaddingBottom=UDim.new(0,0);_p.PaddingLeft=UDim.new(0,5);_p.PaddingRight=UDim.new(0,0);_p.Parent=inp end
+    _crn(inp,4); _stk(inp, T.Border, 1); _pad(inp,0,0,5,0)
 
     if not IsMobile then
-        inp.Focused:Connect(function() stk(inp, T.Accent, 1) end)
-        inp.FocusLost:Connect(function() stk(inp, T.Border, 1) end)
+        inp.Focused:Connect(function() _stk(inp, T.Accent, 1) end)
+        inp.FocusLost:Connect(function() _stk(inp, T.Border, 1) end)
     end
 
     local nl = INew("TextLabel"); nl.Parent = row
@@ -1563,8 +1572,8 @@ function Lib:ModeratorList()
     f.AnchorPoint = V2(1, 0.5); f.Position = U2(1, -14, 0.5, 0)
     f.Size = U2(0, 200, 0, 0); f.AutomaticSize = Enum.AutomaticSize.Y
     f.BackgroundColor3 = T.Bg2; f.BorderSizePixel = 0
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,6);_c.Parent=f end; stk(f, T.Border, 1)
-    mkShadow(f, 22, 4, 0.55); do local _p=Instance.new("UIPadding");_p.PaddingTop=UDim.new(0,8);_p.PaddingBottom=UDim.new(0,8);_p.PaddingLeft=UDim.new(0,10);_p.PaddingRight=UDim.new(0,10);_p.Parent=f end
+    _crn(f,6); _stk(f, T.Border, 1)
+    mkShadow(f, 22, 4, 0.55); _pad(f,8,8,10,10)
     makeDraggable(f)
 
     -- red top line
@@ -1586,7 +1595,7 @@ function Lib:ModeratorList()
     local cont = INew("Frame"); cont.Parent = f
     cont.Position = U2(0, 0, 0, 25); cont.BackgroundTransparency = 1
     cont.AutomaticSize = Enum.AutomaticSize.XY; cont.BorderSizePixel = 0
-    do local _l=Instance.new("UIListLayout");_l.FillDirection=Enum.FillDirection.Vertical;_l.Padding=UDim.new(0,4);_l.SortOrder=Enum.SortOrder.LayoutOrder;_l.Parent=cont end
+    _vl(cont,4)
 
     function ML:SetVisibility(b) f.Visible = b end
     function ML:add_mod(username, role)
@@ -1598,7 +1607,7 @@ function Lib:ModeratorList()
         local dot = INew("Frame"); dot.Parent = row
         dot.Size = U2(0, 4, 0, 4); dot.AnchorPoint = V2(0, 0.5)
         dot.Position = U2(0, 0, 0.5, 0); dot.BackgroundColor3 = T.Accent
-        dot.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=dot end
+        dot.BorderSizePixel = 0; _crn(dot,99)
 
         local namelbl = INew("TextLabel"); namelbl.Parent = row
         namelbl.Position = U2(0, 9, 0, 0); namelbl.Size = U2(0.6, 0, 1, 0)
@@ -1636,7 +1645,7 @@ function Lib:AddSearch(Window)
     local searchWrap = INew("Frame"); searchWrap.Parent = sb
     searchWrap.AnchorPoint = V2(0, 1); searchWrap.Position = U2(0, 5, 1, -8)
     searchWrap.Size = U2(1, -10, 0, 22); searchWrap.BackgroundColor3 = T.Bg3
-    searchWrap.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,4);_c.Parent=searchWrap end; stk(searchWrap, T.Border, 1)
+    searchWrap.BorderSizePixel = 0; _crn(searchWrap,4); _stk(searchWrap, T.Border, 1)
 
     local searchIcon = INew("TextLabel"); searchIcon.Parent = searchWrap
     searchIcon.Size = U2(0, 14, 1, 0); searchIcon.BackgroundTransparency = 1
@@ -1776,8 +1785,8 @@ function Lib:KeybindList()
     f.AnchorPoint = V2(0, 0.5); f.Position = U2(0, 10, 0.5, 0)
     f.BackgroundColor3 = T.Bg2; f.BorderSizePixel = 0
     f.AutomaticSize = Enum.AutomaticSize.XY
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,6);_c.Parent=f end; stk(f, T.Border, 1)
-    mkShadow(f, 24, 4, 0.55); do local _p=Instance.new("UIPadding");_p.PaddingTop=UDim.new(0,8);_p.PaddingBottom=UDim.new(0,8);_p.PaddingLeft=UDim.new(0,10);_p.PaddingRight=UDim.new(0,10);_p.Parent=f end
+    _crn(f,6); _stk(f, T.Border, 1)
+    mkShadow(f, 24, 4, 0.55); _pad(f,8,8,10,10)
 
     -- red top accent
     local topLine = INew("Frame"); topLine.Parent = f
@@ -1798,7 +1807,7 @@ function Lib:KeybindList()
     local cont = INew("Frame"); cont.Parent = f
     cont.Position = U2(0, 0, 0, 25); cont.BackgroundTransparency = 1
     cont.AutomaticSize = Enum.AutomaticSize.XY; cont.BorderSizePixel = 0
-    do local _l=Instance.new("UIListLayout");_l.FillDirection=Enum.FillDirection.Vertical;_l.Padding=UDim.new(0,3);_l.SortOrder=Enum.SortOrder.LayoutOrder;_l.Parent=cont end
+    _vl(cont,3)
 
     function KL:SetVisibility(b) f.Visible = b end
     function KL:Add(name, key)
@@ -1809,7 +1818,7 @@ function Lib:KeybindList()
         local dot = INew("Frame"); dot.Parent = row
         dot.Size = U2(0, 3, 0, 3); dot.AnchorPoint = V2(0, 0.5)
         dot.Position = U2(0, 0, 0.5, 0); dot.BackgroundColor3 = T.Accent
-        dot.BorderSizePixel = 0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=dot end
+        dot.BorderSizePixel = 0; _crn(dot,99)
 
         local lbl = INew("TextLabel"); lbl.Parent = row
         lbl.Position = U2(0, 8, 0, 0); lbl.Size = U2(0, 0, 1, 0)
@@ -1934,7 +1943,7 @@ function Lib:Ripple(parent, x, y)
     rip.AnchorPoint = V2(0.5, 0.5); rip.Position = U2(0, x, 0, y)
     rip.Size = U2(0, 0, 0, 0); rip.BackgroundColor3 = T.Accent
     rip.BackgroundTransparency = 0.6; rip.BorderSizePixel = 0
-    rip.ZIndex = (parent.ZIndex or 1) + 5; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=rip end
+    rip.ZIndex = (parent.ZIndex or 1) + 5; _crn(rip,99)
     local sz = math.max(parent.AbsoluteSize.X, parent.AbsoluteSize.Y) * 2
     tw(rip, {Size=U2(0,sz,0,sz), BackgroundTransparency=1}, 0.4, Enum.EasingStyle.Quart)
     game:GetService(Debris):AddItem(rip, 0.5)
@@ -2001,8 +2010,8 @@ local function ensureTooltip()
     tooltipFrame = INew('Frame'); tooltipFrame.Parent = Lib.Holder
     tooltipFrame.Size = U2(0,0,0,20); tooltipFrame.AutomaticSize = Enum.AutomaticSize.X
     tooltipFrame.BackgroundColor3 = T.Bg4; tooltipFrame.BorderSizePixel = 0
-    tooltipFrame.Visible = false; tooltipFrame.ZIndex = 20; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,4);_c.Parent=tooltipFrame end
-    stk(tooltipFrame, T.Border, 1); do local _p=Instance.new("UIPadding");_p.PaddingTop=UDim.new(0,0);_p.PaddingBottom=UDim.new(0,0);_p.PaddingLeft=UDim.new(0,7);_p.PaddingRight=UDim.new(0,7);_p.Parent=tooltipFrame end
+    tooltipFrame.Visible = false; tooltipFrame.ZIndex = 20; _crn(tooltipFrame,4)
+    _stk(tooltipFrame, T.Border, 1); _pad(tooltipFrame,0,0,7,7)
     tooltipText = INew('TextLabel'); tooltipText.Parent = tooltipFrame
     tooltipText.Size = U2(0,0,1,0); tooltipText.AutomaticSize = Enum.AutomaticSize.X
     tooltipText.BackgroundTransparency = 1; tooltipText.Text = ''
@@ -2057,12 +2066,12 @@ function Lib.Sections:ProgressBar(Data)
     local track = INew('Frame'); track.Parent=wrap
     track.AnchorPoint=V2(0,1); track.Position=U2(0,0,1,0)
     track.Size=U2(1,0,0,pH); track.BackgroundColor3=T.Bg4; track.BorderSizePixel=0
-    do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=track end; stk(track,T.Border,1)
+    _crn(track,99); _stk(track,T.Border,1)
 
     local fill = INew('Frame'); fill.Parent=track
     fill.Position=U2(0,1,0,1); fill.Size=U2(0,-2,1,-2)
-    fill.BackgroundColor3=PB.Color; fill.BorderSizePixel=0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=fill end
-    stk(fill, T.AccentSoft, 1).Transparency = 0.5
+    fill.BackgroundColor3=PB.Color; fill.BorderSizePixel=0; _crn(fill,99)
+    _stk(fill, T.AccentSoft, 1).Transparency = 0.5
 
     function PB:Set(v)
         PB.Value = clamp(v, 0, PB.Max)
@@ -2087,7 +2096,7 @@ function Lib.Sections:ColorTag(Data)
     local badge = INew('Frame'); badge.Parent=row
     badge.Size=U2(0, IsMobile and 10 or 8, 0, IsMobile and 10 or 8)
     badge.AnchorPoint=V2(0,0.5); badge.Position=U2(0,0,0.5,0)
-    badge.BackgroundColor3 = Data.Color or T.Accent; badge.BorderSizePixel=0; do local _c=Instance.new("UICorner");_c.CornerRadius=UDim.new(0,99);_c.Parent=badge end
+    badge.BackgroundColor3 = Data.Color or T.Accent; badge.BorderSizePixel=0; _crn(badge,99)
 
     local lbl = INew('TextLabel'); lbl.Parent=row
     lbl.Position=U2(0, IsMobile and 15 or 12, 0, 0)
