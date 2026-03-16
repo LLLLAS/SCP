@@ -111,39 +111,24 @@ NotifHolder.Position=U2(1,-14,1,-14);NotifHolder.Size=U2(0,0,1,0);NotifHolder.Au
 local _nl2=INew("UIListLayout");_nl2.Parent=NotifHolder;_nl2.SortOrder=Enum.SortOrder.LayoutOrder
 _nl2.HorizontalAlignment=Enum.HorizontalAlignment.Right;_nl2.VerticalAlignment=Enum.VerticalAlignment.Bottom;_nl2.Padding=UD(0,5)
 
--- ── Spring Drag ───────────────────────────────────────────────────
+-- ── Simple Drag ──────────────────────────────────────────────────
 local function makeSpringDrag(frame,handle)
     handle=handle or frame
     local dragging,ds,sp=false,nil,nil
-    local tilting=false
-    local spX=makeSpring(180,22); local spY=makeSpring(180,22)
-    local velX,velY=0,0; local lastX,lastY=0,0; local lastTime=0
-
     handle.InputBegan:Connect(function(i)
         if i.UserInputType~=Enum.UserInputType.MouseButton1 and i.UserInputType~=Enum.UserInputType.Touch then return end
         dragging=true; ds=i.Position; sp=frame.Position
-        spX.pos=sp.X.Offset; spY.pos=sp.Y.Offset
-        spX.vel=0; spY.vel=0
-        lastX=i.Position.X; lastY=i.Position.Y; lastTime=tick()
     end)
-
     UIS.InputChanged:Connect(function(i)
         if not dragging then return end
         if i.UserInputType~=Enum.UserInputType.MouseMovement and i.UserInputType~=Enum.UserInputType.Touch then return end
-        local now=tick(); local dt=now-lastTime
-        if dt>0 then velX=(i.Position.X-lastX)/dt; velY=(i.Position.Y-lastY)/dt end
-        lastX=i.Position.X; lastY=i.Position.Y; lastTime=now
         local d=i.Position-ds; local ps=frame.Parent.AbsoluteSize
         local nx=clamp(sp.X.Offset+d.X,0,ps.X-frame.AbsoluteSize.X)
         local ny=clamp(sp.Y.Offset+d.Y,0,ps.Y-frame.AbsoluteSize.Y)
         frame.Position=U2(0,nx,0,ny)
-
-        -- no size stretching
     end)
-
     UIS.InputEnded:Connect(function(i)
-        if i.UserInputType~=Enum.UserInputType.MouseButton1 and i.UserInputType~=Enum.UserInputType.Touch then return end
-        dragging=false
+        if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then dragging=false end
     end)
 end
 
