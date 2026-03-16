@@ -1,11 +1,5 @@
 -- FlowLib v3.0 by zerohub.fun
 
--- FlowLib v3.0 helper bootstrap
-local function _crn(p,r) local c=Instance.new('UICorner');c.CornerRadius=UDim.new(0,r or 4);c.Parent=p;return c end
-local function _stk(p,col,t) local s=Instance.new('UIStroke');s.Color=col or Color3.fromRGB(28,22,34);s.Thickness=t or 1;s.Parent=p;return s end
-local function _pad(p,pt,pb,pl,pr) local pd=Instance.new('UIPadding');pd.PaddingTop=UDim.new(0,pt or 0);pd.PaddingBottom=UDim.new(0,pb or 0);pd.PaddingLeft=UDim.new(0,pl or 0);pd.PaddingRight=UDim.new(0,pr or 0);pd.Parent=p end
-local function _vl(p,sp) local l=Instance.new('UIListLayout');l.FillDirection=Enum.FillDirection.Vertical;l.Padding=UDim.new(0,sp or 0);l.SortOrder=Enum.SortOrder.LayoutOrder;l.Parent=p;return l end
-local function _hl(p,sp,ha,va) local l=Instance.new('UIListLayout');l.FillDirection=Enum.FillDirection.Horizontal;l.Padding=UDim.new(0,sp or 0);l.HorizontalAlignment=ha or Enum.HorizontalAlignment.Left;l.VerticalAlignment=va or Enum.VerticalAlignment.Center;l.SortOrder=Enum.SortOrder.LayoutOrder;l.Parent=p;return l end
 
 
 
@@ -145,7 +139,7 @@ Lib.NotifHolder = nfHolder
 function _crn(p,r)
     local c = INew("UICorner"); c.CornerRadius = UD(0, r or 4); c.Parent = p; return c
 end
-function _stk_OLD(p, col, t, li)
+function _stk(p, col, t, li)
     local s = INew("UIStroke")
     s.Color = col or T.Border; s.Thickness = t or 1
     if li then s.LineJoinMode = li end
