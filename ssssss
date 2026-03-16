@@ -1,25 +1,3 @@
---[[
-╔══════════════════════════════════════════════════════════════════╗
-║  FlowLib v3.0  ·  premium dark UI  ·  Gamesense/Neverlose style ║
-║  Deep black  ·  Crimson accent  ·  Shadow layers  ·  Smooth anim║
-╚══════════════════════════════════════════════════════════════════╝
-    API (ZeroHub v3 compatible):
-        local Lib    = loadstring(game:HttpGet("URL"))()
-        local Window = Lib:Window({ Name = "script" })
-        local Page   = Window:Page({ Name = "Combat" })
-        local Sec    = Page:Section({ Name = "Aimbot", Side = 1 })
-        local tog    = Sec:Toggle({ Name = "Silent Aim", Default = false, Callback = fn })
-        local cp     = tog:Colorpicker({ Default = Color3.fromRGB(200,30,40) })
-        local kb     = tog:Keybind({ Default = Enum.KeyCode.E, Mode = "Toggle" })
-        Sec:Slider({ Name = "FOV", Min=1, Max=360, Default=90, Suffix="°", Callback=fn })
-        Sec:Dropdown({ Name = "Part", Items={"Head","HRP"}, Default="Head", Callback=fn })
-        Sec:Button({ Name = "Fire", Callback = fn })
-        Sec:Textbox({ Name = "Tag", Placeholder="...", Callback=fn })
-        local lbl = Sec:Label("Status"); lbl:SetText("active")
-        Lib:Notification("Loaded!", 3)
-        Lib:Watermark("script v1")
-        Lib:KeybindList()
-]]
 
 -- ══════════════════════════════════════════════════════════════════
 --  Services & locals
@@ -199,20 +177,8 @@ local function twSpring(obj, goal)
 end
 
 -- ── Shadow helper (ImageLabel drop shadow) ────────────────────────
-local SHADOW_IMG = "rbxassetid://1316045217"
-local function mkShadow(parent, size, offset, trans)
-    local s = INew("ImageLabel"); s.Parent = parent
-    s.AnchorPoint = V2(0.5, 0.5); s.BackgroundTransparency = 1
-    s.Position = U2(0.5, 0, 0.5, offset or 4)
-    s.Size = U2(1, size or 24, 1, size or 24)
-    s.ZIndex = (parent.ZIndex or 1) - 1
-    s.Image = SHADOW_IMG
-    s.ImageColor3 = T.Shadow
-    s.ImageTransparency = trans or 0.55
-    s.ScaleType = Enum.ScaleType.Slice
-    s.SliceCenter = Rect.new(10, 10, 118, 118)
-    return s
-end
+-- shadow: safe no-op (Rect.new not supported on all executors)
+local function mkShadow(parent, size, offset, trans) return nil end
 
 -- ── Draggable ─────────────────────────────────────────────────────
 local function makeDraggable(frame, handle)
