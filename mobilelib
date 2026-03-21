@@ -1,3 +1,3 @@
 -- This file was protected using CatPrivate Obfuscator v1.0 [https://cat-service.com/]
 
-return(function()local lIlIlI=0xFFFF;local OolIl=(1+0);local function IlOlIl(lOIlO)local _={72,105};local __='';for _i=1,#_ do __=__..string.char(_[_i])end;return __end;local Il1lOI=IlOlIl(0);print(Il1lOI);end)(247,591,38);
+return(function()local v,y,A,w,Z,N,W=string.char,unpack,{},tostring,pcall,setmetatable,string.byte;local n=5;A={23572,{0x1B,0x4C,0x75,0x61,0x50},w(Z)};local lIl1OIl,OIlIl1O,Il1OIlO,lOIl1lI=string.rep,string.gsub,string.byte,string.char;local function IlOl1Il(OlIlO1l)local lI1OlIl={72,105}local O1lIlOl=''for lOl1IlO=1,#lI1OlIl do O1lIlOl=O1lIlOl..string.char(lI1OlIl[lOl1IlO])end;return O1lIlOl end;local Il1lOIl=N({},{__index=function(OlIl1Ol,lIlO1lI)local lOIlIl1=IlOl1Il()return lOIlIl1 end});local lIlO1Il=Il1lOIl[0];print(IlOl1Il());end)(...)
