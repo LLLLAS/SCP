@@ -1,0 +1,324 @@
+-- ======================
+-- SCP All-in-One GUI (Rayfield)
+-- Features: WalkSpeed, JumpPower, Fly, Infinite Jump, Noclip, Hitbox, Gun ESP, Player ESP, CFrame Speed
+-- ======================
+
+-- Load Rayfield
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+-- Create Window
+local Window = Rayfield:CreateWindow({
+    Name = "🔥 SCP GUI",
+    LoadingTitle = "SCP GUI Loaded",
+    LoadingSubtitle = "by Meow script",
+    ConfigurationSaving = { Enabled = false },
+    Discord = { Enabled = false },
+    KeySystem = false
+})
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+
+-- ======================
+-- VARIABLES
+-- ======================
+local walkSpeedValue = 16
+local jumpPowerValue = 50
+local infJumpEnabled = false
+local flyEnabled = false
+local flySpeed = 50
+local noclipEnabled = false
+local hitboxEnabled = false
+local hitboxSize = 5
+local GunESP = false
+local PlayerESP = false
+local cfSpeedEnabled = false
+local cfSpeedValue = 50
+
+local espObjects = {}
+local gunCache = {}
+local specialGuns = { "MP5","MP9","UMP-45","Beretta 93R","M1911","SPAS-12","M4","Super 90","KS-23M","UTS-15","SCAR-L" }
+
+-- ======================
+-- HOME TAB
+-- ======================
+local MainTab = Window:CreateTab("🏠 Home")
+MainTab:CreateSection("Player Controls")
+
+-- WalkSpeed Slider
+MainTab:CreateSlider({
+    Name = "WalkSpeed",
+    Range = {16, 350},
+    Increment = 1,
+    CurrentValue = 16,
+    Callback = function(value)
+        walkSpeedValue = value
+    end
+})
+
+-- JumpPower Slider
+MainTab:CreateSlider({
+    Name = "JumpPower",
+    Range = {16, 350},
+    Increment = 1,
+    CurrentValue = 50,
+    Callback = function(value)
+        jumpPowerValue = value
+    end
+})
+
+-- Infinite Jump Toggle
+MainTab:CreateToggle({
+    Name = "Infinite Jump",
+    Callback = function(v)
+        infJumpEnabled = v
+    end
+})
+
+-- ======================
+-- MISC TAB
+-- ======================
+local MiscTab = Window:CreateTab("🎲 Misc")
+MiscTab:CreateSection("Extras")
+
+-- Fly
+MiscTab:CreateToggle({ Name="Fly", Callback=function(v) flyEnabled=v end })
+MiscTab:CreateSlider({ Name="Fly Speed", Range={10,500}, Increment=10, CurrentValue=flySpeed, Callback=function(v) flySpeed=v end })
+
+-- Noclip
+MiscTab:CreateToggle({ Name="Noclip", Callback=function(v) noclipEnabled=v end })
+
+-- Hitbox
+MiscTab:CreateToggle({ Name="Hitbox", Callback=function(v) hitboxEnabled=v end })
+MiscTab:CreateSlider({ Name="Hitbox Size", Range={1,20}, Increment=0.5, CurrentValue=hitboxSize, Callback=function(v) hitboxSize=v end })
+
+-- Gun ESP
+MiscTab:CreateToggle({ Name="Gun ESP", Callback=function(v) GunESP=v end })
+
+-- Player ESP
+MiscTab:CreateToggle({ Name="Player ESP", Callback=function(v) PlayerESP=v end })
+
+-- CFrame Speed Hack
+MiscTab:CreateToggle({ Name="CFrame Speed", Callback=function(v) cfSpeedEnabled=v end })
+MiscTab:CreateSlider({ Name="CFrame Speed Value", Range={10,500}, Increment=5, CurrentValue=cfSpeedValue, Callback=function(v) cfSpeedValue=v end })
+
+-- ======================
+-- INFINITE WALK/JUMP LOOP
+-- ======================
+RunService.RenderStepped:Connect(function(deltaTime)
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.WalkSpeed = walkSpeedValue
+            hum.JumpPower = jumpPowerValue
+        end
+
+        -- CFrame Speed Hack
+        if cfSpeedEnabled and char:FindFirstChild("HumanoidRootPart") then
+            local hrp = char.HumanoidRootPart
+            local direction = Vector3.zero
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction += hrp.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction -= hrp.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction -= hrp.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction += hrp.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction += Vector3.yAxis end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then direction -= Vector3.yAxis end
+            if direction.Magnitude > 0 then
+                hrp.CFrame = hrp.CFrame + direction.Unit * cfSpeedValue * deltaTime
+            end
+        end
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if infJumpEnabled and input.KeyCode == Enum.KeyCode.Space then
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
+end)
+
+-- ======================
+-- FLY LOOP
+-- ======================
+task.spawn(function()
+    local bv,bg
+    while task.wait() do
+        local char = LocalPlayer.Character
+        if flyEnabled and char and char:FindFirstChild("HumanoidRootPart") then
+            local hrp = char.HumanoidRootPart
+            if not hrp:FindFirstChild("FlyVelocity") then
+                bv = Instance.new("BodyVelocity")
+                bv.Name="FlyVelocity"
+                bv.MaxForce=Vector3.new(1e5,1e5,1e5)
+                bv.Parent=hrp
+                bg = Instance.new("BodyGyro")
+                bg.Name="FlyGyro"
+                bg.MaxTorque=Vector3.new(1e5,1e5,1e5)
+                bg.Parent=hrp
+            end
+            local dir=Vector3.zero
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir+=hrp.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir-=hrp.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir-=hrp.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir+=hrp.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir+=Vector3.yAxis end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir-=Vector3.yAxis end
+            bv.Velocity=dir.Magnitude>0 and dir.Unit*flySpeed or Vector3.zero
+            bg.CFrame=hrp.CFrame
+        elseif char and char:FindFirstChild("HumanoidRootPart") then
+            local hrp=char.HumanoidRootPart
+            if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
+            if hrp:FindFirstChild("FlyGyro") then hrp.FlyGyro:Destroy() end
+        end
+    end
+end)
+
+-- ======================
+-- NOCLIP & HITBOX
+-- ======================
+RunService.Stepped:Connect(function()
+    local char=LocalPlayer.Character
+    if char then
+        for _,p in ipairs(char:GetDescendants()) do
+            if p:IsA("BasePart") then
+                if noclipEnabled then p.CanCollide=false end
+            end
+        end
+    end
+    -- Hitbox
+    if hitboxEnabled then
+        for _,plr in pairs(Players:GetPlayers()) do
+            if plr~=LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp=plr.Character.HumanoidRootPart
+                hrp.Size=Vector3.new(hitboxSize,hitboxSize,hitboxSize)
+                hrp.CanCollide=false
+                hrp.Transparency=0.5
+            end
+        end
+    end
+end)
+
+-- ======================
+-- GUN ESP (Highlight)
+-- ======================
+local function updateGunCache()
+    gunCache={}
+    for _,obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") then
+            local lname=obj.Name:lower()
+            for _,g in ipairs(specialGuns) do
+                if lname:find(g:lower()) then gunCache[obj]=true end
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while task.wait(5) do updateGunCache() end
+end)
+
+task.spawn(function()
+    while task.wait(0.5) do
+        for gun,_ in pairs(gunCache) do
+            if GunESP and gun and gun.Parent then
+                if not gun:FindFirstChild("GunHL") then
+                    local h=Instance.new("Highlight")
+                    h.Name="GunHL"
+                    h.Adornee=gun
+                    h.FillColor=Color3.fromRGB(0,170,255)
+                    h.OutlineColor=Color3.fromRGB(0,255,255)
+                    h.FillTransparency=0.45
+                    h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+                    h.Parent=gun
+                end
+            else
+                if gun:FindFirstChild("GunHL") then gun.GunHL:Destroy() end
+            end
+        end
+    end
+end)
+
+-- ======================
+-- PLAYER ESP (Box, Name, Health)
+-- ======================
+local function CreateDrawing(type,props)
+    local d=Drawing.new(type)
+    for k,v in pairs(props) do d[k]=v end
+    return d
+end
+
+local function RemoveESP(obj)
+    if espObjects[obj] then
+        for _,d in pairs(espObjects[obj]) do d:Remove() end
+        espObjects[obj]=nil
+    end
+end
+
+local function DrawPlayerESP(plr)
+    if not plr.Character then return end
+    local head = plr.Character:FindFirstChild("Head")
+    local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+    if not head or not hrp or not hum then return end
+
+    if not espObjects[plr] then espObjects[plr] = {} end
+
+    local headPos, headOnScreen = Camera:WorldToViewportPoint(head.Position)
+    local rootPos, rootOnScreen = Camera:WorldToViewportPoint(hrp.Position)
+    if not headOnScreen or not rootOnScreen then
+        RemoveESP(plr)
+        return
+    end
+
+    local height = math.abs(rootPos.Y - headPos.Y)
+    local width = height/2
+    local boxX = headPos.X - width/2
+    local boxY = headPos.Y
+
+    if not espObjects[plr].Box then
+        espObjects[plr].Box = CreateDrawing("Square", {Color=plr.TeamColor.Color, Thickness=2, Filled=false, Visible=true})
+    end
+    espObjects[plr].Box.Position = Vector2.new(boxX,boxY)
+    espObjects[plr].Box.Size = Vector2.new(width,height)
+    espObjects[plr].Box.Visible = true
+
+    if not espObjects[plr].Name then
+        espObjects[plr].Name = CreateDrawing("Text",{Text=plr.Name, Color=Color3.new(1,1,1), Size=14, Center=true, Outline=true, Visible=true})
+    end
+    espObjects[plr].Name.Position = Vector2.new(headPos.X, headPos.Y - 15)
+    espObjects[plr].Name.Visible = true
+
+    if not espObjects[plr].Health then
+        espObjects[plr].Health = CreateDrawing("Text",{Text="", Color=Color3.new(1,0,0), Size=14, Center=true, Outline=true, Visible=true})
+    end
+    espObjects[plr].Health.Position = Vector2.new(rootPos.X, rootPos.Y + 5)
+    espObjects[plr].Health.Text = math.floor(hum.Health).." / "..math.floor(hum.MaxHealth)
+    espObjects[plr].Health.Visible = true
+end
+
+task.spawn(function()
+    while task.wait(0.03) do
+        for _,plr in pairs(Players:GetPlayers()) do
+            if plr~=LocalPlayer and PlayerESP then
+                DrawPlayerESP(plr)
+            else
+                RemoveESP(plr)
+            end
+        end
+    end
+end)
+
+-- ======================
+-- Notification
+-- ======================
+Rayfield:Notify({
+    Title = "SCP GUI Loaded",
+    Content = "All features ready! WalkSpeed/Jump/Fly/ESP/CFrame active",
+    Duration = 5
+})
